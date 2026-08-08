@@ -30,7 +30,7 @@ const Footer = () => {
               <li><Link to="/tienda" className="hover:text-red-brand transition-colors">Tienda de Accesorios</Link></li>
               <li><Link to="/como-funciona" className="hover:text-red-brand transition-colors">Cómo Funciona</Link></li>
               <li><Link to="/registro" className="hover:text-red-brand transition-colors">Vender mi Moto</Link></li>
-              <li><Link to="/socios" className="hover:text-red-brand transition-colors font-medium">Súmate a nuestra red</Link></li>
+              <li><Link to="/sumate" className="hover:text-red-brand transition-colors font-medium">Súmate a nuestra red</Link></li>
             </ul>
           </div>
 

@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage';
 import CatalogPage from './pages/CatalogPage';
 import MotoDetailPage from './pages/MotoDetailPage';
 import HowItWorksPage from './pages/HowItWorksPage';
+import PartnersPage from './pages/PartnersPage';
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import ShopPage from './pages/ShopPage';
@@ -29,6 +30,8 @@ function App() {
               <Route path="/motos" element={<CatalogPage />} />
               <Route path="/motos/:id" element={<MotoDetailPage />} />
               <Route path="/como-funciona" element={<HowItWorksPage />} />
+              <Route path="/sumate" element={<PartnersPage />} />
+              <Route path="/partners" element={<PartnersPage />} />
               <Route path="/tienda" element={<ShopPage />} />
               <Route path="/registro" element={<RegisterPage />} />
               <Route path="/iniciar-sesion" element={<LoginPage />} />

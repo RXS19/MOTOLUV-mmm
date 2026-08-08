@@ -5,7 +5,16 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
+import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+
+let aiInstance: GoogleGenAI | null = null;
+function getAIInstance() {
+  if (!aiInstance && process.env.GEMINI_API_KEY) {
+    aiInstance = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return aiInstance;
+}
 
 const PORT = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'motoluv-super-secret-key-change-in-production';
@@ -526,20 +535,119 @@ async function startServer() {
 
   // Partners Route
   api.post('/partners', (req, res) => {
-    const { name, phone, location, email, message } = req.body;
+    const { name, position, company_name, category, phone, email, message } = req.body;
     const id = `partner_${Math.random().toString(36).slice(2, 10)}`;
     const appDoc: PartnerApp = {
       id,
       name,
       phone,
-      location,
+      location: category || 'socio',
       email,
-      message,
+      message: `[${position || 'Contacto'} - ${company_name || 'Empresa'}] ${message || ''}`,
       created_at: new Date().toISOString(),
       status: 'pending',
     };
     db.partners.set(id, appDoc);
     return res.json({ ok: true, id });
+  });
+
+  // Lu Chatbot Route
+  api.post('/chat', async (req, res) => {
+    try {
+      const { message, history } = req.body;
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ detail: 'Mensaje requerido' });
+      }
+
+      // Security check: Block attempts to retrieve confidential user data
+      const lower = message.toLowerCase();
+      if (
+        lower.includes('clabe') ||
+        lower.includes('contraseña') ||
+        lower.includes('password') ||
+        lower.includes('jwt') ||
+        lower.includes('token') ||
+        lower.includes('cuenta bancaria') ||
+        lower.includes('tarjeta') ||
+        lower.includes('cvv') ||
+        lower.includes('secret')
+      ) {
+        return res.json({
+          reply: 'Por políticas de privacidad y estricta seguridad, jamás puedo solicitar ni compartir información confidencial como números CLABE, contraseñas o datos de pago. 🔒 Si necesitas asistencia con tu cuenta, escribe a contacto@motoluv.mx',
+          confidentialBlocked: true,
+        });
+      }
+
+      // Prepare context of Motoluv
+      const activeMotos = Array.from(db.motos.values())
+        .filter((m) => m.status === 'active')
+        .map((m) => `• ${m.brand} ${m.model} (${m.year}) - $${m.price.toLocaleString()} MXN | ${m.km.toLocaleString()} km | Score: ${m.score}/10 | Ubicación: ${m.city}`);
+
+      const systemPrompt = `Eres "Lu", el asistente virtual oficial y mascota emblemática de Motoluv.
+Eres un lince audaz y carismático que usa una sudadera negra de Motoluv con capucha y botas de motociclista.
+Tu tono es amable, apasionado por las motos, servicial y profesional.
+
+REGLA DE SEGURIDAD ABSOLUTA:
+Jamás reveles o solicites información confidencial de usuarios (cuentas bancarias, contraseñas, datos personales privados, etc.).
+
+INFORMACIÓN DEL SITIO MOTOLUV:
+- Qué es Motoluv: El marketplace más seguro de compra y venta de motocicletas seminuevas en México.
+- Eslogan: SUBE · CONECTA · RUEDA.
+- Garantía Escrow: Motoluv resguarda el pago del comprador en una cuenta en garantía segura hasta que el comprador recibe y valida la moto.
+- Paquetes de Servicio:
+  1. Básico ($1,900 MXN): Inspección técnica con Score de 100 puntos y contrato digital.
+  2. Plus ($3,900 MXN): Básico + depósito en garantía seguro y validación de documentos.
+  3. Total ($5,900 MXN): Plus + traslado nacional garantizado hasta tu puerta.
+- Red de Socios ("Súmate a nuestra red"): Talleres mecánicos, tiendas de accesorios, agencias de motocicletas, financieras y organizadores de eventos pueden registrarse en la sección "/sumate".
+- Inventario actual de motocicletas disponibles:
+${activeMotos.slice(0, 10).join('\n')}
+
+- Tienda de equipamiento disponible (/tienda):
+Cascos de marcas reconocidas, chaquetas con armadura, guantes tácticos, intercomunicadores y accesorios.
+
+Responde siempre en español, de forma concisa, clara y amigable con emojis acordes (🏍️, 🐾, ⚡, 🛡️).`;
+
+      const ai = getAIInstance();
+      if (ai) {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.6-flash',
+          contents: [
+            { role: 'user', parts: [{ text: systemPrompt }] },
+            ...(Array.isArray(history) ? history.map((h: any) => ({
+              role: h.role === 'user' ? 'user' : 'model',
+              parts: [{ text: h.content }],
+            })) : []),
+            { role: 'user', parts: [{ text: message }] },
+          ],
+        });
+
+        const replyText = response.text || '¡Hola! Soy Lu 🐾. ¿En qué puedo ayudarte hoy sobre motos o accesorios en Motoluv?';
+        return res.json({ reply: replyText });
+      }
+
+      // Smart fallback response generator when AI key is absent
+      let fallback = '';
+      if (lower.includes('hola') || lower.includes('saludos') || lower.includes('buenos')) {
+        fallback = '¡Hola, Biker! 🐾 Soy Lu, el asistente virtual de Motoluv. ¿Buscas comprar una moto, equiparte en la tienda o registrar tu negocio en nuestra red de aliados? Cuéntame y con gusto te asesoro. 🏍️';
+      } else if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catálogo') || lower.includes('catalogo')) {
+        fallback = `En Motoluv contamos con un catálogo certificado con score de 100 puntos 🏁. Algunas opciones disponibles hoy:\n\n${activeMotos.slice(0, 3).join('\n')}\n\nPuedes consultar el inventario completo en la pestaña "Catálogo" (/motos).`;
+      } else if (lower.includes('accesorio') || lower.includes('casco') || lower.includes('tienda') || lower.includes('chaqueta')) {
+        fallback = 'En nuestra Tienda Oficial (/tienda) encontrarás cascos certificados, chaquetas con protección, guantes y equipamiento de alta calidad 🛡️.';
+      } else if (lower.includes('red') || lower.includes('sumate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
+        fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller, tienda de accesorios, agencia de motocicletas, financiera u organizas eventos, ingresa a "/sumate" para registrar tus datos y conectarte con miles de motociclistas.';
+      } else if (lower.includes('paquete') || lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro') || lower.includes('escrow')) {
+        fallback = 'En Motoluv tu dinero está 100% seguro con nuestro sistema de depósito en garantía (Escrow) 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con envío nacional).';
+      } else {
+        fallback = '¡Con gusto te orientó! 🐾 En Motoluv puedes comprar o vender motos seminuevas garantizadas, adquirir accesorios o sumar tu taller o negocio a nuestra red en la sección "/sumate". ¿Qué te gustaría consultar?';
+      }
+
+      return res.json({ reply: fallback });
+    } catch (err: any) {
+      console.error('Chat API Error:', err);
+      return res.json({
+        reply: '¡Ups! Ocurrió un pequeño inconveniente en el camino ⚡. Pero puedes explorar nuestro catálogo de motos en /motos o ingresar a la tienda.',
+      });
+    }
   });
 
   // Seed Route

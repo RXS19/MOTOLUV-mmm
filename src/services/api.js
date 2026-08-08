@@ -61,5 +61,9 @@ export const partnerApi = {
   apply: (data) => api.post('/partners', data).then((r) => r.data),
 };
 
+export const chatApi = {
+  send: (message, history = []) => api.post('/chat', { message, history }).then((r) => r.data),
+};
+
 export default api;
 

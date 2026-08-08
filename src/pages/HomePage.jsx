@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowDown, Clock, Users, Shield, Wrench, Sparkles, CheckCircle, Eye, FileText } from 'lucide-react';
+import { ArrowRight, ArrowDown, Clock, Users, Shield, Wrench, Sparkles, CheckCircle, Eye, FileText, Handshake } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
 
@@ -55,8 +55,8 @@ const HomePage = () => {
         <div className="absolute inset-0 hero-vignette opacity-80" />
 
         <div className="relative z-10 max-w-5xl mx-auto px-5 lg:px-8 text-center py-24">
-          <div className="inline-flex items-center gap-2 border border-red-brand/60 text-red-brand text-[11px] tracking-widest uppercase px-3.5 py-2 rounded-full mb-10">
-            <Clock size={12} /> Próximamente — Regístrate
+          <div className="inline-flex items-center justify-center border border-red-brand/60 text-red-brand text-[11px] font-bold tracking-widest uppercase px-4 py-2 rounded-full mb-10">
+            SUBE · CONECTA · RUEDA
           </div>
 
           <h1 className="hero-title text-white text-5xl md:text-7xl lg:text-8xl uppercase">
@@ -204,9 +204,13 @@ const HomePage = () => {
           <p className="text-zinc-300 mt-6 max-w-xl mx-auto text-base leading-relaxed">
             Desde el catálogo hasta la entrega, todo ocurre dentro de Motoluv. Ficha técnica, score mecánico, asesor, documentación y seguimiento en un solo lugar.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link to="/registro" className="btn-red group inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm">
               Crear cuenta gratis <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link to="/sumate" className="btn-outline inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm border-[#E10600]/60 text-white hover:border-[#E10600]">
+              <Handshake size={16} className="text-[#E10600]" />
+              Súmate a nuestra red
             </Link>
             <Link to="/motos" className="btn-outline inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm">
               Explorar catálogo

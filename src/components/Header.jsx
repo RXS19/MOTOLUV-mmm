@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bike, Store, HelpCircle, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, User } from 'lucide-react';
+import { Bike, Store, HelpCircle, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, User, Handshake } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
@@ -25,6 +25,7 @@ const Header = () => {
     { to: '/motos', label: 'Catálogo', icon: Bike },
     { to: '/tienda', label: 'Tienda', icon: Store },
     { to: '/como-funciona', label: 'Cómo Funciona', icon: HelpCircle },
+    { to: '/sumate', label: 'Súmate a la Red', icon: Handshake },
   ];
 
   const doLogout = () => {
