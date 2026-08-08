@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, MapPin, Star, Wrench } from 'lucide-react';
+import { getStatusStyle } from '../utils/status';
 
 const MotoCard = ({ moto, showScore = true }) => {
+  const style = getStatusStyle(moto.status);
+
   return (
     <Link
       to={`/motos/${moto.id}`}
@@ -11,11 +14,17 @@ const MotoCard = ({ moto, showScore = true }) => {
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
         <img src={moto.image} alt={`${moto.brand} ${moto.model}`} className="w-full h-full object-cover" />
 
-        {moto.featured && (
-          <div className="absolute top-3 left-3 bg-red-brand text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-sm flex items-center gap-1">
-            <Wrench size={10} /> DESTACADA
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+          {moto.featured && (
+            <div className="bg-red-brand text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-sm flex items-center gap-1 shadow">
+              <Wrench size={10} /> DESTACADA
+            </div>
+          )}
+          <div className={`bg-black/80 backdrop-blur px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow ${style.badgeClass}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
+            {style.label}
           </div>
-        )}
+        </div>
 
         {showScore && moto.score && (
           <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur text-white text-xs font-medium px-2 py-1 rounded-sm flex items-center gap-1">
@@ -66,6 +75,14 @@ const MotoCard = ({ moto, showScore = true }) => {
             </span>
           </div>
         )}
+
+        {/* Apartado Badge Callout */}
+        <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs bg-red-brand/10 -mx-4 -mb-4 px-4 py-2.5 border-t border-red-brand/20">
+          <span className="text-zinc-300 font-medium text-[11px]">Aparta por solo <strong className="text-white">$600 MXN</strong></span>
+          <span className="text-red-brand font-bold uppercase tracking-wider text-[10px] bg-red-brand/10 border border-red-brand/30 px-2 py-0.5 rounded-sm">
+            Apartar
+          </span>
+        </div>
       </div>
     </Link>
   );

@@ -56,11 +56,44 @@ interface User {
   passwordHash: string;
   created_at: string;
   avatar?: string;
+  provider?: string;
+  buyer_profile?: {
+    shipping_city?: string;
+    favorites?: string[];
+  };
+  seller_profile?: {
+    store_name?: string;
+    rfc?: string;
+    bank_clabe?: string;
+    bank_name?: string;
+    bank_holder?: string;
+    rating?: number;
+    total_sales?: number;
+  };
   rating: number;
   operations: number;
   bank_clabe?: string;
   bank_name?: string;
   bank_holder?: string;
+}
+
+function getCommissionRate(price: number): number {
+  if (price <= 30000) return 0.10;
+  if (price <= 50000) return 0.08;
+  if (price <= 150000) return 0.07;
+  if (price <= 300000) return 0.06;
+  return 0.05;
+}
+
+function calculateCommission(price: number) {
+  const rate = getCommissionRate(price);
+  const amount = Math.round(price * rate);
+  const net = Math.max(0, price - amount);
+  return {
+    commission_rate: rate,
+    commission_amount: amount,
+    net_payout: net,
+  };
 }
 
 interface Moto {
@@ -76,6 +109,9 @@ interface Moto {
   category: string;
   city: string;
   price: number;
+  commission_rate: number;
+  commission_amount: number;
+  net_payout: number;
   description: string;
   images: string[];
   image: string;
@@ -130,9 +166,21 @@ function sanitizeUser(u: User) {
     name: u.name,
     phone: u.phone,
     city: u.city,
-    role: u.role,
+    role: u.role || 'both',
     created_at: u.created_at,
     avatar: u.avatar,
+    provider: u.provider || 'email',
+    buyer_profile: u.buyer_profile || {
+      shipping_city: u.city || '',
+      favorites: [],
+    },
+    seller_profile: u.seller_profile || {
+      bank_clabe: u.bank_clabe || '',
+      bank_name: u.bank_name || '',
+      bank_holder: u.bank_holder || '',
+      rating: u.rating || 5.0,
+      total_sales: u.operations || 0,
+    },
     rating: u.rating,
     operations: u.operations,
     bank_clabe: u.bank_clabe,
@@ -207,6 +255,10 @@ function seedDatabase() {
       motoImages[(i + 2) % motoImages.length],
       motoImages[(i + 3) % motoImages.length],
     ];
+    const comm = calculateCommission(s.price);
+    const statuses = ['Publicada', 'Publicada', 'Apartada', 'Certificación', 'Oferta', 'Proceso de entrega', 'Entregada', 'Vendida'];
+    const assignedStatus = statuses[i % statuses.length];
+
     const moto: Moto = {
       id,
       owner_id: sellerId,
@@ -220,6 +272,9 @@ function seedDatabase() {
       category: s.category,
       city: s.city,
       price: s.price,
+      commission_rate: comm.commission_rate,
+      commission_amount: comm.commission_amount,
+      net_payout: comm.net_payout,
       description: `Excelente ${s.brand} ${s.model} en muy buen estado. Mantenimientos al día en agencia. Ideal para quien busca una moto ${s.category.toLowerCase()} confiable y con historial verificado.`,
       images: imgs,
       image: imgs[0],
@@ -227,7 +282,7 @@ function seedDatabase() {
       rating: s.rating,
       views: s.views,
       featured: s.featured,
-      status: 'active',
+      status: assignedStatus,
       created_at: new Date(Date.now() - i * 3600000).toISOString(),
       score_details: {
         Motor: Math.min(100, 70 + ((i * 3) % 30)),
@@ -317,6 +372,43 @@ async function startServer() {
     return res.json({ access_token: token, token_type: 'bearer', user: sanitizeUser(user) });
   });
 
+  api.post('/auth/oauth', (req, res) => {
+    const { provider, email, name, avatar } = req.body;
+    if (!email) {
+      return res.status(400).json({ detail: 'Email de OAuth no provisto' });
+    }
+
+    let user = db.usersByEmail.get(email);
+    if (!user) {
+      const id = `user_${Math.random().toString(36).slice(2, 10)}`;
+      user = {
+        id,
+        email,
+        name: name || email.split('@')[0],
+        phone: '',
+        city: 'Ciudad de México',
+        role: 'both',
+        passwordHash: '',
+        created_at: new Date().toISOString(),
+        avatar: avatar || '',
+        provider: provider || 'google',
+        buyer_profile: { shipping_city: 'Ciudad de México', favorites: [] },
+        seller_profile: { rating: 5.0, total_sales: 0 },
+        rating: 5.0,
+        operations: 0,
+      };
+      db.users.set(id, user);
+      db.usersByEmail.set(email, user);
+    } else {
+      user.role = 'both';
+      user.provider = provider || user.provider;
+      if (avatar && !user.avatar) user.avatar = avatar;
+    }
+
+    const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    return res.json({ access_token: token, token_type: 'bearer', user: sanitizeUser(user) });
+  });
+
   api.get('/auth/me', authenticateToken, (req, res) => {
     return res.json(sanitizeUser((req as any).user));
   });
@@ -349,8 +441,15 @@ async function startServer() {
 
   // Moto Routes
   api.get('/motos', (req, res) => {
-    const { brand, category, city, q, featured, limit } = req.query;
-    let list = Array.from(db.motos.values()).filter((m) => m.status === 'active');
+    const { brand, category, city, q, featured, limit, status } = req.query;
+    let list = Array.from(db.motos.values());
+
+    if (status) {
+      list = list.filter((m) => m.status === status);
+    } else {
+      // By default list active operations (Publicada, active, Apartada, Certificación, Oferta, Proceso de entrega)
+      list = list.filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada');
+    }
 
     if (brand) list = list.filter((m) => m.brand === brand);
     if (category) list = list.filter((m) => m.category === category);
@@ -386,6 +485,9 @@ async function startServer() {
     const imgs = images && images.length > 0 ? images : [defaultImg];
     const id = `moto_${Math.random().toString(36).slice(2, 10)}`;
 
+    const numericPrice = parseInt(price, 10) || 0;
+    const comm = calculateCommission(numericPrice);
+
     const moto: Moto = {
       id,
       owner_id: user.id,
@@ -398,7 +500,10 @@ async function startServer() {
       engine: engine || '',
       category: category || 'Naked',
       city: city || '',
-      price: parseInt(price, 10) || 0,
+      price: numericPrice,
+      commission_rate: comm.commission_rate,
+      commission_amount: comm.commission_amount,
+      net_payout: comm.net_payout,
       description: description || '',
       images: imgs,
       image: imgs[0],
@@ -406,7 +511,7 @@ async function startServer() {
       rating: 5,
       views: 0,
       featured: false,
-      status: 'active',
+      status: 'Publicada',
       created_at: new Date().toISOString(),
       score_details: {
         Motor: 85,
@@ -464,15 +569,18 @@ async function startServer() {
   // Offer Routes
   api.post('/offers', authenticateToken, (req, res) => {
     const user = (req as any).user as User;
-    const { moto_id, amount, package: pkg, message } = req.body;
+    const { moto_id, amount, package: pkg, message, is_apartado } = req.body;
     const moto = db.motos.get(moto_id);
     if (!moto) return res.status(404).json({ detail: 'Moto no encontrada' });
     if (moto.owner_id === user.id) {
-      return res.status(400).json({ detail: 'No puedes ofertar en tu propia moto' });
+      return res.status(400).json({ detail: 'No puedes ofertar o apartar tu propia moto' });
     }
 
     const id = `offer_${Math.random().toString(36).slice(2, 10)}`;
-    const offer: Offer = {
+    const parsedAmount = parseInt(amount, 10) || 600;
+    const isApartado = Boolean(is_apartado || parsedAmount === 600);
+
+    const offer: any = {
       id,
       moto_id,
       buyer_id: user.id,
@@ -481,12 +589,17 @@ async function startServer() {
       moto_brand: moto.brand,
       moto_model: moto.model,
       moto_image: moto.image,
-      amount: parseInt(amount, 10),
+      amount: parsedAmount,
       package: pkg || 'plus',
       message: message || '',
-      status: 'pending',
+      status: isApartado ? 'accepted' : 'pending',
+      is_apartado: isApartado,
       created_at: new Date().toISOString(),
     };
+
+    if (isApartado) {
+      moto.status = 'Apartada';
+    }
 
     db.offers.set(id, offer);
     return res.json(offer);

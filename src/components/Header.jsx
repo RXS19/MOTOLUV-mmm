@@ -9,7 +9,7 @@ const Header = () => {
   const [open, setOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const { user, logout, updateRole } = useAuth();
+  const { user, logout, activeView, setActiveView } = useAuth();
 
   useEffect(() => {
     const handler = (e) => {
@@ -22,10 +22,9 @@ const Header = () => {
   const isActive = (p) => location.pathname === p || (p !== '/' && location.pathname.startsWith(p));
 
   const navItems = [
-    { to: '/motos', label: 'Catálogo', icon: Bike },
-    { to: '/tienda', label: 'Tienda', icon: Store },
     { to: '/como-funciona', label: 'Cómo Funciona', icon: HelpCircle },
-    { to: '/sumate', label: 'Súmate a la Red', icon: Handshake },
+    { to: '/motos', label: 'Motocicletas', icon: Bike },
+    { to: '/tienda', label: 'Tienda', icon: Store },
   ];
 
   const doLogout = () => {
@@ -34,11 +33,12 @@ const Header = () => {
     navigate('/');
   };
 
-  const switchRole = async () => {
-    const target = user.role === 'vendedor' ? 'comprador' : 'vendedor';
-    await updateRole(target);
+  const toggleProfileView = () => {
+    const nextView = activeView === 'vendedor' ? 'comprador' : 'vendedor';
+    setActiveView(nextView);
     setDropdownOpen(false);
-    navigate('/panel');
+    if (nextView === 'comprador') navigate('/panel/mis-ofertas');
+    else navigate('/panel');
   };
 
   const firstName = user?.name?.split(' ')[0] || 'Usuario';
@@ -90,25 +90,23 @@ const Header = () => {
 
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-[#111112] border border-white/10 rounded-md shadow-xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-white/5">
+                  <div className="px-4 py-3 border-b border-white/5 bg-[#0a0a0a]">
                     <div className="text-white text-sm font-medium">{user.name}</div>
                     <div className="text-zinc-500 text-xs truncate">{user.email}</div>
-                    <div className="text-red-brand text-[10px] tracking-widest uppercase mt-1">
-                      {user.role === 'vendedor' ? 'Vendedor' : user.role === 'both' ? 'Vendedor & Comprador' : 'Comprador'}
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-brand/10 border border-red-brand/30 text-red-brand">
+                      {activeView === 'vendedor' ? '🏍️ Perfil Vendedor' : '🛒 Perfil Comprador'}
                     </div>
                   </div>
                   <div className="py-2">
-                    <DropdownLink to="/panel" icon={LayoutDashboard} label="Panel de Control" onClick={() => setDropdownOpen(false)} />
-                    <DropdownLink to="/panel/mis-ofertas" icon={Tag} label="Mis Ofertas" onClick={() => setDropdownOpen(false)} />
-                    {(user.role === 'vendedor' || user.role === 'both') && (
-                      <DropdownLink to="/panel/mis-motos" icon={Bike} label="Mis Motos" onClick={() => setDropdownOpen(false)} />
-                    )}
+                    <DropdownLink to="/panel" icon={LayoutDashboard} label="Panel de Vendedor" onClick={() => { setActiveView('vendedor'); setDropdownOpen(false); }} />
+                    <DropdownLink to="/panel/mis-ofertas" icon={Tag} label="Mis Ofertas (Comprador)" onClick={() => { setActiveView('comprador'); setDropdownOpen(false); }} />
+                    <DropdownLink to="/panel/mis-motos" icon={Bike} label="Mis Publicaciones" onClick={() => { setActiveView('vendedor'); setDropdownOpen(false); }} />
                   </div>
                   <div className="border-t border-white/5 py-2">
-                    <button onClick={switchRole} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-brand hover:bg-white/5 transition-colors">
-                      <Repeat size={14} /> {user.role === 'vendedor' ? 'Cambiar a Comprador' : 'Crear perfil de Vendedor'}
+                    <button onClick={toggleProfileView} className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-bold tracking-wider uppercase text-zinc-300 hover:text-white hover:bg-white/5 transition-colors">
+                      <Repeat size={14} className="text-red-brand" /> {activeView === 'vendedor' ? 'Cambiar a Vista Comprador' : 'Cambiar a Vista Vendedor'}
                     </button>
-                    <button onClick={doLogout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-brand hover:bg-white/5 transition-colors">
+                    <button onClick={doLogout} className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-bold tracking-wider uppercase text-red-brand hover:bg-white/5 transition-colors">
                       <LogOut size={14} /> Cerrar Sesión
                     </button>
                   </div>

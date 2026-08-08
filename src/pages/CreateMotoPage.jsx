@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bike, ArrowLeft, ImagePlus, X, Save, Upload, Camera } from 'lucide-react';
+import { Bike, ArrowLeft, ImagePlus, X, Save, Upload, Camera, Calculator, DollarSign, Info } from 'lucide-react';
 import { motoApi, uploadApi, resolveImageUrl } from '../services/api';
 import { toast } from '../hooks/use-toast';
+import { calculateCommission } from '../utils/commission';
 
 const BRANDS = ['Honda', 'Yamaha', 'Kawasaki', 'Suzuki', 'Ducati', 'Harley-Davidson', 'BMW', 'KTM', 'Triumph', 'Aprilia', 'Otra'];
 const CATEGORIES = ['Deportiva', 'Naked', 'Cruiser', 'Adventure', 'Scooter', 'Touring', 'Trail', 'Custom'];
@@ -120,9 +121,47 @@ const CreateMotoPage = () => {
         </section>
 
         <section>
-          <SectionTitle>Precio</SectionTitle>
-          <div className="mt-4">
-            <TextField label="Precio (MXN)" type="number" value={form.price} onChange={(v) => update('price', v)} placeholder="95000" required />
+          <SectionTitle icon={DollarSign}>Precio y Desglose de Comisión</SectionTitle>
+          <div className="mt-4 space-y-4">
+            <TextField label="Precio de Publicación (MXN)" type="number" value={form.price} onChange={(v) => update('price', v)} placeholder="95000" required />
+
+            {form.price && Number(form.price) > 0 && (() => {
+              const comm = calculateCommission(form.price);
+              return (
+                <div className="p-4 bg-[#0a0a0a] border border-red-brand/30 rounded-md space-y-3">
+                  <div className="flex items-center justify-between text-xs text-zinc-400 border-b border-white/5 pb-2">
+                    <span className="flex items-center gap-1.5 font-medium text-white">
+                      <Calculator size={14} className="text-red-brand" /> Regla de Comisión Aplicada
+                    </span>
+                    <span className="bg-red-brand/10 text-red-brand font-bold px-2 py-0.5 rounded-sm border border-red-brand/30">
+                      Tasa del {comm.percentageLabel}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                    <div className="bg-[#111112] p-2.5 rounded-sm border border-white/5">
+                      <span className="text-zinc-500 block text-[10px] uppercase">Precio Publicado</span>
+                      <span className="text-white font-bold text-sm">${comm.price.toLocaleString()} MXN</span>
+                    </div>
+
+                    <div className="bg-[#111112] p-2.5 rounded-sm border border-white/5">
+                      <span className="text-zinc-500 block text-[10px] uppercase">Comisión Motoluv ({comm.percentageLabel})</span>
+                      <span className="text-red-brand font-bold text-sm">-${comm.commissionAmount.toLocaleString()} MXN</span>
+                    </div>
+
+                    <div className="bg-emerald-500/10 p-2.5 rounded-sm border border-emerald-500/30 col-span-2 md:col-span-1">
+                      <span className="text-emerald-400 block text-[10px] uppercase font-bold">Tu Depósito Neto</span>
+                      <span className="text-emerald-300 font-bold text-sm">${comm.netEarnings.toLocaleString()} MXN</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 text-[11px] text-zinc-500 pt-1">
+                    <Info size={12} className="text-zinc-400 mt-0.5 flex-shrink-0" />
+                    <span>La comisión se descuenta únicamente al momento de concretar la venta y liberación del depósito en garantía.</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </section>
 
