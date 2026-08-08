@@ -165,9 +165,11 @@ const MotoDetailPage = () => {
                 <Wrench size={11} /> DESTACADA
               </div>
             )}
-            <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur text-white text-sm font-medium px-3 py-1.5 rounded-sm flex items-center gap-1.5">
-              <Wrench size={13} className="text-red-brand" /> Score {moto.score.toFixed(1)}/5
-            </div>
+            {user && moto.score && (
+              <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur text-white text-sm font-medium px-3 py-1.5 rounded-sm flex items-center gap-1.5">
+                <Wrench size={13} className="text-red-brand" /> Score {moto.score.toFixed(1)}/5
+              </div>
+            )}
             <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-white text-xs px-3 py-1.5 rounded-sm flex items-center gap-1.5">
               <Eye size={12} /> {moto.views} vistas
             </div>
@@ -199,34 +201,36 @@ const MotoDetailPage = () => {
             </div>
           </div>
 
-          <div className="mt-10">
-            <h2 className="font-display font-bold text-white text-2xl uppercase tracking-wide mb-5 flex items-center gap-3">
-              Score mecánico <span className="text-red-brand text-lg">{moto.score.toFixed(1)}/5</span>
-            </h2>
-            <div className="bg-[#111112] border border-white/5 rounded-md p-6 space-y-4">
-              {Object.entries(moto.score_details || {}).map(([k, v]) => (
-                <div key={k}>
-                  <div className="flex items-center justify-between text-sm mb-1.5">
-                    <span className="text-zinc-300">{k}</span>
-                    <span className="text-white font-medium">{v}%</span>
+          {user && moto.score && (
+            <div className="mt-10">
+              <h2 className="font-display font-bold text-white text-2xl uppercase tracking-wide mb-5 flex items-center gap-3">
+                Score mecánico <span className="text-red-brand text-lg">{moto.score.toFixed(1)}/5</span>
+              </h2>
+              <div className="bg-[#111112] border border-white/5 rounded-md p-6 space-y-4">
+                {Object.entries(moto.score_details || {}).map(([k, v]) => (
+                  <div key={k}>
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <span className="text-zinc-300">{k}</span>
+                      <span className="text-white font-medium">{v}%</span>
+                    </div>
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-red-brand rounded-full transition-all" style={{ width: `${v}%` }} />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-red-brand rounded-full transition-all" style={{ width: `${v}%` }} />
-                  </div>
-                </div>
-              ))}
-              <p className="text-xs text-zinc-500 pt-3 border-t border-white/5">
-                Evaluación realizada por mecánicos certificados Motoluv.
-              </p>
+                ))}
+                <p className="text-xs text-zinc-500 pt-3 border-t border-white/5">
+                  Evaluación realizada por mecánicos certificados Motoluv.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="space-y-5">
           <div className="bg-[#111112] border border-white/5 rounded-md p-6">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="text-xs text-zinc-500 uppercase tracking-widest">{moto.category}</span>
-              {(() => {
+              {Boolean(user && (user.id === moto.owner_id || user.id === moto.ownerId || user.id === moto.buyer_id || hasApartado)) && (() => {
                 const style = getStatusStyle(moto.status);
                 return (
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${style.badgeClass}`}>
@@ -314,44 +318,13 @@ const MotoDetailPage = () => {
             )}
           </div>
 
-          {/* PASO 2: DESPLEGAR PAQUETES DE PROTECCIÓN (SOLO SI YA APARTÓ) */}
-          <div className="bg-[#111112] border border-white/5 rounded-md p-6 relative">
-            <h3 className="font-display font-bold text-white uppercase tracking-wide text-sm mb-4 flex items-center gap-2">
-              <Shield size={16} className="text-red-brand" /> Paquetes de Protección
-            </h3>
+          {/* PASO 2: DESPLEGAR PAQUETES DE PROTECCIÓN (ÚNICAMENTE SI YA APARTÓ) */}
+          {hasApartado && (
+            <div className="bg-[#111112] border border-white/5 rounded-md p-6 relative">
+              <h3 className="font-display font-bold text-white uppercase tracking-wide text-sm mb-4 flex items-center gap-2">
+                <Shield size={16} className="text-red-brand" /> Paquetes de Protección
+              </h3>
 
-            {!hasApartado ? (
-              /* BLOQUEADO SI NO HA REALIZADO APARTADO DE $600 */
-              <div className="relative">
-                <div className="p-4 bg-[#0a0a0a] border border-amber-500/30 rounded-sm mb-4 flex items-start gap-3">
-                  <Lock size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs space-y-1">
-                    <div className="font-bold text-amber-400 uppercase tracking-wider">Desbloqueo tras apartado</div>
-                    <p className="text-zinc-400 leading-relaxed text-[11px]">
-                      Los paquetes de protección solo se despliegan una vez que el cliente haya realizado su apartado de $600 MXN como usuario registrado.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Previsualización deshabilitada */}
-                <div className="opacity-40 pointer-events-none space-y-2 filter blur-[1px]">
-                  {[
-                    { name: 'Básico', price: 'Gratis' },
-                    { name: 'Plus', price: '$1,800 MXN', rec: true },
-                    { name: 'Total', price: '$3,500 MXN' },
-                  ].map((p, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 border border-white/10 rounded-sm bg-[#0a0a0a]">
-                      <div className="flex items-center gap-2 text-zinc-400 text-xs">
-                        <input type="radio" disabled checked={p.rec} />
-                        <span>{p.name}</span>
-                      </div>
-                      <span className="text-zinc-500 text-xs">{p.price}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* DESBLOQUEADO Y ACTIVO TRAS EL APARTADO */
               <div className="space-y-4">
                 <div className="text-xs text-zinc-400 leading-relaxed">
                   Elige el nivel de cobertura e inspección mecánica antes de finalizar la compra:
@@ -394,12 +367,12 @@ const MotoDetailPage = () => {
                   {offerLoading ? 'Guardando...' : 'Confirmar Paquete y Oferta'}
                 </button>
               </div>
-            )}
 
-            <button className="btn-outline mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
-              <MessageCircle size={13} /> Contactar asesor Motoluv
-            </button>
-          </div>
+              <button className="btn-outline mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
+                <MessageCircle size={13} /> Contactar asesor Motoluv
+              </button>
+            </div>
+          )}
 
           {/* VENDEDOR */}
           <div className="bg-[#111112] border border-white/5 rounded-md p-6">

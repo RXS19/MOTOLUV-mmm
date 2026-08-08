@@ -53,18 +53,26 @@ const SellerDashboard = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-5 lg:px-8 py-10 space-y-8">
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="font-display font-bold text-white text-3xl md:text-4xl uppercase">
-            Panel de <span className="text-red-brand">Vendedor</span>
-          </h1>
-          <p className="text-zinc-400 mt-1 text-sm">Bienvenido, {user?.name}</p>
+    <div className="relative min-h-screen py-10">
+      {/* Background Favicon overlay for Sellers */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-40 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url('/favicon.jpg')` }}
+      />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0a0a0c]/50 via-[#0a0a0c]/70 to-[#0a0a0c]" />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-5 lg:px-8 space-y-8">
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="font-display font-bold text-white text-3xl md:text-4xl uppercase">
+              Panel de <span className="text-red-brand">Vendedor</span>
+            </h1>
+            <p className="text-zinc-400 mt-1 text-sm">Bienvenido, {user?.name}</p>
+          </div>
+          <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
+            <Plus size={14} /> Nueva Publicación
+          </Link>
         </div>
-        <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
-          <Plus size={14} /> Nueva Publicación
-        </Link>
-      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s, i) => <StatCard key={i} {...s} />)}
@@ -239,6 +247,7 @@ const SellerDashboard = () => {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 };

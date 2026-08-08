@@ -2,9 +2,25 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, MapPin, Star, Wrench } from 'lucide-react';
 import { getStatusStyle } from '../utils/status';
+import { useAuth } from '../context/AuthContext';
 
-const MotoCard = ({ moto, showScore = true }) => {
+const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
+  const { user } = useAuth();
   const style = getStatusStyle(moto.status);
+
+  // Status tags are ONLY visible to the owner of the listing or the linked buyer
+  const isOwnerOrLinkedBuyer = Boolean(
+    user && (
+      user.id === moto.owner_id ||
+      user.id === moto.ownerId ||
+      user.id === moto.buyer_id ||
+      moto.is_linked_buyer ||
+      showStatus
+    )
+  );
+
+  // Score is ONLY visible if user is logged in
+  const canSeeScore = Boolean(user && showScore);
 
   return (
     <Link
@@ -20,13 +36,15 @@ const MotoCard = ({ moto, showScore = true }) => {
               <Wrench size={10} /> DESTACADA
             </div>
           )}
-          <div className={`bg-black/80 backdrop-blur px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow ${style.badgeClass}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
-            {style.label}
-          </div>
+          {isOwnerOrLinkedBuyer && (
+            <div className={`bg-black/80 backdrop-blur px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow ${style.badgeClass}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
+              {style.label}
+            </div>
+          )}
         </div>
 
-        {showScore && moto.score && (
+        {canSeeScore && moto.score && (
           <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur text-white text-xs font-medium px-2 py-1 rounded-sm flex items-center gap-1">
             <Wrench size={11} className="text-red-brand" /> {moto.score.toFixed(1)}/5
           </div>
@@ -65,7 +83,7 @@ const MotoCard = ({ moto, showScore = true }) => {
           </span>
         </div>
 
-        {showScore && moto.rating && (
+        {canSeeScore && moto.rating && (
           <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
             <span className="text-zinc-500 flex items-center gap-1"><Wrench size={11} /> Score Mecánico</span>
             <span className="flex gap-0.5">
