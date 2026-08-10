@@ -54,12 +54,12 @@ const SellerDashboard = () => {
 
   return (
     <div className="relative min-h-screen py-10">
-      {/* Background Favicon overlay for Sellers */}
+      {/* Background overlay for Sellers with dark motorcycle aesthetic */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-40 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url('/favicon.jpg')` }}
+        className="absolute inset-0 pointer-events-none opacity-40 bg-cover bg-center bg-no-repeat transition-all duration-500"
+        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=1920&q=80')` }}
       />
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0a0a0c]/50 via-[#0a0a0c]/70 to-[#0a0a0c]" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0a0a0c]/60 via-[#0a0a0c]/75 to-[#0a0a0c]" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-5 lg:px-8 space-y-8">
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -100,7 +100,7 @@ const SellerDashboard = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-zinc-300">
-              <thead className="bg-[#0a0a0a] uppercase text-[10px] tracking-wider text-zinc-500 border-b border-white/5">
+              <thead className="bg-[#0a0a0a] uppercase text-[10px] tracking-wider text-zinc-500">
                 <tr>
                   <th className="py-3 px-4">Moto / Publicación</th>
                   <th className="py-3 px-4">Precio Publicado</th>
@@ -109,7 +109,7 @@ const SellerDashboard = () => {
                   <th className="py-3 px-4 text-right">Cambiar Estatus</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody>
                 {motos.map((m) => {
                   const comm = calculateCommission(m.price);
                   const style = getStatusStyle(m.status);

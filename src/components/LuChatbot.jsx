@@ -20,7 +20,7 @@ const LuChatbot = () => {
         {
           id: 'welcome_1',
           sender: 'lu',
-          text: '¡Hola! Soy Lu, tu asistente oficial de Motoluv 🐾 👋. ¿En qué puedo ayudarte hoy?',
+          text: '¡Hola! Soy Lu, tu asistente oficial de Motoluv. ¿En qué puedo ayudarte hoy?',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -129,26 +129,15 @@ const LuChatbot = () => {
         </div>
       )}
 
-      {/* Floating Trigger Button */}
+      {/* Floating Trigger Button (Avatar only) */}
       {!isOpen && (
         <button
           onClick={toggleChat}
-          className="group relative flex items-center gap-3 p-2 pr-4 bg-[#111112] border border-[#E10600]/60 hover:border-[#E10600] rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95"
+          className="group relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#E10600] bg-black shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-none ring-2 ring-black/50"
           aria-label="Abrir chat con Lu"
         >
-          <div className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-[#E10600] bg-black">
-            <img src="/lu-avatar.jpg" alt="Lu Mascot" className="w-full h-full object-cover" />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-black rounded-full" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-white text-xs font-bold font-display uppercase tracking-wider flex items-center gap-1">
-              Lu <span className="text-[10px] text-[#E10600] font-normal font-sans">IA</span>
-            </span>
-            <span className="text-[10px] text-zinc-400">Asistente Motoluv</span>
-          </div>
-          <div className="w-7 h-7 rounded-full bg-[#E10600]/10 border border-[#E10600]/40 flex items-center justify-center text-[#E10600] group-hover:bg-[#E10600] group-hover:text-white transition-colors">
-            <MessageSquare size={14} />
-          </div>
+          <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
+          <span className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-black rounded-full" />
         </button>
       )}
 
@@ -164,7 +153,7 @@ const LuChatbot = () => {
               </div>
               <div>
                 <div className="text-white text-sm font-bold font-display uppercase tracking-wider flex items-center gap-1.5">
-                  Lu <span className="text-[10px] bg-[#E10600]/20 text-[#E10600] px-1.5 py-0.5 rounded border border-[#E10600]/40">Motoluv AI</span>
+                  Lu <span className="text-[10px] bg-[#E10600]/20 text-[#E10600] px-1.5 py-0.5 rounded border border-[#E10600]/40">Asistente</span>
                 </div>
                 <div className="text-[11px] text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

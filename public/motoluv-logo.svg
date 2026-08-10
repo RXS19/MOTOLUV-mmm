@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" style="background:#000000;">
+  <defs>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@1,900&amp;family=Orbitron:wght@800;900&amp;display=swap");
+      .moto-text { font-family: "Orbitron", "Montserrat", sans-serif; font-weight: 900; font-style: italic; fill: #FFFFFF; font-size: 82px; letter-spacing: -1px; }
+      .luv-text { font-family: "Orbitron", "Montserrat", sans-serif; font-weight: 900; font-style: italic; fill: #FFFFFF; font-size: 82px; letter-spacing: -1px; }
+      .slogan-text { font-family: "Orbitron", "Montserrat", sans-serif; font-weight: 900; fill: #E10600; font-size: 28px; letter-spacing: 7px; }
+    </style>
+  </defs>
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#000000" />
+  
+  <!-- Logo Group -->
+  <g transform="translate(400, 130)" text-anchor="middle">
+    <!-- MOTO -->
+    <text x="-165" y="25" class="moto-text" text-anchor="end">MOTO</text>
+    
+    <!-- Red Pill Badge for LUV -->
+    <rect x="-155" y="-55" width="310" height="105" rx="20" ry="20" fill="#E10600" />
+    
+    <!-- LUV -->
+    <text x="0" y="25" class="luv-text" text-anchor="middle">LUV</text>
+  </g>
+  
+  <!-- Slogan -->
+  <text x="400" y="235" class="slogan-text" text-anchor="middle">SUBE CONECTA RUEDA</text>
+</svg>

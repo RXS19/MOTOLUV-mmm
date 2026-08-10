@@ -66,10 +66,10 @@ const BuyerDashboard = () => {
     <div className="relative min-h-screen py-10">
       {/* Background determined by last search / style */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-45 bg-cover bg-center bg-no-repeat transition-all duration-700"
+        className="absolute inset-0 pointer-events-none opacity-40 bg-cover bg-center bg-no-repeat transition-all duration-700"
         style={{ backgroundImage: `url('${bgImage}')` }}
       />
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0a0a0c]/50 via-[#0a0a0c]/75 to-[#0a0a0c]" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0a0a0c]/60 via-[#0a0a0c]/75 to-[#0a0a0c]" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-5 lg:px-8 space-y-8">
         <div className="flex items-start justify-between flex-wrap gap-4">

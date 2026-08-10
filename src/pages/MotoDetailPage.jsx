@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, ChevronLeft, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
 import { motoApi, offerApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +27,21 @@ const MotoDetailPage = () => {
   const [showApartadoModal, setShowApartadoModal] = useState(false);
   const [apartadoPaymentMethod, setApartadoPaymentMethod] = useState('card');
   const [apartadoLoading, setApartadoLoading] = useState(false);
+
+  const images = moto ? (moto.images && moto.images.length > 0 ? moto.images : [moto.image || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=1600&q=80']) : [];
+
+  // Keyboard navigation for image slider
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') {
+        setSelectedImage((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+      } else if (e.key === 'ArrowRight') {
+        setSelectedImage((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [images.length]);
 
   useEffect(() => {
     setLoading(true);
@@ -142,8 +157,6 @@ const MotoDetailPage = () => {
     'Color': moto.color, 'Categoría': moto.category, 'Ubicación': moto.city,
   };
 
-  const images = moto.images && moto.images.length ? moto.images : [moto.image];
-
   return (
     <div className="max-w-7xl mx-auto px-5 lg:px-8 py-8">
       <div className="flex items-center gap-2 text-xs text-zinc-500 mb-6">
@@ -158,8 +171,29 @@ const MotoDetailPage = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <div className="relative aspect-[16/10] rounded-md overflow-hidden bg-[#111112] border border-white/5">
-            <img src={images[selectedImage]} alt={moto.model} className="w-full h-full object-cover" />
+          <div className="relative aspect-[16/10] rounded-md overflow-hidden bg-[#111112] border border-white/5 group">
+            <img src={images[selectedImage]} alt={moto.model} className="w-full h-full object-cover transition-all duration-300" />
+            
+            {/* Click Navigation Controls on Image */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={() => setSelectedImage((prev) => (prev > 0 ? prev - 1 : images.length - 1))}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-red-brand text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 shadow-lg border border-white/10"
+                  aria-label="Anterior imagen"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={() => setSelectedImage((prev) => (prev < images.length - 1 ? prev + 1 : 0))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/60 hover:bg-red-brand text-white flex items-center justify-center transition-all opacity-80 hover:opacity-100 shadow-lg border border-white/10"
+                  aria-label="Siguiente imagen"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
+
             {moto.featured && (
               <div className="absolute top-4 left-4 bg-red-brand text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-sm flex items-center gap-1">
                 <Wrench size={11} /> DESTACADA
@@ -264,15 +298,12 @@ const MotoDetailPage = () => {
             </div>
           </div>
 
-          {/* PASO 1: BLOQUE DE APARTADO $600 MXN */}
+          {/* BLOQUE DE APARTADO */}
           <div className="bg-[#111112] border border-white/5 rounded-md p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-display font-bold text-white uppercase tracking-wide text-sm flex items-center gap-2">
-                <BookmarkCheck size={16} className="text-red-brand" /> Apartado de Publicación
+              <h3 className="font-display font-bold text-white uppercase tracking-wide text-base flex items-center gap-2">
+                <BookmarkCheck size={18} className="text-red-brand" /> APARTAR
               </h3>
-              <span className="text-xs font-bold text-red-brand bg-red-brand/10 border border-red-brand/30 px-2.5 py-0.5 rounded-sm">
-                $600.00 MXN
-              </span>
             </div>
 
             {hasApartado ? (
@@ -281,13 +312,13 @@ const MotoDetailPage = () => {
                   <CheckCircle2 size={16} /> Motocicleta Apartada
                 </div>
                 <p className="text-zinc-300 text-[11px] leading-relaxed">
-                  Has congelado esta publicación por $600 MXN. Ahora puedes seleccionar tu paquete de protección.
+                  La motocicleta ha sido separada del inventario por 24 hrs. Ahora puedes seleccionar tu paquete de protección.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Congela el precio y pausa esta motocicleta con solo <strong className="text-white font-bold">$600 MXN</strong> para evitar que alguien más la aparte.
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Al hacer el apartado la motocicleta será separada del inventario por 24 hrs.
                 </p>
 
                 {user ? (
@@ -295,22 +326,22 @@ const MotoDetailPage = () => {
                     onClick={() => setShowApartadoModal(true)}
                     className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm shadow-lg"
                   >
-                    <BookmarkCheck size={14} /> Realizar Apartado ($600 MXN)
+                    <BookmarkCheck size={14} /> APARTAR
                   </button>
                 ) : (
                   <div className="space-y-2">
                     <button
                       onClick={() => {
-                        toast({ title: 'Registro requerido', description: 'Crea tu cuenta para apartar con $600 MXN y elegir tu paquete de protección.' });
+                        toast({ title: 'Registro requerido', description: 'Crea tu cuenta para hacer el apartado y separar la unidad por 24 hrs.' });
                         navigate('/iniciar-sesion');
                       }}
                       className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm"
                     >
-                      <User size={14} /> Iniciar Sesión para Apartar ($600)
+                      <User size={14} /> APARTAR
                     </button>
                     <p className="text-[10px] text-amber-400/90 flex items-center gap-1.5 pt-1">
                       <AlertCircle size={12} className="flex-shrink-0" />
-                      Debes estar registrado para realizar el apartado y elegir paquete de protección.
+                      Debes estar registrado para hacer el apartado y separar la unidad por 24 hrs.
                     </p>
                   </div>
                 )}
@@ -407,7 +438,7 @@ const MotoDetailPage = () => {
         </div>
       )}
 
-      {/* MODAL INTERACTIVO DE APARTADO DE $600 MXN */}
+      {/* MODAL INTERACTIVO DE APARTADO */}
       {showApartadoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#111112] border border-white/10 rounded-md max-w-md w-full p-6 space-y-6 relative shadow-2xl">
@@ -421,10 +452,10 @@ const MotoDetailPage = () => {
             <div>
               <span className="text-xs font-bold text-red-brand tracking-widest uppercase">Paso 1 de 2</span>
               <h3 className="font-display font-bold text-white text-2xl uppercase mt-1">
-                Apartado de Motocicleta
+                APARTAR
               </h3>
               <p className="text-zinc-400 text-xs mt-1">
-                Congela la unidad para que nadie más pueda apartarla.
+                Al hacer el apartado la motocicleta será separada del inventario por 24 hrs.
               </p>
             </div>
 
@@ -438,14 +469,19 @@ const MotoDetailPage = () => {
 
             <div className="p-4 bg-red-brand/10 border border-red-brand/30 rounded-sm flex items-center justify-between">
               <div>
-                <span className="text-zinc-400 text-xs uppercase block">Monto a pagar ahora</span>
-                <span className="text-white font-extrabold text-lg">Apartado de Garantía</span>
+                <span className="text-white font-extrabold text-sm block">Separación de Inventario (24 hrs)</span>
+                <p className="text-zinc-300 text-[11px] leading-relaxed mt-0.5">
+                  La unidad será bloqueada del inventario por 24 horas a tu favor.
+                </p>
               </div>
-              <span className="font-display font-bold text-red-brand text-2xl">$600.00 MXN</span>
+              <div className="text-right flex-shrink-0 ml-3">
+                <span className="text-[10px] text-zinc-400 uppercase block">Costo de Apartado</span>
+                <span className="font-display font-bold text-red-brand text-xl">$600.00 MXN</span>
+              </div>
             </div>
 
             <div className="space-y-3">
-              <label className="text-xs text-zinc-400 uppercase tracking-wider block">Método de Pago</label>
+              <label className="text-xs text-zinc-400 uppercase tracking-wider block">Método de Confirmación</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'card', label: 'Tarjeta' },
@@ -469,10 +505,10 @@ const MotoDetailPage = () => {
                 disabled={apartadoLoading}
                 className="btn-red w-full py-3.5 text-xs font-bold tracking-widest uppercase rounded-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
               >
-                {apartadoLoading ? 'Procesando Pago...' : 'Confirmar y Pagar $600.00 MXN'}
+                {apartadoLoading ? 'Procesando...' : 'Confirmar y Pagar $600.00 MXN'}
               </button>
               <p className="text-[10px] text-zinc-500 text-center mt-3">
-                Tu pago está protegido. Al confirmar se activará la elección de tu paquete de protección.
+                Al hacer el apartado la motocicleta será separada del inventario por 24 hrs.
               </p>
             </div>
           </div>
