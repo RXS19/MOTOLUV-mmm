@@ -66,5 +66,12 @@ export const chatApi = {
   send: (message, history = []) => api.post('/chat', { message, history }).then((r) => r.data),
 };
 
+export const stripeApi = {
+  getConfig: () => api.get('/stripe/config').then((r) => r.data),
+  createPaymentIntent: (data) => api.post('/stripe/create-payment-intent', data).then((r) => r.data),
+  createCheckoutSession: (data) => api.post('/stripe/create-checkout-session', data).then((r) => r.data),
+  processOrder: (data) => api.post('/stripe/process-order', data).then((r) => r.data),
+};
+
 export default api;
 

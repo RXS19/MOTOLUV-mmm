@@ -5,6 +5,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
+import Stripe from 'stripe';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
@@ -14,6 +15,16 @@ function getAIInstance() {
     aiInstance = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
   return aiInstance;
+}
+
+let stripeClient: Stripe | null = null;
+function getStripe(): Stripe | null {
+  if (!stripeClient && process.env.STRIPE_SECRET_KEY) {
+    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2023-10-16' as any,
+    });
+  }
+  return stripeClient;
 }
 
 const PORT = 3000;
@@ -119,7 +130,7 @@ interface Moto {
   rating: number;
   views: number;
   featured: boolean;
-  status: 'active' | 'sold' | 'paused';
+  status: 'active' | 'sold' | 'paused' | 'Publicada' | 'Apartada' | 'Certificación' | 'Oferta' | 'Proceso de entrega' | 'Entregada' | 'Vendida' | string;
   created_at: string;
   score_details: Record<string, number>;
 }
@@ -644,6 +655,121 @@ async function startServer() {
       }
       return res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
     });
+  });
+
+  // Stripe Payment Routes
+  api.get('/stripe/config', (_req, res) => {
+    return res.json({
+      publishableKey: process.env.VITE_STRIPE_PUBLIC_KEY || '',
+      hasStripeKey: Boolean(process.env.STRIPE_SECRET_KEY),
+    });
+  });
+
+  api.post('/stripe/create-payment-intent', async (req, res) => {
+    try {
+      const { amount, currency = 'mxn', items = [], metadata = {}, customerEmail } = req.body;
+      const stripe = getStripe();
+
+      if (stripe) {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amount * 100), // in cents
+          currency: currency.toLowerCase(),
+          receipt_email: customerEmail || undefined,
+          metadata: {
+            app: 'motoluv',
+            itemsCount: String(items.length),
+            ...metadata,
+          },
+          automatic_payment_methods: { enabled: true },
+        });
+
+        return res.json({
+          clientSecret: paymentIntent.client_secret,
+          paymentIntentId: paymentIntent.id,
+          isLive: true,
+        });
+      }
+
+      // Fallback mode when STRIPE_SECRET_KEY is not configured
+      const mockId = `pi_mock_${Math.random().toString(36).slice(2, 14)}`;
+      return res.json({
+        clientSecret: `${mockId}_secret_${Math.random().toString(36).slice(2, 10)}`,
+        paymentIntentId: mockId,
+        isLive: false,
+        message: 'Modo de prueba Stripe simulado activo. Para pagos en producción en vivo, configura STRIPE_SECRET_KEY en las variables de entorno.',
+      });
+    } catch (err: any) {
+      console.error('Error creating Stripe Payment Intent:', err);
+      return res.status(500).json({ detail: err.message || 'Error al conectar con Stripe' });
+    }
+  });
+
+  api.post('/stripe/create-checkout-session', async (req, res) => {
+    try {
+      const { items = [], successUrl, cancelUrl, customerEmail } = req.body;
+      const stripe = getStripe();
+
+      if (stripe) {
+        const lineItems = items.map((item: any) => ({
+          price_data: {
+            currency: 'mxn',
+            product_data: {
+              name: item.name,
+              description: `${item.brand || 'Motoluv'} - ${item.category || 'Accesorio'}`,
+              images: item.image ? [item.image] : [],
+            },
+            unit_amount: Math.round(item.price * 100),
+          },
+          quantity: item.quantity || 1,
+        }));
+
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: lineItems,
+          mode: 'payment',
+          customer_email: customerEmail || undefined,
+          success_url: successUrl || `${req.headers.origin}/tienda?status=success`,
+          cancel_url: cancelUrl || `${req.headers.origin}/tienda?status=cancel`,
+        });
+
+        return res.json({ url: session.url, sessionId: session.id, isLive: true });
+      }
+
+      // Fallback
+      return res.json({
+        url: null,
+        sessionId: `cs_mock_${Date.now()}`,
+        isLive: false,
+        message: 'Modo de simulación Stripe activo.',
+      });
+    } catch (err: any) {
+      console.error('Error creating Stripe Checkout session:', err);
+      return res.status(500).json({ detail: err.message || 'Error al iniciar Checkout de Stripe' });
+    }
+  });
+
+  api.post('/stripe/process-order', (req, res) => {
+    const { items, totalAmount, shippingAddress, customerInfo, paymentIntentId } = req.body;
+    const orderId = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    const order = {
+      orderId,
+      items: items || [],
+      totalAmount: totalAmount || 0,
+      shippingAddress: shippingAddress || {},
+      customerInfo: customerInfo || {},
+      paymentIntentId: paymentIntentId || `pi_sim_${Date.now()}`,
+      status: 'Paid',
+      createdAt: new Date().toISOString(),
+      estimatedDelivery: new Date(Date.now() + 3 * 86400000).toLocaleDateString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+    };
+
+    return res.json({ success: true, order });
   });
 
   // Partners Route

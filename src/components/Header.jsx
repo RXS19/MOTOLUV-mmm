@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bike, Store, HelpCircle, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, User, Handshake } from 'lucide-react';
+import { Bike, Store, HelpCircle, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, User, Handshake, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 const Header = () => {
   const location = useLocation();
@@ -10,6 +11,7 @@ const Header = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const { user, logout, activeView, setActiveView } = useAuth();
+  const { cartCount, setIsCartOpen } = useCart();
 
   useEffect(() => {
     const handler = (e) => {
@@ -76,6 +78,19 @@ const Header = () => {
 
         {/* Right Actions */}
         <div className="hidden md:flex items-center gap-4">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="relative p-2 rounded-full border border-white/10 hover:border-red-brand/50 text-zinc-300 hover:text-white transition-colors"
+            title="Ver carrito de compra"
+          >
+            <ShoppingCart size={18} />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-brand text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center font-mono">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
           {user ? (
             <div className="relative" ref={dropdownRef}>
               <button

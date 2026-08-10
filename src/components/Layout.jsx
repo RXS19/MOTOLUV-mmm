@@ -3,6 +3,9 @@ import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import LuChatbot from './LuChatbot';
+import ProductDetailModal from './ProductDetailModal';
+import CartDrawer from './CartDrawer';
+import StripeCheckoutModal from './StripeCheckoutModal';
 
 const Layout = () => {
   return (
@@ -13,6 +16,9 @@ const Layout = () => {
       </main>
       <Footer />
       <LuChatbot />
+      <ProductDetailModal />
+      <CartDrawer />
+      <StripeCheckoutModal />
     </div>
   );
 };
