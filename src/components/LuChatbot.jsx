@@ -153,7 +153,7 @@ const LuChatbot = () => {
               </div>
               <div>
                 <div className="text-white text-sm font-bold font-display uppercase tracking-wider flex items-center gap-1.5">
-                  Lu <span className="text-[10px] bg-[#E10600]/20 text-[#E10600] px-1.5 py-0.5 rounded border border-[#E10600]/40">Asistente</span>
+                  Lu
                 </div>
                 <div className="text-[11px] text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

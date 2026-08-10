@@ -262,8 +262,7 @@ const MotoDetailPage = () => {
 
         <div className="space-y-5">
           <div className="bg-[#111112] border border-white/5 rounded-md p-6">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-xs text-zinc-500 uppercase tracking-widest">{moto.category}</span>
+            <div className="flex items-center justify-end gap-2 mb-2">
               {Boolean(user && (user.id === moto.owner_id || user.id === moto.ownerId || user.id === moto.buyer_id || hasApartado)) && (() => {
                 const style = getStatusStyle(moto.status);
                 return (
