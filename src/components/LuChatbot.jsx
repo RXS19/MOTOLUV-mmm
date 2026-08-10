@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Sparkles, Shield, ChevronRight, RefreshCw } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, Shield, ChevronRight, RefreshCw, GripHorizontal } from 'lucide-react';
 import { chatApi } from '../services/api';
 
 const LuChatbot = () => {
@@ -9,13 +9,19 @@ const LuChatbot = () => {
   const [loading, setLoading] = useState(false);
   const [hasGreeted, setHasGreeted] = useState(false);
   const [isWavingAnimation, setIsWavingAnimation] = useState(false);
+  
+  // Floating & Draggable State
+  const [position, setPosition] = useState(null); // { x, y }
+  const isDraggingRef = useRef(false);
+  const dragStartOffsetRef = useRef({ x: 0, y: 0 });
+  const dragMovedRef = useRef(false);
+  const containerRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Initial greeting logic
   useEffect(() => {
     const greeted = sessionStorage.getItem('motoluv_lu_greeted');
     if (!greeted) {
-      // Prepared initial welcome
       setMessages([
         {
           id: 'welcome_1',
@@ -37,18 +43,88 @@ const LuChatbot = () => {
     }
   }, []);
 
+  // Global Mouse & Touch listeners for smooth dragging
+  useEffect(() => {
+    const handlePointerMove = (e) => {
+      if (!isDraggingRef.current) return;
+      
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      const deltaX = Math.abs(clientX - (dragStartOffsetRef.current.initialClientX || clientX));
+      const deltaY = Math.abs(clientY - (dragStartOffsetRef.current.initialClientY || clientY));
+      
+      if (deltaX > 4 || deltaY > 4) {
+        dragMovedRef.current = true;
+      }
+
+      let newX = clientX - dragStartOffsetRef.current.x;
+      let newY = clientY - dragStartOffsetRef.current.y;
+
+      const width = containerRef.current ? containerRef.current.offsetWidth : 360;
+      const height = containerRef.current ? containerRef.current.offsetHeight : 520;
+
+      // Bound within viewport
+      newX = Math.max(10, Math.min(window.innerWidth - width - 10, newX));
+      newY = Math.max(10, Math.min(window.innerHeight - height - 10, newY));
+
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', handlePointerMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+  }, []);
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, loading, isWavingAnimation]);
 
-  const toggleChat = () => {
+  const handleStartDrag = (e) => {
+    if (e.target.closest('button:not(.drag-handle)') || e.target.closest('input')) {
+      return;
+    }
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      dragStartOffsetRef.current = {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+        initialClientX: clientX,
+        initialClientY: clientY,
+      };
+      isDraggingRef.current = true;
+      dragMovedRef.current = false;
+    }
+  };
+
+  const toggleChat = (e) => {
+    if (dragMovedRef.current) {
+      dragMovedRef.current = false;
+      return;
+    }
+
     const nextState = !isOpen;
     setIsOpen(nextState);
 
     if (nextState && !hasGreeted) {
-      // Trigger waving animation on first contact
       setIsWavingAnimation(true);
       sessionStorage.setItem('motoluv_lu_greeted', 'true');
       setHasGreeted(true);
@@ -114,17 +190,25 @@ const LuChatbot = () => {
     '🔒 ¿Cómo funciona la garantía?',
   ];
 
+  const containerStyle = position
+    ? { left: `${position.x}px`, top: `${position.y}px` }
+    : { bottom: '20px', right: '20px' };
+
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+    <div
+      ref={containerRef}
+      style={containerStyle}
+      className="fixed z-50 flex flex-col items-end select-none"
+    >
       {/* First Contact Greeting Speech Bubble when closed */}
       {!isOpen && isWavingAnimation && (
-        <div className="mb-3 p-3 bg-[#111112] border border-[#E10600]/60 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce max-w-xs text-white text-xs">
+        <div className="mb-3 p-3 bg-[#111112] border border-[#E10600]/60 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce max-w-xs text-white text-xs pointer-events-none">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-[#E10600] flex-shrink-0">
             <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="font-bold text-[#E10600]">¡Hola! Soy Lu 🐾</div>
-            <div className="text-zinc-300">¡Haz clic aquí para chatear conmigo! 👋</div>
+            <div className="text-zinc-300">¡Haz clic o arrástrame para chatear! 👋</div>
           </div>
         </div>
       )}
@@ -132,22 +216,31 @@ const LuChatbot = () => {
       {/* Floating Trigger Button (Avatar only) */}
       {!isOpen && (
         <button
+          onMouseDown={handleStartDrag}
+          onTouchStart={handleStartDrag}
           onClick={toggleChat}
-          className="group relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#E10600] bg-black shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 focus:outline-none ring-2 ring-black/50"
+          className="group relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#E10600] bg-black shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none ring-2 ring-black/50 cursor-grab active:cursor-grabbing"
           aria-label="Abrir chat con Lu"
+          title="Haz clic para abrir • Arrastra para mover"
         >
-          <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
+          <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover pointer-events-none" />
           <span className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-black rounded-full" />
         </button>
       )}
 
       {/* Chat Window Widget */}
       {isOpen && (
-        <div className="w-[360px] sm:w-[400px] h-[520px] bg-[#0d0d0e] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
-          {/* Header */}
-          <div className="p-3.5 bg-[#111112] border-b border-white/10 flex items-center justify-between relative">
-            <div className="flex items-center gap-3">
-              <div className={`relative w-10 h-10 rounded-full overflow-hidden border-2 border-[#E10600] bg-black ${isWavingAnimation ? 'animate-bounce' : ''}`}>
+        <div className="w-[360px] sm:w-[400px] h-[520px] bg-[#0d0d0e] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in duration-200">
+          {/* Header - Draggable Area */}
+          <div
+            onMouseDown={handleStartDrag}
+            onTouchStart={handleStartDrag}
+            className="p-3.5 bg-[#111112] border-b border-white/10 flex items-center justify-between relative cursor-grab active:cursor-grabbing select-none"
+            title="Arrastra para mover el chat"
+          >
+            <div className="flex items-center gap-2.5 pointer-events-none">
+              <GripHorizontal size={16} className="text-zinc-500 hover:text-white transition-colors" />
+              <div className={`relative w-9 h-9 rounded-full overflow-hidden border-2 border-[#E10600] bg-black ${isWavingAnimation ? 'animate-bounce' : ''}`}>
                 <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-black rounded-full" />
               </div>
@@ -165,7 +258,7 @@ const LuChatbot = () => {
             <div className="flex items-center gap-1">
               <button
                 onClick={toggleChat}
-                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 aria-label="Cerrar chat"
               >
                 <X size={18} />
@@ -280,3 +373,4 @@ const LuChatbot = () => {
 };
 
 export default LuChatbot;
+
