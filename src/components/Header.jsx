@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bike, Store, HelpCircle, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, User, Handshake, ShoppingCart } from 'lucide-react';
+import { Bike, Store, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -24,8 +24,8 @@ const Header = () => {
   const isActive = (p) => location.pathname === p || (p !== '/' && location.pathname.startsWith(p));
 
   const navItems = [
-    { to: '/como-funciona', label: 'Cómo Funciona', icon: HelpCircle },
-    { to: '/motos', label: 'Motocicletas', icon: Bike },
+    { to: '/como-funciona', label: 'Cómo Funciona' },
+    { to: '/motos', label: 'Motocicletas' },
     { to: '/tienda', label: 'Tienda', icon: Store },
   ];
 
@@ -70,7 +70,7 @@ const Header = () => {
                 isActive(to) ? 'text-red-brand' : 'text-zinc-300 hover:text-red-brand'
               }`}
             >
-              <Icon size={16} />
+              {Icon && <Icon size={16} />}
               {label}
             </Link>
           ))}
@@ -153,7 +153,7 @@ const Header = () => {
         <div className="md:hidden bg-[#0a0a0a] border-t border-white/5 px-5 py-4 space-y-3">
           {navItems.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} onClick={() => setOpen(false)} className="flex items-center gap-2 text-zinc-300 hover:text-red-brand">
-              <Icon size={16} /> {label}
+              {Icon && <Icon size={16} />} {label}
             </Link>
           ))}
           <div className="pt-3 border-t border-white/5 flex flex-col gap-2">
