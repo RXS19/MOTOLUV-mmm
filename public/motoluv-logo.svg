@@ -1,27 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" style="background:#000000;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 220" width="100%" height="100%">
   <defs>
-    <style>
-      @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@1,900&amp;family=Orbitron:wght@800;900&amp;display=swap");
-      .moto-text { font-family: "Orbitron", "Montserrat", sans-serif; font-weight: 900; font-style: italic; fill: #FFFFFF; font-size: 82px; letter-spacing: -1px; }
-      .luv-text { font-family: "Orbitron", "Montserrat", sans-serif; font-weight: 900; font-style: italic; fill: #FFFFFF; font-size: 82px; letter-spacing: -1px; }
-      .slogan-text { font-family: "Orbitron", "Montserrat", sans-serif; font-weight: 900; fill: #E10600; font-size: 28px; letter-spacing: 7px; }
-    </style>
+    <linearGradient id="motoTextGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#EDEDED" />
+    </linearGradient>
   </defs>
-  <!-- Background -->
-  <rect width="100%" height="100%" fill="#000000" />
-  
-  <!-- Logo Group -->
-  <g transform="translate(400, 130)" text-anchor="middle">
-    <!-- MOTO -->
-    <text x="-165" y="25" class="moto-text" text-anchor="end">MOTO</text>
-    
-    <!-- Red Pill Badge for LUV -->
-    <rect x="-155" y="-55" width="310" height="105" rx="20" ry="20" fill="#E10600" />
-    
-    <!-- LUV -->
-    <text x="0" y="25" class="luv-text" text-anchor="middle">LUV</text>
+
+  <g transform="translate(10, 15)">
+    <!-- Red Badge for LUV -->
+    <rect x="465" y="0" width="435" height="140" rx="16" ry="16" fill="#E10600" />
+
+    <!-- Slanted MOTOLUV wordmark -->
+    <g transform="skewX(-13)">
+      <!-- M -->
+      <path d="M 40 130 L 68 10 L 108 10 L 138 78 L 168 10 L 208 10 L 180 130 L 146 130 L 162 55 L 132 120 L 114 120 L 86 55 L 72 130 Z" fill="url(#motoTextGrad)" />
+
+      <!-- O (1) -->
+      <path d="M 230 45 L 252 10 L 320 10 L 342 45 L 322 100 L 300 130 L 232 130 L 210 95 Z M 258 55 L 252 88 L 274 102 L 292 88 L 298 52 L 276 38 Z" fill="url(#motoTextGrad)" fill-rule="evenodd" />
+
+      <!-- T -->
+      <path d="M 334 10 L 442 10 L 436 38 L 402 38 L 382 130 L 348 130 L 368 38 L 334 38 Z" fill="url(#motoTextGrad)" />
+
+      <!-- O (2) -->
+      <path d="M 430 45 L 452 10 L 520 10 L 542 45 L 522 100 L 500 130 L 432 130 L 410 95 Z M 458 55 L 452 88 L 474 102 L 492 88 L 498 52 L 476 38 Z" fill="url(#motoTextGrad)" fill-rule="evenodd" />
+
+      <!-- L -->
+      <path d="M 548 10 L 584 10 L 560 102 L 634 102 L 628 130 L 524 130 Z" fill="#FFFFFF" />
+
+      <!-- U -->
+      <path d="M 648 10 L 684 10 L 670 82 L 684 102 L 718 102 L 732 82 L 746 10 L 782 10 L 762 90 L 734 130 L 670 130 L 638 90 Z" fill="#FFFFFF" />
+
+      <!-- V -->
+      <path d="M 792 10 L 830 10 L 848 88 L 878 88 L 896 10 L 934 10 L 888 130 L 838 130 Z" fill="#FFFFFF" />
+    </g>
+
+    <!-- Subtitle: SUBE CONECTA RUEDA -->
+    <g transform="translate(450, 185)">
+      <text x="0" y="0" text-anchor="middle" fill="#E10600" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="28" letter-spacing="0.30em" font-style="italic">SUBE CONECTA RUEDA</text>
+    </g>
   </g>
-  
-  <!-- Slogan -->
-  <text x="400" y="235" class="slogan-text" text-anchor="middle">SUBE CONECTA RUEDA</text>
 </svg>

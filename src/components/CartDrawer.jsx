@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, ShoppingBag, Trash2, ShieldCheck, CreditCard, CheckSquare, Square } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const CartDrawer = () => {
   const {
@@ -114,8 +115,9 @@ const CartDrawer = () => {
                     </button>
 
                     <img
-                      src={item.product.image}
+                      src={resolveSafeImageUrl(item.product.image, 'gear')}
                       alt={item.product.name}
+                      onError={(e) => handleImageError(e, 'gear')}
                       className="w-16 h-16 object-cover rounded bg-zinc-900 border border-white/10 shrink-0"
                     />
 

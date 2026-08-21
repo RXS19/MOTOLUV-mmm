@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
 
 const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BACKEND_URL) || '';
 export const API = `${BACKEND_URL}/api`;
@@ -6,13 +7,9 @@ export const API = `${BACKEND_URL}/api`;
 // Feature flag: switch to Supabase when env vars are set
 export const USE_SUPABASE = false;
 
-// Helper: resolve relative image URLs (e.g. /uploads/xxx.jpg) with backend host
-export const resolveImageUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/')) return `${BACKEND_URL}${url}`;
-  return url;
-};
+// Helper: resolve relative image URLs (e.g. /uploads/xxx.jpg) with backend host and safe fallbacks
+export const resolveImageUrl = (url, fallbackType = 'moto') => resolveSafeImageUrl(url, fallbackType);
+
 
 const api = axios.create({ baseURL: API });
 

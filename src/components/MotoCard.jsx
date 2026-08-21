@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Eye, MapPin, Star, Wrench } from 'lucide-react';
 import { getStatusStyle } from '../utils/status';
 import { useAuth } from '../context/AuthContext';
+import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   const { user } = useAuth();
@@ -28,7 +29,12 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
       className="moto-card group block bg-[#111112] border border-white/5 rounded-md overflow-hidden"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
-        <img src={moto.image} alt={`${moto.brand} ${moto.model}`} className="w-full h-full object-cover" />
+        <img 
+          src={resolveSafeImageUrl(moto.image)} 
+          alt={`${moto.brand} ${moto.model}`} 
+          onError={(e) => handleImageError(e, 'moto')}
+          className="w-full h-full object-cover" 
+        />
 
         <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
           {moto.featured && (

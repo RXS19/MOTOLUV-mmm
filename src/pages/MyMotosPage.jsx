@@ -4,6 +4,7 @@ import { Plus, Eye, Trash2, Wrench, Activity } from 'lucide-react';
 import { motoApi } from '../services/api';
 import { toast } from '../hooks/use-toast';
 import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
+import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const MyMotosPage = () => {
   const [motos, setMotos] = useState([]);
@@ -67,7 +68,12 @@ const MyMotosPage = () => {
               <div key={m.id} className="bg-[#111112] border border-white/5 rounded-md overflow-hidden flex flex-col justify-between">
                 <div>
                   <div className="aspect-[4/3] bg-zinc-900 relative">
-                    <img src={m.image} alt={m.model} className="w-full h-full object-cover" />
+                    <img 
+                      src={resolveSafeImageUrl(m.image, 'moto')} 
+                      alt={m.model} 
+                      onError={(e) => handleImageError(e, 'moto')}
+                      className="w-full h-full object-cover" 
+                    />
                     <div className="absolute top-3 left-3">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider bg-black/80 backdrop-blur ${style.badgeClass}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>

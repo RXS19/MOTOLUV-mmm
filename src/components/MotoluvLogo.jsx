@@ -1,0 +1,107 @@
+import React from 'react';
+
+/**
+ * Motoluv Official Brand Logo
+ * Vector-precise, crisp SVG matching the official brand identity.
+ */
+export const MotoluvLogo = ({ className = 'h-8 md:h-9 w-auto', variant = 'full' }) => {
+  return (
+    <svg
+      viewBox="0 0 920 220"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`${className} transition-transform duration-200`}
+      aria-label="Motoluv - Sube Conecta Rueda"
+      role="img"
+    >
+      <defs>
+        <linearGradient id="motoTextGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#EDEDED" />
+        </linearGradient>
+      </defs>
+
+      {/* Main Wordmark Container */}
+      <g transform="translate(10, 15)">
+        {/* Red Pill/Badge behind LUV */}
+        <rect
+          x="465"
+          y="0"
+          width="435"
+          height="140"
+          rx="16"
+          ry="16"
+          fill="#E10600"
+        />
+
+        {/* Slanted letters group (-13 degrees slant) */}
+        <g transform="skewX(-13)">
+          {/* --- M --- */}
+          <path
+            d="M 40 130 L 68 10 L 108 10 L 138 78 L 168 10 L 208 10 L 180 130 L 146 130 L 162 55 L 132 120 L 114 120 L 86 55 L 72 130 Z"
+            fill="url(#motoTextGrad)"
+          />
+
+          {/* --- O (1) --- Chamfered octagonal automotive shape */}
+          <path
+            d="M 230 45 L 252 10 L 320 10 L 342 45 L 322 100 L 300 130 L 232 130 L 210 95 Z M 258 55 L 252 88 L 274 102 L 292 88 L 298 52 L 276 38 Z"
+            fill="url(#motoTextGrad)"
+            fillRule="evenodd"
+          />
+
+          {/* --- T --- */}
+          <path
+            d="M 334 10 L 442 10 L 436 38 L 402 38 L 382 130 L 348 130 L 368 38 L 334 38 Z"
+            fill="url(#motoTextGrad)"
+          />
+
+          {/* --- O (2) --- Chamfered octagonal automotive shape */}
+          <path
+            d="M 430 45 L 452 10 L 520 10 L 542 45 L 522 100 L 500 130 L 432 130 L 410 95 Z M 458 55 L 452 88 L 474 102 L 492 88 L 498 52 L 476 38 Z"
+            fill="url(#motoTextGrad)"
+            fillRule="evenodd"
+          />
+
+          {/* --- L --- Inside Red Badge */}
+          <path
+            d="M 548 10 L 584 10 L 560 102 L 634 102 L 628 130 L 524 130 Z"
+            fill="#FFFFFF"
+          />
+
+          {/* --- U --- Inside Red Badge */}
+          <path
+            d="M 648 10 L 684 10 L 670 82 L 684 102 L 718 102 L 732 82 L 746 10 L 782 10 L 762 90 L 734 130 L 670 130 L 638 90 Z"
+            fill="#FFFFFF"
+          />
+
+          {/* --- V --- Inside Red Badge */}
+          <path
+            d="M 792 10 L 830 10 L 848 88 L 878 88 L 896 10 L 934 10 L 888 130 L 838 130 Z"
+            fill="#FFFFFF"
+          />
+        </g>
+
+        {/* Subtitle Slogan: SUBE CONECTA RUEDA */}
+        {variant === 'full' && (
+          <g transform="translate(450, 185)">
+            <text
+              x="0"
+              y="0"
+              textAnchor="middle"
+              fill="#E10600"
+              fontFamily="'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+              fontWeight="900"
+              fontSize="28"
+              letterSpacing="0.30em"
+              style={{ textTransform: 'uppercase', fontStyle: 'italic' }}
+            >
+              SUBE CONECTA RUEDA
+            </text>
+          </g>
+        )}
+      </g>
+    </svg>
+  );
+};
+
+export default MotoluvLogo;

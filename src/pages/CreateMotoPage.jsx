@@ -4,6 +4,7 @@ import { Bike, ArrowLeft, ImagePlus, X, Save, Upload, Camera, Calculator, Dollar
 import { motoApi, uploadApi, resolveImageUrl } from '../services/api';
 import { toast } from '../hooks/use-toast';
 import { calculateCommission } from '../utils/commission';
+import { handleImageError } from '../utils/imageFallback';
 
 const BRANDS = ['Honda', 'Yamaha', 'Kawasaki', 'Suzuki', 'Ducati', 'Harley-Davidson', 'BMW', 'KTM', 'Triumph', 'Aprilia', 'Otra'];
 const CATEGORIES = ['Deportiva', 'Naked', 'Cruiser', 'Adventure', 'Scooter', 'Touring', 'Trail', 'Custom'];
@@ -196,7 +197,12 @@ const CreateMotoPage = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {images.map((url, i) => (
                   <div key={i} className="relative aspect-video rounded-md overflow-hidden bg-[#0a0a0a] border border-white/5 group">
-                    <img src={resolveImageUrl(url)} alt="" className="w-full h-full object-cover" />
+                    <img 
+                      src={resolveImageUrl(url, 'moto')} 
+                      alt="" 
+                      onError={(e) => handleImageError(e, 'moto')}
+                      className="w-full h-full object-cover" 
+                    />
                     {i === 0 && (
                       <div className="absolute top-2 left-2 bg-red-brand text-white text-[9px] font-bold tracking-widest uppercase px-2 py-1 rounded-sm">
                         Portada

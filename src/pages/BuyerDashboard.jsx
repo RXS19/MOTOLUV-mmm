@@ -9,7 +9,7 @@ const MOTO_STYLE_IMAGES = {
   Deportiva: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=1600&q=80',
   Cruiser: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=1600&q=80',
   Adventure: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=1600&q=80',
-  Scooter: 'https://images.unsplash.com/photo-1525160354320-d8e92641c563?w=1600&q=80',
+  Scooter: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?w=1600&q=80',
   Naked: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=1600&q=80',
   Custom: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=1600&q=80',
   Honda: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=1600&q=80',

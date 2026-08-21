@@ -6,6 +6,7 @@ import { motoApi, offerApi, clipApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from '../hooks/use-toast';
 import { getStatusStyle } from '../utils/status';
+import { handleImageError, resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
 
 const PKG_PRICES = { basico: 0, plus: 1800, total: 3500 };
 
@@ -28,7 +29,11 @@ const MotoDetailPage = () => {
   const [apartadoPaymentMethod, setApartadoPaymentMethod] = useState('card');
   const [apartadoLoading, setApartadoLoading] = useState(false);
 
-  const images = moto ? (moto.images && moto.images.length > 0 ? moto.images : [moto.image || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=1600&q=80']) : [];
+  const images = moto 
+    ? (moto.images && moto.images.length > 0 
+        ? moto.images.map((img) => resolveSafeImageUrl(img, 'moto')) 
+        : [resolveSafeImageUrl(moto.image || FALLBACK_MOTO_IMAGE, 'moto')]) 
+    : [];
 
   // Keyboard navigation for image slider
   useEffect(() => {
@@ -197,7 +202,12 @@ const MotoDetailPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <div className="relative aspect-[16/10] rounded-md overflow-hidden bg-[#111112] border border-white/5 group">
-            <img src={images[selectedImage]} alt={moto.model} className="w-full h-full object-cover transition-all duration-300" />
+            <img 
+              src={images[selectedImage]} 
+              alt={moto.model} 
+              onError={(e) => handleImageError(e, 'moto')}
+              className="w-full h-full object-cover transition-all duration-300" 
+            />
             
             {/* Click Navigation Controls on Image */}
             {images.length > 1 && (
@@ -238,7 +248,12 @@ const MotoDetailPage = () => {
             {images.map((img, i) => (
               <button key={i} onClick={() => setSelectedImage(i)}
                 className={`aspect-[4/3] rounded-md overflow-hidden border-2 transition-colors ${selectedImage === i ? 'border-red-brand' : 'border-white/5 hover:border-red-brand/50'}`}>
-                <img src={img} alt={`${moto.model} ${i + 1}`} className="w-full h-full object-cover" />
+                <img 
+                  src={img} 
+                  alt={`${moto.model} ${i + 1}`} 
+                  onError={(e) => handleImageError(e, 'moto')}
+                  className="w-full h-full object-cover" 
+                />
               </button>
             ))}
           </div>
@@ -484,7 +499,12 @@ const MotoDetailPage = () => {
             </div>
 
             <div className="flex items-center gap-3 p-3 bg-[#0a0a0a] border border-white/5 rounded-sm">
-              <img src={moto.image} alt={moto.model} className="w-14 h-14 object-cover rounded-sm" />
+              <img 
+                src={resolveSafeImageUrl(moto.image, 'moto')} 
+                alt={moto.model} 
+                onError={(e) => handleImageError(e, 'moto')}
+                className="w-14 h-14 object-cover rounded-sm" 
+              />
               <div>
                 <div className="text-white text-sm font-bold">{moto.brand} {moto.model}</div>
                 <div className="text-zinc-500 text-xs">Precio de lista: ${moto.price.toLocaleString()} MXN</div>

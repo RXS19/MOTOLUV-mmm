@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingBag, Star, Search, Eye, ShoppingCart, ShieldCheck, CreditCard, Sparkles, Filter } from 'lucide-react';
 import { accessories } from '../mock';
 import { useCart } from '../context/CartContext';
+import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const ShopPage = () => {
   const [q, setQ] = useState('');
@@ -89,8 +90,9 @@ const ShopPage = () => {
                 className="aspect-square bg-zinc-900 relative overflow-hidden cursor-pointer"
               >
                 <img
-                  src={a.image}
+                  src={resolveSafeImageUrl(a.image, 'gear')}
                   alt={a.name}
+                  onError={(e) => handleImageError(e, 'gear')}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
                 />
                 <div className="absolute top-3 left-3 bg-black/80 backdrop-blur text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded">

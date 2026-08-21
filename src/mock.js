@@ -17,13 +17,13 @@ const motoImages = [
   'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800',
   'https://images.unsplash.com/photo-1547549082-6bc09f2049ae?w=800',
   'https://images.unsplash.com/photo-1449426468159-d96dbf08f19f?w=800',
-  'https://images.unsplash.com/photo-1611241443322-b5c0f7f70e2f?w=800',
+  'https://images.unsplash.com/photo-1558980664-769d59546b3d?w=800',
   'https://images.unsplash.com/photo-1580310614729-ccd69652491d?w=800',
-  'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=800',
+  'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=800',
   'https://images.pexels.com/photos/30444779/pexels-photo-30444779.jpeg?auto=compress&cs=tinysrgb&w=800',
   'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=800',
-  'https://images.unsplash.com/photo-1508357941304-42a883c78f89?w=800',
-  'https://images.unsplash.com/photo-1517846875602-9c8ce67cfe75?w=800',
+  'https://images.unsplash.com/photo-1558981420-87aa9dad1c89?w=800',
+  'https://images.unsplash.com/photo-1558980664-3a031cf67ea8?w=800',
 ];
 
 const modelData = [
@@ -212,8 +212,8 @@ export const accessories = [
     image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800', 
     images: [
       'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800',
-      'https://images.unsplash.com/photo-1508357941304-42a883c78f89?w=800',
-      'https://images.unsplash.com/photo-1517846875602-9c8ce67cfe75?w=800'
+      'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800',
+      'https://images.unsplash.com/photo-1558981408-db0ecd8a1ee4?w=800'
     ],
     rating: 4.9,
     reviewsCount: 18,
@@ -245,7 +245,7 @@ export const accessories = [
     images: [
       'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=800',
       'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
-      'https://images.unsplash.com/photo-1611241443322-b5c0f7f70e2f?w=800'
+      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=800'
     ],
     rating: 5.0,
     reviewsCount: 54,
@@ -338,11 +338,11 @@ export const accessories = [
     brand: 'Motul', 
     price: 950, 
     category: 'Lubricantes', 
-    image: 'https://images.unsplash.com/photo-1611241443322-b5c0f7f70e2f?w=800', 
+    image: 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=800', 
     images: [
-      'https://images.unsplash.com/photo-1611241443322-b5c0f7f70e2f?w=800',
-      'https://images.unsplash.com/photo-1580310614729-ccd69652491d?w=800',
-      'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=800'
+      'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=800',
+      'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=800',
+      'https://images.unsplash.com/photo-1580310614729-ccd69652491d?w=800'
     ],
     rating: 4.9,
     reviewsCount: 110,

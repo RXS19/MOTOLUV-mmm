@@ -6,6 +6,7 @@ import { motoApi, offerApi } from '../services/api';
 import { calculateCommission } from '../utils/commission';
 import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
 import { toast } from '../hooks/use-toast';
+import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const SellerDashboard = () => {
   const { user } = useAuth();
@@ -116,7 +117,12 @@ const SellerDashboard = () => {
                   return (
                     <tr key={m.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="py-3.5 px-4 font-medium text-white flex items-center gap-3">
-                        <img src={m.image} alt={m.model} className="w-10 h-10 object-cover rounded-sm" />
+                        <img 
+                          src={resolveSafeImageUrl(m.image, 'moto')} 
+                          alt={m.model} 
+                          onError={(e) => handleImageError(e, 'moto')}
+                          className="w-10 h-10 object-cover rounded-sm" 
+                        />
                         <div>
                           <div className="font-bold">{m.brand} {m.model}</div>
                           <div className="text-zinc-500 text-[11px]">{m.year} · {m.city}</div>
@@ -213,7 +219,12 @@ const SellerDashboard = () => {
                 const style = getStatusStyle(m.status);
                 return (
                   <Link to={`/motos/${m.id}`} key={m.id} className="flex items-center gap-3 p-3 bg-[#0a0a0a] border border-white/5 rounded-sm hover:border-red-brand/40 transition-colors">
-                    <img src={m.image} alt={m.model} className="w-14 h-14 object-cover rounded-sm" />
+                    <img 
+                      src={resolveSafeImageUrl(m.image, 'moto')} 
+                      alt={m.model} 
+                      onError={(e) => handleImageError(e, 'moto')}
+                      className="w-14 h-14 object-cover rounded-sm" 
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="text-white text-sm font-medium truncate">{m.brand} {m.model}</div>
                       <div className="text-zinc-500 text-xs mt-0.5 flex items-center gap-2">
@@ -295,7 +306,14 @@ export const OfferRow = ({ offer, isSeller, onUpdate }) => {
   return (
     <div className="p-3 bg-[#0a0a0a] border border-white/5 rounded-sm hover:border-red-brand/40 transition-colors">
       <div className="flex items-center gap-3">
-        {offer.moto_image && <img src={offer.moto_image} alt={offer.moto_model} className="w-12 h-12 object-cover rounded-sm" />}
+        {offer.moto_image && (
+          <img 
+            src={resolveSafeImageUrl(offer.moto_image, 'moto')} 
+            alt={offer.moto_model} 
+            onError={(e) => handleImageError(e, 'moto')}
+            className="w-12 h-12 object-cover rounded-sm" 
+          />
+        )}
         <div className="flex-1 min-w-0">
           <div className="text-white text-sm font-medium truncate">{offer.moto_brand} {offer.moto_model}</div>
           <div className="text-zinc-500 text-xs">{isSeller ? `Comprador: ${offer.buyer_name}` : `Paquete: ${offer.package}`}</div>

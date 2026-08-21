@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Star, ShieldCheck, Truck, ShoppingCart, ChevronRight, CheckCircle2, RotateCcw, Check } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const ProductDetailModal = () => {
   const { selectedProduct, setSelectedProduct, addToCart, setIsCartOpen } = useCart();
@@ -74,8 +75,9 @@ const ProductDetailModal = () => {
               {/* Main Image Frame */}
               <div className="relative aspect-square w-full bg-zinc-900/80 rounded-lg overflow-hidden border border-white/5 group">
                 <img
-                  src={selectedImage || selectedProduct.image}
+                  src={resolveSafeImageUrl(selectedImage || selectedProduct.image, 'gear')}
                   alt={selectedProduct.name}
+                  onError={(e) => handleImageError(e, 'gear')}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <span className="absolute top-3 left-3 bg-red-brand/90 backdrop-blur text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded">
@@ -99,7 +101,12 @@ const ProductDetailModal = () => {
                         selectedImage === imgUrl ? 'border-red-brand scale-105' : 'border-white/10 opacity-60 hover:opacity-100'
                       }`}
                     >
-                      <img src={imgUrl} alt={`Vista ${idx + 1}`} className="w-full h-full object-cover" />
+                      <img 
+                        src={resolveSafeImageUrl(imgUrl, 'gear')} 
+                        alt={`Vista ${idx + 1}`} 
+                        onError={(e) => handleImageError(e, 'gear')}
+                        className="w-full h-full object-cover" 
+                      />
                     </button>
                   ))}
                 </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Sparkles, Shield, ChevronRight, RefreshCw, GripHorizontal } from 'lucide-react';
 import { chatApi } from '../services/api';
+import { OFFICIAL_LU_AVATAR, handleImageError } from '../utils/imageFallback';
 
 const LuChatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -204,7 +205,12 @@ const LuChatbot = () => {
       {!isOpen && isWavingAnimation && (
         <div className="mb-3 p-3 bg-[#111112] border border-[#E10600]/60 rounded-xl shadow-2xl flex items-center gap-3 animate-bounce max-w-xs text-white text-xs pointer-events-none">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-[#E10600] flex-shrink-0">
-            <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
+            <img 
+              src={OFFICIAL_LU_AVATAR} 
+              alt="Lu" 
+              onError={(e) => handleImageError(e, 'avatar')}
+              className="w-full h-full object-cover" 
+            />
           </div>
           <div>
             <div className="font-bold text-[#E10600]">¡Hola! Soy Lu 🐾</div>
@@ -223,7 +229,12 @@ const LuChatbot = () => {
           aria-label="Abrir chat con Lu"
           title="Haz clic para abrir • Arrastra para mover"
         >
-          <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover pointer-events-none" />
+          <img 
+            src={OFFICIAL_LU_AVATAR} 
+            alt="Lu" 
+            onError={(e) => handleImageError(e, 'avatar')}
+            className="w-full h-full object-cover pointer-events-none" 
+          />
           <span className="absolute bottom-1 right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-black rounded-full" />
         </button>
       )}
@@ -241,7 +252,12 @@ const LuChatbot = () => {
             <div className="flex items-center gap-2.5 pointer-events-none">
               <GripHorizontal size={16} className="text-zinc-500 hover:text-white transition-colors" />
               <div className={`relative w-9 h-9 rounded-full overflow-hidden border-2 border-[#E10600] bg-black ${isWavingAnimation ? 'animate-bounce' : ''}`}>
-                <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
+                <img 
+                  src={OFFICIAL_LU_AVATAR} 
+                  alt="Lu" 
+                  onError={(e) => handleImageError(e, 'avatar')}
+                  className="w-full h-full object-cover" 
+                />
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-black rounded-full" />
               </div>
               <div>
@@ -285,7 +301,12 @@ const LuChatbot = () => {
               >
                 {m.sender === 'lu' && (
                   <div className="w-7 h-7 rounded-full overflow-hidden border border-[#E10600] flex-shrink-0 mt-0.5">
-                    <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover" />
+                    <img 
+                      src={OFFICIAL_LU_AVATAR} 
+                      alt="Lu" 
+                      onError={(e) => handleImageError(e, 'avatar')}
+                      className="w-full h-full object-cover" 
+                    />
                   </div>
                 )}
 
@@ -309,7 +330,12 @@ const LuChatbot = () => {
             {loading && (
               <div className="flex gap-2.5 max-w-[85%] items-center">
                 <div className="w-7 h-7 rounded-full overflow-hidden border border-[#E10600] flex-shrink-0">
-                  <img src="/lu-avatar.jpg" alt="Lu" className="w-full h-full object-cover animate-spin" />
+                  <img 
+                    src={OFFICIAL_LU_AVATAR} 
+                    alt="Lu" 
+                    onError={(e) => handleImageError(e, 'avatar')}
+                    className="w-full h-full object-cover animate-spin" 
+                  />
                 </div>
                 <div className="p-3 rounded-2xl bg-[#161618] border border-white/10 text-zinc-400 text-xs flex items-center gap-2">
                   <RefreshCw size={12} className="animate-spin text-[#E10600]" />
