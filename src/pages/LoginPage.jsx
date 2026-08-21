@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { toast } from '../hooks/use-toast';
 import { useAuth } from '../context/AuthContext';
-import { MotoluvLogo } from '../components/MotoluvLogo';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -43,9 +42,6 @@ const LoginPage = () => {
   return (
     <div className="max-w-md mx-auto px-5 py-16">
       <div className="text-center mb-8">
-        <Link to="/" className="inline-block mb-4" aria-label="Motoluv Inicio">
-          <MotoluvLogo className="h-10 md:h-12 mx-auto hover:scale-105" />
-        </Link>
         <h1 className="font-display font-bold text-white text-3xl md:text-4xl uppercase">
           Iniciar <span className="text-red-brand">sesión</span>
         </h1>

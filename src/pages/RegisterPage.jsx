@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, Lock, ArrowRight, Check, Bike } from 'lucide-react';
 import { toast } from '../hooks/use-toast';
 import { useAuth } from '../context/AuthContext';
-import { MotoluvLogo } from '../components/MotoluvLogo';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -65,14 +64,9 @@ const RegisterPage = () => {
     <div className="max-w-6xl mx-auto px-5 lg:px-8 py-12">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
         <div className="hidden lg:block sticky top-24">
-          <Link to="/" className="inline-block mb-6" aria-label="Motoluv Inicio">
-            <MotoluvLogo className="h-10 md:h-12 w-auto hover:scale-105" />
-          </Link>
-          <div>
-            <span className="inline-block text-red-brand text-[11px] tracking-widest uppercase border border-red-brand/60 rounded-full px-3 py-1.5 mb-6">
-              Únete a Motoluv
-            </span>
-          </div>
+          <span className="inline-block text-red-brand text-[11px] tracking-widest uppercase border border-red-brand/60 rounded-full px-3 py-1.5 mb-6">
+            Únete a Motoluv
+          </span>
           <h1 className="font-display font-bold text-white text-4xl md:text-5xl uppercase leading-tight">
             Comienza a <br /><span className="text-red-brand">rodar seguro</span>
           </h1>

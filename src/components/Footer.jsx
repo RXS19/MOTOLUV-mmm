@@ -1,24 +1,38 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
-import { MotoluvLogo } from './MotoluvLogo';
+import { OFFICIAL_MOTOLUV_LOGO, handleImageError } from '../utils/imageFallback';
 
 const Footer = () => {
   return (
     <footer className="border-t border-white/5 bg-[#0a0a0a] mt-24">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {/* Brand */}
+          {/* Brand & Partner */}
           <div>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
               <Link to="/" className="inline-block" aria-label="Motoluv Inicio">
-                <MotoluvLogo className="h-10 md:h-12 w-auto hover:scale-105" />
+                <div className="flex items-center justify-center py-1 px-1.5 rounded bg-black/60 border border-white/10 w-fit hover:border-[#E10600]/40 transition-colors">
+                  <img 
+                    src={OFFICIAL_MOTOLUV_LOGO} 
+                    alt="Motoluv" 
+                    onError={(e) => handleImageError(e, 'logo')}
+                    className="h-9 w-auto object-contain rounded-sm" 
+                    style={{ filter: 'contrast(1.1) brightness(1.05)' }} 
+                  />
+                </div>
               </Link>
+
+              <div className="h-6 w-px bg-white/15 hidden xs:block" aria-hidden="true" />
+
+              <div className="flex items-center gap-2 py-1.5 px-2.5 rounded bg-black/60 border border-white/10 w-fit hover:border-white/20 transition-colors" title="Novatech Partner">
+                <img src="/novatech-logo-white.svg" alt="Novatech" className="h-5 md:h-6 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity" />
+              </div>
             </div>
             <p className="text-zinc-400 text-sm leading-relaxed max-w-xs">
               El marketplace más grande de motocicletas en México. Compra y vende de forma transparente, verificada y segura.
             </p>
-            <div className="mt-4 text-xs tracking-[0.25em] text-[#E10600] font-semibold">
+            <div className="mt-6 text-xs tracking-[0.3em] text-zinc-500 font-medium">
               SUBE · CONECTA · RUEDA
             </div>
           </div>
