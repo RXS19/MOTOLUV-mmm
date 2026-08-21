@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, Lock, CreditCard, CheckCircle2, Truck } from 'lucide-react';
+import { X, ShieldCheck, Lock, CreditCard, CheckCircle2, Truck, QrCode, ExternalLink } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { stripeApi } from '../services/api';
+import { stripeApi, clipApi } from '../services/api';
 import { toast } from '../hooks/use-toast';
 
 const StripeCheckoutModal = () => {
@@ -14,6 +14,10 @@ const StripeCheckoutModal = () => {
   const [step, setStep] = useState('form'); // 'form' | 'processing' | 'success'
   const [loading, setLoading] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
+  const [paymentProvider, setPaymentProvider] = useState('clip'); // 'clip' | 'stripe' | 'spei'
+
+  // Clip state
+  const [clipData, setClipData] = useState(null);
 
   // Form State
   const [email, setEmail] = useState('');
@@ -33,6 +37,7 @@ const StripeCheckoutModal = () => {
       setStep('form');
       setLoading(false);
       setCompletedOrder(null);
+      setClipData(null);
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -55,11 +60,11 @@ const StripeCheckoutModal = () => {
     toast({ title: 'Tarjeta de Prueba', description: 'Datos de prueba cargados automáticamente.' });
   };
 
-  const handlePayWithStripe = async (e) => {
+  const handleProcessPayment = async (e) => {
     e.preventDefault();
 
-    if (!email || !name || !address || !cardNumber || !cardExpiry || !cardCvc) {
-      toast({ title: 'Campos requeridos', description: 'Por favor completa los datos de envío y pago.', variant: 'destructive' });
+    if (!email || !name || !address) {
+      toast({ title: 'Campos requeridos', description: 'Por favor completa los datos de envío.', variant: 'destructive' });
       return;
     }
 
@@ -72,31 +77,63 @@ const StripeCheckoutModal = () => {
     setStep('processing');
 
     try {
-      // Step 1: Create Stripe Payment Intent on server
-      const intentRes = await stripeApi.createPaymentIntent({
-        amount: totalAmount,
-        currency: 'mxn',
-        items: itemsToBuy,
-        customerEmail: email,
-        metadata: { customerName: name, city, address },
-      });
+      if (paymentProvider === 'clip') {
+        // Create Clip request & process Clip order
+        const clipReq = await clipApi.createPaymentRequest({
+          amount: totalAmount,
+          description: 'Compra de Accesorios Motoluv',
+          customerEmail: email,
+          customerName: name,
+          items: itemsToBuy,
+        });
 
-      // Simulate network processing
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise((r) => setTimeout(r, 1500));
 
-      // Step 2: Record completed order
-      const orderRes = await stripeApi.processOrder({
-        items: itemsToBuy,
-        totalAmount,
-        shippingAddress: { address, city, postalCode, phone },
-        customerInfo: { name, email },
-        paymentIntentId: intentRes.paymentIntentId,
-      });
+        const orderRes = await clipApi.processCheckout({
+          amount: totalAmount,
+          items: itemsToBuy,
+          shippingAddress: { address, city, postalCode, phone },
+          customerInfo: { name, email },
+          clipReference: clipReq.clipReference,
+        });
 
-      setCompletedOrder(orderRes.order);
-      setStep('success');
-      clearSelectedCart();
-      toast({ title: '¡Compra Completada Exitosamente!', description: `Orden ${orderRes.order.orderId} confirmada.` });
+        setCompletedOrder(orderRes.order);
+        setClipData(clipReq);
+        setStep('success');
+        clearSelectedCart();
+        toast({ title: '¡Pago Procesado con Clip México!', description: `Orden ${orderRes.order.orderId} confirmada.` });
+      } else {
+        // Process via Stripe
+        if (!cardNumber || !cardExpiry || !cardCvc) {
+          toast({ title: 'Datos de Tarjeta Faltantes', description: 'Ingresa los datos de tu tarjeta bancaria.', variant: 'destructive' });
+          setStep('form');
+          setLoading(false);
+          return;
+        }
+
+        const intentRes = await stripeApi.createPaymentIntent({
+          amount: totalAmount,
+          currency: 'mxn',
+          items: itemsToBuy,
+          customerEmail: email,
+          metadata: { customerName: name, city, address },
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        const orderRes = await stripeApi.processOrder({
+          items: itemsToBuy,
+          totalAmount,
+          shippingAddress: { address, city, postalCode, phone },
+          customerInfo: { name, email },
+          paymentIntentId: intentRes.paymentIntentId,
+        });
+
+        setCompletedOrder(orderRes.order);
+        setStep('success');
+        clearSelectedCart();
+        toast({ title: '¡Compra Completada Exitosamente!', description: `Orden ${orderRes.order.orderId} confirmada.` });
+      }
     } catch (err) {
       console.error('Checkout error:', err);
       toast({ title: 'Error al procesar pago', description: err.message || 'No se pudo completar la transacción.', variant: 'destructive' });
@@ -215,7 +252,7 @@ const StripeCheckoutModal = () => {
           )}
 
           {step === 'form' && (
-            <form onSubmit={handlePayWithStripe} className="space-y-6">
+            <form onSubmit={handleProcessPayment} className="space-y-6">
               {/* Order Total Header */}
               <div className="p-4 bg-red-brand/10 border border-red-brand/20 rounded-lg flex items-center justify-between">
                 <div>
@@ -231,7 +268,7 @@ const StripeCheckoutModal = () => {
                   onClick={handleFillTestCard}
                   className="px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[11px] font-bold tracking-wider uppercase rounded transition-colors"
                 >
-                  ⚡ Autocompletar Tarjeta Prueba
+                  ⚡ Autocompletar Datos
                 </button>
               </div>
 
@@ -298,67 +335,128 @@ const StripeCheckoutModal = () => {
                 </div>
               </div>
 
-              {/* Section 2: Payment Card */}
+              {/* Section 2: Payment Provider Selection (Clip vs Stripe) */}
               <div className="space-y-3 pt-3 border-t border-white/10">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                    <CreditCard size={14} className="text-red-brand" /> 2. Método de Pago
+                    <CreditCard size={14} className="text-red-brand" /> 2. Pasarela y Método de Pago
                   </h4>
-                  <span className="text-[10px] text-zinc-500 font-mono">VISA / MASTERCARD / AMEX</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">PAGOS SEGUROS EN MÉXICO</span>
                 </div>
 
-                <div className="p-4 bg-[#0a0a0a] border border-white/10 rounded-lg space-y-3">
-                  <div>
-                    <label className="text-[11px] text-zinc-400 font-medium block mb-1">Número de Tarjeta</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        placeholder="4242 4242 4242 4242"
-                        className="w-full px-3 py-2.5 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none pl-9"
-                      />
-                      <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentProvider('clip')}
+                    className={`p-3 rounded-lg border text-left transition-all relative ${
+                      paymentProvider === 'clip'
+                        ? 'border-orange-500 bg-orange-500/10 text-white shadow-lg'
+                        : 'border-white/10 bg-[#0a0a0a] text-zinc-400 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-xs flex items-center gap-1.5 text-orange-400">
+                        ⚡ Clip México
+                      </span>
+                      {paymentProvider === 'clip' && (
+                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>
+                      )}
                     </div>
-                  </div>
+                    <p className="text-[10px] text-zinc-400">Tarjetas, Clip QR o Link directo de pago en México</p>
+                  </button>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] text-zinc-400 font-medium block mb-1">Vencimiento (MM/AA)</label>
-                      <input
-                        type="text"
-                        required
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        placeholder="MM/AA"
-                        className="w-full px-3 py-2 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none"
-                      />
+                  <button
+                    type="button"
+                    onClick={() => setPaymentProvider('stripe')}
+                    className={`p-3 rounded-lg border text-left transition-all relative ${
+                      paymentProvider === 'stripe'
+                        ? 'border-red-brand bg-red-brand/10 text-white shadow-lg'
+                        : 'border-white/10 bg-[#0a0a0a] text-zinc-400 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-xs flex items-center gap-1.5 text-zinc-200">
+                        💳 Tarjeta Bancaria (Stripe)
+                      </span>
                     </div>
-                    <div>
-                      <label className="text-[11px] text-zinc-400 font-medium block mb-1">CVC / CVV</label>
-                      <input
-                        type="password"
-                        required
-                        maxLength={4}
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value)}
-                        placeholder="123"
-                        className="w-full px-3 py-2 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none"
-                      />
+                    <p className="text-[10px] text-zinc-400">Visa, Mastercard, Amex con procesamiento Stripe</p>
+                  </button>
+                </div>
+
+                {paymentProvider === 'clip' ? (
+                  <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-orange-300 pb-2 border-b border-orange-500/10">
+                      <span>Procesamiento vía Clip México</span>
+                      <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-mono">
+                        CLIP PAY
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Al dar clic en confirmar, se creará el registro de compra con <strong>Clip México</strong>.
+                      Podrás pagar mediante tarjeta, generar tu código QR o usar tu Link de Pago de Clip de manera instantánea.
+                    </p>
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-400 pt-1">
+                      <ShieldCheck size={14} className="text-orange-400" />
+                      <span>Transacción respaldada por la infraestructura de Clip México.</span>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-[#0a0a0a] border border-white/10 rounded-lg space-y-3">
+                    <div>
+                      <label className="text-[11px] text-zinc-400 font-medium block mb-1">Número de Tarjeta</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value)}
+                          placeholder="4242 4242 4242 4242"
+                          className="w-full px-3 py-2.5 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none pl-9"
+                        />
+                        <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-zinc-400 font-medium block mb-1">Vencimiento (MM/AA)</label>
+                        <input
+                          type="text"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          placeholder="MM/AA"
+                          className="w-full px-3 py-2 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-zinc-400 font-medium block mb-1">CVC / CVV</label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={cardCvc}
+                          onChange={(e) => setCardCvc(e.target.value)}
+                          placeholder="123"
+                          className="w-full px-3 py-2 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Submit CTA */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-red-brand hover:bg-red-600 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-widest rounded-md shadow-lg shadow-red-900/30 flex items-center justify-center gap-2 transition-all"
+                className={`w-full py-4 font-bold text-xs uppercase tracking-widest rounded-md shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
+                  paymentProvider === 'clip'
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-950/40'
+                    : 'bg-red-brand hover:bg-red-600 text-white shadow-red-900/30'
+                }`}
               >
                 <ShieldCheck size={16} />
-                <span>CONFIRMAR Y PAGAR COMPRA (${totalAmount.toLocaleString()} MXN)</span>
+                <span>
+                  CONFIRMAR Y PAGAR CON {paymentProvider === 'clip' ? 'CLIP MÉXICO' : 'STRIPE'} (${totalAmount.toLocaleString()} MXN)
+                </span>
               </button>
             </form>
           )}

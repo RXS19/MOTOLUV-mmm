@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, ChevronLeft, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
-import { motoApi, offerApi } from '../services/api';
+import { motoApi, offerApi, clipApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from '../hooks/use-toast';
 import { getStatusStyle } from '../utils/status';
@@ -94,23 +94,48 @@ const MotoDetailPage = () => {
     }
     setApartadoLoading(true);
     try {
-      await offerApi.create({
-        moto_id: moto.id,
-        amount: 600,
-        is_apartado: true,
-        message: 'Apartado inicial de $600 MXN',
-      });
-      toast({
-        title: '¡Apartado exitoso!',
-        description: `Has reservado ${moto.brand} ${moto.model} con $600 MXN. Ahora puedes seleccionar tu paquete de protección.`,
-      });
+      if (apartadoPaymentMethod === 'clip') {
+        const clipReq = await clipApi.createPaymentRequest({
+          amount: 600,
+          description: `Apartado Motocicleta ${moto.brand} ${moto.model}`,
+          customerEmail: user.email,
+          customerName: user.name,
+          isApartado: true,
+          motoId: moto.id,
+        });
+
+        await clipApi.processCheckout({
+          amount: 600,
+          customerInfo: { email: user.email, name: user.name },
+          clipReference: clipReq.clipReference,
+          isApartado: true,
+          motoId: moto.id,
+        });
+
+        toast({
+          title: '¡Apartado con Clip México Exitoso!',
+          description: `Has apartado ${moto.brand} ${moto.model} con $600 MXN. Ref: ${clipReq.clipReference}`,
+        });
+      } else {
+        await offerApi.create({
+          moto_id: moto.id,
+          amount: 600,
+          is_apartado: true,
+          message: 'Apartado inicial de $600 MXN',
+        });
+        toast({
+          title: '¡Apartado exitoso!',
+          description: `Has reservado ${moto.brand} ${moto.model} con $600 MXN. Ahora puedes seleccionar tu paquete de protección.`,
+        });
+      }
+
       setHasApartado(true);
       setShowApartadoModal(false);
       setMoto((prev) => prev ? { ...prev, status: 'Apartada' } : prev);
     } catch (err) {
       toast({
         title: 'Error al procesar el apartado',
-        description: err?.response?.data?.detail || 'Intenta nuevamente.',
+        description: err?.response?.data?.detail || err?.message || 'Intenta nuevamente.',
       });
     } finally {
       setApartadoLoading(false);
@@ -480,17 +505,23 @@ const MotoDetailPage = () => {
             </div>
 
             <div className="space-y-3">
-              <label className="text-xs text-zinc-400 uppercase tracking-wider block">Método de Confirmación</label>
+              <label className="text-xs text-zinc-400 uppercase tracking-wider block">Método de Confirmación y Pago</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: 'card', label: 'Tarjeta' },
-                  { id: 'spei', label: 'SPEI' },
-                  { id: 'oxxo', label: 'OXXO' },
+                  { id: 'clip', label: '⚡ Clip México' },
+                  { id: 'card', label: '💳 Tarjeta' },
+                  { id: 'spei', label: '🏦 SPEI' },
                 ].map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setApartadoPaymentMethod(m.id)}
-                    className={`py-2 px-3 border text-xs font-bold rounded-sm uppercase tracking-wider transition-colors ${apartadoPaymentMethod === m.id ? 'border-red-brand bg-red-brand/10 text-white' : 'border-white/10 text-zinc-400 hover:border-white/20'}`}
+                    className={`py-2 px-3 border text-xs font-bold rounded-sm uppercase tracking-wider transition-colors ${
+                      apartadoPaymentMethod === m.id
+                        ? m.id === 'clip'
+                          ? 'border-orange-500 bg-orange-500/20 text-orange-400 font-extrabold'
+                          : 'border-red-brand bg-red-brand/10 text-white'
+                        : 'border-white/10 text-zinc-400 hover:border-white/20'
+                    }`}
                   >
                     {m.label}
                   </button>

@@ -8,6 +8,66 @@ import multer from 'multer';
 import Stripe from 'stripe';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
+import { createClient } from '@supabase/supabase-js';
+import axios from 'axios';
+
+// Supabase server client
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseServer = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+
+// n8n & HubSpot Webhook Automation Trigger
+async function triggerN8nHubspotWebhook(eventType: string, payload: any) {
+  const webhookUrl = process.env.N8N_WEBHOOK_URL || process.env.HUBSPOT_WEBHOOK_URL;
+  
+  const formattedPayload = {
+    event: eventType,
+    timestamp: new Date().toISOString(),
+    source: 'Motoluv Platform',
+    hubspot_contact: {
+      email: payload.email || payload.customerEmail || payload.userEmail || '',
+      firstname: (payload.name || payload.customerName || '').split(' ')[0] || 'Usuario',
+      lastname: (payload.name || payload.customerName || '').split(' ').slice(1).join(' ') || 'Motoluv',
+      phone: payload.phone || '',
+      city: payload.city || 'Ciudad de México',
+      user_type: payload.role || 'comprador',
+      hs_lead_status: 'NEW',
+    },
+    data: payload,
+  };
+
+  // 1. Write user record to Supabase profiles database table
+  if (supabaseServer && eventType === 'user.registered') {
+    try {
+      await supabaseServer.from('profiles').upsert([{
+        id: payload.id,
+        email: payload.email,
+        name: payload.name,
+        phone: payload.phone,
+        role: payload.role || 'comprador',
+        city: payload.city || '',
+        created_at: payload.created_at || new Date().toISOString(),
+      }], { onConflict: 'id' });
+      console.log('User synced to Supabase database:', payload.email);
+    } catch (err) {
+      console.error('Error writing user to Supabase:', err);
+    }
+  }
+
+  // 2. Trigger n8n webhook workflow for HubSpot contact creation and card status updates
+  if (webhookUrl) {
+    try {
+      await axios.post(webhookUrl, formattedPayload, { headers: { 'Content-Type': 'application/json' }, timeout: 5000 });
+      console.log(`n8n/HubSpot webhook dispatched successfully [${eventType}]`);
+    } catch (err: any) {
+      console.warn(`n8n Webhook call failed (${err.message}). Payload prepared.`);
+    }
+  } else {
+    console.log(`[n8n/HubSpot Automation Ready] Event: ${eventType} | Target: ${payload.email || payload.cardId || payload.id}`);
+  }
+
+  return formattedPayload;
+}
 
 let aiInstance: GoogleGenAI | null = null;
 function getAIInstance() {
@@ -325,8 +385,9 @@ function authenticateToken(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+export const app = express();
+
 async function startServer() {
-  const app = express();
   app.use(cors());
   app.use(express.json());
 
@@ -367,6 +428,9 @@ async function startServer() {
     };
     db.users.set(id, user);
     db.usersByEmail.set(email, user);
+
+    // Trigger n8n/HubSpot webhook & Supabase database sync on new user registration
+    triggerN8nHubspotWebhook('user.registered', user);
 
     const token = jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ access_token: token, token_type: 'bearer', user: sanitizeUser(user) });
@@ -410,6 +474,9 @@ async function startServer() {
       };
       db.users.set(id, user);
       db.usersByEmail.set(email, user);
+
+      // Trigger n8n/HubSpot webhook & Supabase database sync
+      triggerN8nHubspotWebhook('user.registered', user);
     } else {
       user.role = 'both';
       user.provider = provider || user.provider;
@@ -535,6 +602,18 @@ async function startServer() {
     };
 
     db.motos.set(id, moto);
+
+    // Sync listing creation card to n8n / HubSpot
+    triggerN8nHubspotWebhook('card.status_created', {
+      cardId: `card_${id}`,
+      title: `${brand} ${model}`,
+      status: 'Publicada',
+      userId: user.id,
+      userEmail: user.email,
+      motoId: id,
+      price: numericPrice,
+    });
+
     return res.json(moto);
   });
 
@@ -544,10 +623,24 @@ async function startServer() {
     if (!moto) return res.status(404).json({ detail: 'No encontrada' });
     if (moto.owner_id !== user.id) return res.status(403).json({ detail: 'No autorizado' });
 
+    const previousStatus = moto.status;
     Object.assign(moto, req.body);
     if (req.body.images && req.body.images.length > 0) {
       moto.image = req.body.images[0];
     }
+
+    // Trigger status card update webhook for n8n / HubSpot sync
+    if (req.body.status || previousStatus !== moto.status) {
+      triggerN8nHubspotWebhook('card.status_updated', {
+        cardId: `card_${moto.id}`,
+        title: `${moto.brand} ${moto.model}`,
+        status: moto.status,
+        userId: user.id,
+        userEmail: user.email,
+        motoId: moto.id,
+      });
+    }
+
     return res.json(moto);
   });
 
@@ -772,6 +865,118 @@ async function startServer() {
     return res.json({ success: true, order });
   });
 
+  // Clip Payment Routes
+  api.get('/clip/config', (_req, res) => {
+    return res.json({
+      hasClipKey: Boolean(process.env.CLIP_API_KEY || process.env.CLIP_SECRET_KEY),
+      publicKey: process.env.VITE_CLIP_PUBLIC_KEY || '',
+      provider: 'Clip México',
+      supportedMethods: ['Tarjeta de Crédito / Débito', 'Clip QR', 'Link de Pago Clip'],
+    });
+  });
+
+  api.post('/clip/create-payment-request', async (req, res) => {
+    try {
+      const { amount, description, customerEmail, customerName, isApartado, motoId, items = [] } = req.body;
+      const clipReference = `CLIP-${isApartado ? 'MOTO' : 'STORE'}-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      // Build Clip Checkout URL or Token
+      const clipPayload = {
+        amount: Number(amount) || 3000,
+        currency: 'MXN',
+        purchase_description: description || (isApartado ? 'Apartado de Motocicleta Motoluv' : 'Compra de Accesorios Motoluv'),
+        redirection_url: {
+          success: `${req.headers.origin || 'http://localhost:3000'}/panel?clip_status=success&ref=${clipReference}`,
+          error: `${req.headers.origin || 'http://localhost:3000'}/panel?clip_status=error&ref=${clipReference}`,
+          default: `${req.headers.origin || 'http://localhost:3000'}/panel`,
+        },
+        metadata: {
+          clipReference,
+          customerEmail,
+          customerName,
+          isApartado: Boolean(isApartado),
+          motoId,
+          itemsCount: items.length,
+        },
+      };
+
+      // Trigger n8n webhook automation for initiated Clip transaction
+      triggerN8nHubspotWebhook('payment.clip_initiated', {
+        clipReference,
+        amount,
+        customerEmail,
+        customerName,
+        isApartado,
+        motoId,
+      });
+
+      return res.json({
+        success: true,
+        clipReference,
+        amount: Number(amount),
+        currency: 'MXN',
+        paymentUrl: `https://pay.clip.mx/${clipReference}`,
+        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://pay.clip.mx/${clipReference}`,
+        status: 'PENDING_PAYMENT',
+      });
+    } catch (err: any) {
+      console.error('Error creating Clip payment request:', err);
+      return res.status(500).json({ detail: err.message || 'Error al conectar con Clip México' });
+    }
+  });
+
+  api.post('/clip/process-checkout', (req, res) => {
+    const { amount, items, shippingAddress, customerInfo, clipReference, isApartado, motoId } = req.body;
+    const orderId = `CLIP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    // Update motorcycle status if it was an apartado
+    if (isApartado && motoId) {
+      const moto = db.motos.get(motoId);
+      if (moto) {
+        moto.status = 'Apartada';
+        triggerN8nHubspotWebhook('card.status_updated', {
+          cardId: `card_${moto.id}`,
+          title: `${moto.brand} ${moto.model}`,
+          status: 'Apartada',
+          userEmail: customerInfo?.email,
+          motoId: moto.id,
+        });
+      }
+    }
+
+    const order = {
+      orderId,
+      clipReference: clipReference || `clip_ref_${Date.now()}`,
+      items: items || [],
+      totalAmount: amount || 0,
+      paymentMethod: 'Clip México',
+      shippingAddress: shippingAddress || {},
+      customerInfo: customerInfo || {},
+      status: 'Paid',
+      createdAt: new Date().toISOString(),
+      estimatedDelivery: '24 a 48 horas hábiles con Clip',
+    };
+
+    triggerN8nHubspotWebhook('payment.clip_completed', order);
+
+    return res.json({ success: true, order });
+  });
+
+  // Webhooks Endpoints for HubSpot & n8n Sync
+  api.post('/webhooks/hubspot/user-register', async (req, res) => {
+    const payload = req.body;
+    const result = await triggerN8nHubspotWebhook('user.registered', payload);
+    return res.json({ success: true, synced: true, payload: result });
+  });
+
+  api.post('/webhooks/hubspot/status-card', async (req, res) => {
+    const { cardId, title, status, userId, userEmail, motoId, details } = req.body;
+    const result = await triggerN8nHubspotWebhook('card.status_updated', {
+      cardId, title, status, userId, userEmail, motoId, details,
+    });
+    return res.json({ success: true, synced: true, payload: result });
+  });
+
   // Partners Route
   api.post('/partners', (req, res) => {
     const { name, position, company_name, category, phone, email, message } = req.body;
@@ -831,10 +1036,10 @@ Jamás reveles o solicites información confidencial de usuarios (cuentas bancar
 INFORMACIÓN DEL SITIO MOTOLUV:
 - Qué es Motoluv: El marketplace más seguro de compra y venta de motocicletas seminuevas en México.
 - Eslogan: SUBE · CONECTA · RUEDA.
-- Garantía Escrow: Motoluv resguarda el pago del comprador en una cuenta en garantía segura hasta que el comprador recibe y valida la moto.
+- Garantía y Protección: Motoluv resguarda la operación con transacciones y pagos verificados hasta que se complete la entrega.
 - Paquetes de Servicio:
   1. Básico ($1,900 MXN): Inspección técnica con Score de 100 puntos y contrato digital.
-  2. Plus ($3,900 MXN): Básico + depósito en garantía seguro y validación de documentos.
+  2. Plus ($3,900 MXN): Básico + protección de pago verificada y validación de documentos.
   3. Total ($5,900 MXN): Plus + traslado nacional garantizado hasta tu puerta.
 - Red de Socios ("Súmate a nuestra red"): Talleres mecánicos, tiendas de accesorios, agencias de motocicletas, financieras y organizadores de eventos pueden registrarse en la sección "/sumate".
 - Inventario actual de motocicletas disponibles:
@@ -873,8 +1078,8 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
         fallback = 'En nuestra Tienda Oficial (/tienda) encontrarás cascos certificados, chaquetas con protección, guantes y equipamiento de alta calidad 🛡️.';
       } else if (lower.includes('red') || lower.includes('sumate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
         fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller, tienda de accesorios, agencia de motocicletas, financiera u organizas eventos, ingresa a "/sumate" para registrar tus datos y conectarte con miles de motociclistas.';
-      } else if (lower.includes('paquete') || lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro') || lower.includes('escrow')) {
-        fallback = 'En Motoluv tu dinero está 100% seguro con nuestro sistema de depósito en garantía (Escrow) 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con envío nacional).';
+      } else if (lower.includes('paquete') || lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro')) {
+        fallback = 'En Motoluv tu dinero está 100% protegido con transacciones verificadas 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con envío nacional).';
       } else {
         fallback = '¡Con gusto te orientó! 🐾 En Motoluv puedes comprar o vender motos seminuevas garantizadas, adquirir accesorios o sumar tu taller o negocio a nuestra red en la sección "/sumate". ¿Qué te gustaría consultar?';
       }
@@ -897,13 +1102,13 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
   app.use('/api', api);
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
@@ -911,11 +1116,15 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server listening on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
 startServer().catch((err) => {
   console.error('Failed to start server:', err);
 });
+
+export default app;

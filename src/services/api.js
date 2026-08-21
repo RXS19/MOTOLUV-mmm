@@ -73,5 +73,16 @@ export const stripeApi = {
   processOrder: (data) => api.post('/stripe/process-order', data).then((r) => r.data),
 };
 
+export const clipApi = {
+  getConfig: () => api.get('/clip/config').then((r) => r.data),
+  createPaymentRequest: (data) => api.post('/clip/create-payment-request', data).then((r) => r.data),
+  processCheckout: (data) => api.post('/clip/process-checkout', data).then((r) => r.data),
+};
+
+export const hubspotApi = {
+  syncUserRegistration: (userData) => api.post('/webhooks/hubspot/user-register', userData).then((r) => r.data),
+  syncStatusCard: (cardData) => api.post('/webhooks/hubspot/status-card', cardData).then((r) => r.data),
+};
+
 export default api;
 

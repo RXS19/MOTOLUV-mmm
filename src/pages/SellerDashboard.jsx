@@ -184,7 +184,7 @@ const SellerDashboard = () => {
               <span className="text-red-brand font-bold text-sm">-${currentCalc.commissionAmount.toLocaleString()} MXN</span>
             </div>
             <div className="bg-emerald-500/10 px-3 py-1.5 rounded-sm border border-emerald-500/30">
-              <span className="text-emerald-400 text-[10px] font-bold uppercase block">Depósito Neto Est.</span>
+              <span className="text-emerald-400 text-[10px] font-bold uppercase block">Pago Neto Est.</span>
               <span className="text-emerald-300 font-extrabold text-base">${currentCalc.netEarnings.toLocaleString()} MXN</span>
             </div>
           </div>

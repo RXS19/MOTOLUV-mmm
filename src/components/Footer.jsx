@@ -15,7 +15,7 @@ const Footer = () => {
               </div>
             </Link>
             <p className="text-zinc-400 text-sm leading-relaxed max-w-xs">
-              El marketplace más grande de motocicletas en México. Compra y vende de forma segura con nuestra garantía de depósito.
+              El marketplace más grande de motocicletas en México. Compra y vende de forma transparente, verificada y segura.
             </p>
             <div className="mt-6 text-xs tracking-[0.3em] text-zinc-500 font-medium">
               SUBE · CONECTA · RUEDA
@@ -43,8 +43,20 @@ const Footer = () => {
               <li className="flex items-center gap-2"><MapPin size={14} className="text-red-brand" /> Ciudad de México, MX</li>
             </ul>
             <div className="flex gap-3 mt-6">
-              {[Facebook, Instagram, Twitter].map((Icon, i) => (
-                <a key={i} href="#" className="w-9 h-9 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:text-red-brand hover:border-red-brand/50 transition-colors">
+              {[
+                { icon: Facebook, href: "https://www.facebook.com/motoluvmx", label: "Facebook" },
+                { icon: Instagram, href: "https://www.instagram.com/motoluvmx?igsh=djBlMWtmaHc4YzBz&utm_source=qr", label: "Instagram" },
+                { icon: Twitter, href: "https://x.com/motoluvmx", label: "Twitter / X" },
+              ].map(({ icon: Icon, href, label }, i) => (
+                <a
+                  key={i}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  title={label}
+                  className="w-9 h-9 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:text-red-brand hover:border-red-brand/50 transition-colors"
+                >
                   <Icon size={14} />
                 </a>
               ))}

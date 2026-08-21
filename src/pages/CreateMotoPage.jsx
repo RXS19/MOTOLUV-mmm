@@ -150,14 +150,14 @@ const CreateMotoPage = () => {
                     </div>
 
                     <div className="bg-emerald-500/10 p-2.5 rounded-sm border border-emerald-500/30 col-span-2 md:col-span-1">
-                      <span className="text-emerald-400 block text-[10px] uppercase font-bold">Tu Depósito Neto</span>
+                      <span className="text-emerald-400 block text-[10px] uppercase font-bold">Tu Pago Neto</span>
                       <span className="text-emerald-300 font-bold text-sm">${comm.netEarnings.toLocaleString()} MXN</span>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-2 text-[11px] text-zinc-500 pt-1">
                     <Info size={12} className="text-zinc-400 mt-0.5 flex-shrink-0" />
-                    <span>La comisión se descuenta únicamente al momento de concretar la venta y liberación del depósito en garantía.</span>
+                    <span>La comisión se descuenta únicamente al momento de concretar la venta.</span>
                   </div>
                 </div>
               );

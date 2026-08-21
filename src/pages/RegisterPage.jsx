@@ -56,7 +56,7 @@ const RegisterPage = () => {
     'Acceso a más de 500 motocicletas verificadas',
     'Score mecánico certificado en cada moto',
     'Un asesor personal coordina tu operación',
-    'Depósito en garantía 100% protegido',
+    'Transacciones y pagos 100% verificados',
     'Sin contacto directo entre comprador y vendedor',
   ];
 
