@@ -7,7 +7,6 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import Stripe from 'stripe';
 import { GoogleGenAI } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 
@@ -96,10 +95,16 @@ function getStripe(): Stripe | null {
 
 const PORT = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'motoluv-super-secret-key-change-in-production';
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const UPLOAD_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'uploads')
+  : path.join(process.cwd(), 'uploads');
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Warning: Could not create upload directory:', err);
 }
 
 // Multer storage setup
@@ -1132,12 +1137,14 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
     return res.json({ ok: true, seeded: db.motos.size });
   });
 
-  // Mount API router
+  // Mount API router (mount on both /api and root to handle any Vercel/proxy path rewriting)
   app.use('/api', api);
+  app.use(api);
 
   async function startServer() {
     // Vite middleware for development
     if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+      const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa',
@@ -1158,8 +1165,10 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
     }
   }
 
-  startServer().catch((err) => {
-    console.error('Failed to start server:', err);
-  });
+  if (!process.env.VERCEL) {
+    startServer().catch((err) => {
+      console.error('Failed to start server:', err);
+    });
+  }
 
   export default app;
