@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
-import { OFFICIAL_MOTOLUV_LOGO, handleImageError } from '../utils/imageFallback';
+import { OFFICIAL_MOTOLUV_LOGO, OFFICIAL_NOVATECH_LOGO, handleImageError } from '../utils/imageFallback';
 
 const Footer = () => {
   return (
@@ -18,7 +18,6 @@ const Footer = () => {
                     alt="Motoluv" 
                     onError={(e) => handleImageError(e, 'logo')}
                     className="h-9 w-auto object-contain rounded-sm" 
-                    style={{ filter: 'contrast(1.1) brightness(1.05)' }} 
                   />
                 </div>
               </Link>
@@ -26,7 +25,12 @@ const Footer = () => {
               <div className="h-6 w-px bg-white/15 hidden xs:block" aria-hidden="true" />
 
               <div className="flex items-center gap-2 py-1.5 px-2.5 rounded bg-black/60 border border-white/10 w-fit hover:border-white/20 transition-colors" title="Novatech Partner">
-                <img src="/novatech-logo-white.svg" alt="Novatech" className="h-5 md:h-6 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity" />
+                <img 
+                  src={OFFICIAL_NOVATECH_LOGO} 
+                  alt="Novatech" 
+                  onError={(e) => handleImageError(e, 'novatech')}
+                  className="h-5 md:h-6 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity" 
+                />
               </div>
             </div>
             <p className="text-zinc-400 text-sm leading-relaxed max-w-xs">

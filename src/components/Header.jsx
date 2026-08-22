@@ -57,7 +57,6 @@ const Header = () => {
               alt="Motoluv" 
               onError={(e) => handleImageError(e, 'logo')}
               className="h-8 md:h-9 w-auto object-contain rounded-sm" 
-              style={{ filter: 'contrast(1.1) brightness(1.05)' }} 
             />
           </div>
         </Link>
