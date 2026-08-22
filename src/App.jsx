@@ -15,6 +15,7 @@ import BuyerDashboard from './pages/BuyerDashboard';
 import CreateMotoPage from './pages/CreateMotoPage';
 import MyOffersPage from './pages/MyOffersPage';
 import MyMotosPage from './pages/MyMotosPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -37,6 +38,9 @@ function App() {
                 <Route path="/tienda" element={<ShopPage />} />
                 <Route path="/registro" element={<RegisterPage />} />
                 <Route path="/iniciar-sesion" element={<LoginPage />} />
+                <Route path="/aviso-de-privacidad" element={<PrivacyPolicyPage />} />
+                <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
+                <Route path="/privacidad" element={<PrivacyPolicyPage />} />
                 <Route path="/panel" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
                 <Route path="/panel/publicar" element={<ProtectedRoute role="vendedor"><CreateMotoPage /></ProtectedRoute>} />
                 <Route path="/panel/mis-motos" element={<ProtectedRoute role="vendedor"><MyMotosPage /></ProtectedRoute>} />

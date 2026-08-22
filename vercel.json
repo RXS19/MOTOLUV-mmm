@@ -8,6 +8,10 @@
       "destination": "/api"
     },
     {
+      "source": "/api",
+      "destination": "/api"
+    },
+    {
       "source": "/((?!api/|uploads/).*)",
       "destination": "/index.html"
     }

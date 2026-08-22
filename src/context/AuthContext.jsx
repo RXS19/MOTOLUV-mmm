@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { authApi } from '../services/api';
-import { isSupabaseConfigured, signInWithProvider } from '../lib/supabase';
+import { isSupabaseConfigured, signInWithProvider, supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
@@ -27,12 +27,44 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => { bootstrap(); }, [bootstrap]);
 
   const login = async (email, password) => {
-    const res = await authApi.login({ email, password });
-    localStorage.setItem('motoluv_token', res.access_token);
-    setUser(res.user);
-    if (res.user.role === 'comprador') setActiveView('comprador');
-    else setActiveView('vendedor');
-    return res.user;
+    try {
+      const res = await authApi.login({ email, password });
+      localStorage.setItem('motoluv_token', res.access_token);
+      setUser(res.user);
+      if (res.user.role === 'comprador') setActiveView('comprador');
+      else setActiveView('vendedor');
+      return res.user;
+    } catch (err) {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: supaAuth, error: supaErr } = await supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password: password,
+          });
+          if (!supaErr && supaAuth?.user) {
+            const fallbackUser = {
+              id: supaAuth.user.id,
+              email: supaAuth.user.email,
+              name: supaAuth.user.user_metadata?.full_name || supaAuth.user.user_metadata?.name || email.split('@')[0],
+              role: supaAuth.user.user_metadata?.role || 'both',
+              city: supaAuth.user.user_metadata?.city || 'Ciudad de México',
+              phone: supaAuth.user.user_metadata?.phone || '',
+              rating: 5.0,
+              operations: 1,
+            };
+            const token = supaAuth.session?.access_token || `token_${supaAuth.user.id}`;
+            localStorage.setItem('motoluv_token', token);
+            setUser(fallbackUser);
+            if (fallbackUser.role === 'comprador') setActiveView('comprador');
+            else setActiveView('vendedor');
+            return fallbackUser;
+          }
+        } catch (supaEx) {
+          console.warn('Direct Supabase login fallback failed:', supaEx);
+        }
+      }
+      throw err;
+    }
   };
 
   const loginWithOAuth = async (provider) => {
@@ -63,11 +95,49 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (data) => {
-    const res = await authApi.register(data);
-    localStorage.setItem('motoluv_token', res.access_token);
-    setUser(res.user);
-    if (data.role) setActiveView(data.role);
-    return res.user;
+    try {
+      const res = await authApi.register(data);
+      localStorage.setItem('motoluv_token', res.access_token);
+      setUser(res.user);
+      if (data.role) setActiveView(data.role);
+      return res.user;
+    } catch (err) {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: supaAuth, error: supaErr } = await supabase.auth.signUp({
+            email: data.email.trim().toLowerCase(),
+            password: data.password,
+            options: {
+              data: {
+                full_name: data.name,
+                phone: data.phone || '',
+                city: data.city || 'Ciudad de México',
+                role: data.role || 'both',
+              },
+            },
+          });
+          if (!supaErr && supaAuth?.user) {
+            const fallbackUser = {
+              id: supaAuth.user.id,
+              email: data.email,
+              name: data.name,
+              role: data.role || 'both',
+              city: data.city || 'Ciudad de México',
+              phone: data.phone || '',
+              rating: 5.0,
+              operations: 0,
+            };
+            const token = supaAuth.session?.access_token || `token_${supaAuth.user.id}`;
+            localStorage.setItem('motoluv_token', token);
+            setUser(fallbackUser);
+            return fallbackUser;
+          }
+        } catch (supaEx) {
+          console.warn('Direct Supabase register fallback failed:', supaEx);
+        }
+      }
+      throw err;
+    }
   };
 
   const logout = () => {
