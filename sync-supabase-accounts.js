@@ -1,12 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+const rawUrl = (process.env.SUPABASE_URL || '').trim();
 const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
 const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-const anonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
-const activeKey = serviceKey || anonKey;
 
-const supabase = createClient(cleanUrl, activeKey, {
+const supabase = createClient(cleanUrl, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
@@ -20,8 +18,8 @@ const accountsToProvision = [
     role: 'both',
     bank_account: {
       bank_name: 'BBVA Bancomer',
-      bank_clabe: '012180001234567890',
-      bank_holder: 'Rodrigo Salinas Motoluv'
+      bank_clabe: '000000000000000000',
+      bank_holder: 'DEMO MOTOLUV'
     }
   },
   {
@@ -33,8 +31,8 @@ const accountsToProvision = [
     role: 'both',
     bank_account: {
       bank_name: 'Santander México',
-      bank_clabe: '012180004567890123',
-      bank_holder: 'Demo Motoluv'
+      bank_clabe: '000000000000000000',
+      bank_holder: 'DEMO MOTOLUV'
     }
   },
   {
@@ -55,8 +53,8 @@ const accountsToProvision = [
     role: 'vendedor',
     bank_account: {
       bank_name: 'Banorte',
-      bank_clabe: '012180009988776655',
-      bank_holder: 'Vendedor Certificado'
+      bank_clabe: '000000000000000000',
+      bank_holder: 'DEMO MOTOLUV'
     }
   }
 ];

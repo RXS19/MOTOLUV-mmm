@@ -1,21 +1,27 @@
 import axios from 'axios';
 import { resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
 import { motos as fallbackMotos } from '../mock';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BACKEND_URL) || '';
 export const API = `${BACKEND_URL}/api`;
-
-// Feature flag: switch to Supabase when env vars are set
-export const USE_SUPABASE = false;
 
 // Helper: resolve relative image URLs (e.g. /uploads/xxx.jpg) with backend host and safe fallbacks
 export const resolveImageUrl = (url, fallbackType = 'moto') => resolveSafeImageUrl(url, fallbackType);
 
 const api = axios.create({ baseURL: API, timeout: 8000 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('motoluv_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(async (config) => {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+      }
+    } catch {
+      // ignore
+    }
+  }
   return config;
 });
 

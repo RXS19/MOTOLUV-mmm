@@ -76,7 +76,6 @@ export const AuthProvider = ({ children }) => {
         if (mounted) {
           if (initialSession?.user) {
             setSession(initialSession);
-            localStorage.setItem('motoluv_token', initialSession.access_token);
             const userObj = await buildUserObject(initialSession.user, initialSession);
             setUser(userObj);
             if (userObj?.role === 'comprador') setActiveView('comprador');
@@ -84,7 +83,6 @@ export const AuthProvider = ({ children }) => {
           } else {
             setSession(null);
             setUser(null);
-            localStorage.removeItem('motoluv_token');
           }
         }
       } catch (err) {
@@ -104,7 +102,6 @@ export const AuthProvider = ({ children }) => {
 
         if (currentSession?.user) {
           setSession(currentSession);
-          localStorage.setItem('motoluv_token', currentSession.access_token);
           const userObj = await buildUserObject(currentSession.user, currentSession);
           setUser(userObj);
           if (userObj?.role === 'comprador') setActiveView('comprador');
@@ -112,7 +109,6 @@ export const AuthProvider = ({ children }) => {
         } else {
           setSession(null);
           setUser(null);
-          localStorage.removeItem('motoluv_token');
         }
       });
       subscription = authListener.subscription;
@@ -146,7 +142,6 @@ export const AuthProvider = ({ children }) => {
 
     if (data?.session) {
       setSession(data.session);
-      localStorage.setItem('motoluv_token', data.session.access_token);
     }
 
     const userObj = await buildUserObject(data.user, data.session);
@@ -191,7 +186,6 @@ export const AuthProvider = ({ children }) => {
 
     if (data?.session) {
       setSession(data.session);
-      localStorage.setItem('motoluv_token', data.session.access_token);
     }
 
     // Intentar insertar de inmediato en profiles por redundancia si el trigger estuviera en proceso
@@ -234,7 +228,6 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.warn('Error al cerrar sesión en Supabase:', err);
     } finally {
-      localStorage.removeItem('motoluv_token');
       setSession(null);
       setUser(null);
     }

@@ -23,7 +23,11 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- 3. TRIGGER AUTOMÁTICO: Crear / sincronizar perfil al registrar en auth.users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO public.profiles (
     id,
@@ -52,7 +56,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Asociar trigger a auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -126,11 +130,12 @@ ALTER TABLE public.motos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.partners ENABLE ROW LEVEL SECURITY;
 
--- Políticas para Profiles
+-- Políticas para Profiles (Privacidad y Aislamiento de Usuario)
 DROP POLICY IF EXISTS "Public profiles read" ON public.profiles;
-CREATE POLICY "Public profiles read"
+DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
+CREATE POLICY "Users can read own profile"
   ON public.profiles FOR SELECT
-  USING (true);
+  USING (auth.uid() = id);
 
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"

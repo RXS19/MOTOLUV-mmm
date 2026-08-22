@@ -2,18 +2,16 @@ import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import Stripe from 'stripe';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 
-// Supabase server client with URL sanitization (strips /rest/v1 or trailing slashes if pasted directly)
-const rawSupabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+// Supabase server client with URL sanitization - ONLY using SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+const rawSupabaseUrl = (process.env.SUPABASE_URL || '').trim();
 const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
-const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const supabaseServer = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 // n8n & HubSpot Webhook Automation Trigger
@@ -36,25 +34,20 @@ async function triggerN8nHubspotWebhook(eventType: string, payload: any) {
     data: payload,
   };
 
-  // 1. Write user record to Supabase database (syncing to users / profiles table)
+  // 1. Write user record to Supabase database (syncing to profiles table)
   if (supabaseServer && eventType === 'user.registered') {
     try {
       const userPayload = {
         id: payload.id,
-        email: payload.email,
-        name: payload.name,
+        full_name: payload.name,
         phone: payload.phone || '',
         role: payload.role || 'comprador',
-        city: payload.city || '',
-        created_at: payload.created_at || new Date().toISOString(),
+        city: payload.city || 'Ciudad de México',
+        updated_at: new Date().toISOString(),
       };
       
-      const { error: errUsers } = await supabaseServer.from('users').upsert([userPayload], { onConflict: 'id' });
-      if (errUsers) {
-        // Fallback to profiles table if users table has restrictions
-        await supabaseServer.from('profiles').upsert([userPayload], { onConflict: 'id' });
-      }
-      console.log('User synced to Supabase database:', payload.email);
+      await supabaseServer.from('profiles').upsert([userPayload], { onConflict: 'id' });
+      console.log('User synced to Supabase database profiles:', payload.email);
     } catch (err: any) {
       console.error('Error writing user to Supabase:', err?.message || err);
     }
@@ -101,7 +94,6 @@ function getStripe(): Stripe | null {
 }
 
 const PORT = 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'motoluv-super-secret-key-change-in-production';
 const UPLOAD_DIR = process.env.VERCEL
   ? path.join('/tmp', 'uploads')
   : path.join(process.cwd(), 'uploads');
@@ -135,37 +127,23 @@ const upload = multer({
   },
 });
 
-// In-memory data store
-interface User {
+export interface AuthenticatedUser {
   id: string;
   email: string;
   name: string;
   phone?: string;
   city?: string;
   role: 'comprador' | 'vendedor' | 'both';
-  passwordHash: string;
-  created_at: string;
+  created_at?: string;
   avatar?: string;
-  provider?: string;
-  buyer_profile?: {
-    shipping_city?: string;
-    favorites?: string[];
-  };
-  seller_profile?: {
-    store_name?: string;
-    rfc?: string;
-    bank_clabe?: string;
-    bank_name?: string;
-    bank_holder?: string;
-    rating?: number;
-    total_sales?: number;
-  };
-  rating: number;
-  operations: number;
   bank_clabe?: string;
   bank_name?: string;
   bank_holder?: string;
+  rating?: number;
+  operations?: number;
 }
+
+export type User = AuthenticatedUser;
 
 function getCommissionRate(price: number): number {
   if (price <= 30000) return 0.10;
@@ -242,135 +220,14 @@ interface PartnerApp {
 }
 
 const db = {
-  users: new Map<string, User>(),
-  usersByEmail: new Map<string, User>(),
   motos: new Map<string, Moto>(),
   offers: new Map<string, Offer>(),
   partners: new Map<string, PartnerApp>(),
 };
 
-function sanitizeUser(u: User) {
-  return {
-    id: u.id,
-    email: u.email,
-    name: u.name,
-    phone: u.phone,
-    city: u.city,
-    role: u.role || 'both',
-    created_at: u.created_at,
-    avatar: u.avatar,
-    provider: u.provider || 'email',
-    buyer_profile: u.buyer_profile || {
-      shipping_city: u.city || '',
-      favorites: [],
-    },
-    seller_profile: u.seller_profile || {
-      bank_clabe: u.bank_clabe || '',
-      bank_name: u.bank_name || '',
-      bank_holder: u.bank_holder || '',
-      rating: u.rating || 5.0,
-      total_sales: u.operations || 0,
-    },
-    rating: u.rating,
-    operations: u.operations,
-    bank_clabe: u.bank_clabe,
-    bank_name: u.bank_name,
-    bank_holder: u.bank_holder,
-  };
-}
-
-// Seed initial data
+// Seed initial data for motos marketplace
 function seedDatabase() {
   if (db.motos.size > 0) return;
-
-  const defaultUsers: User[] = [
-    {
-      id: 'user_admin_demo',
-      email: 'admin.demo@motoluv.mx',
-      name: 'Rodrigo Salinas Motoluv',
-      phone: '5544332211',
-      city: 'Ciudad de México',
-      role: 'both',
-      passwordHash: bcrypt.hashSync('MotoluvSecure2026!', 10),
-      created_at: new Date().toISOString(),
-      bank_clabe: '012180001234567890',
-      bank_name: 'BBVA Bancomer',
-      bank_holder: 'Rodrigo Salinas Motoluv',
-      rating: 5.0,
-      operations: 18,
-      buyer_profile: { shipping_city: 'Ciudad de México', favorites: [] },
-      seller_profile: {
-        bank_clabe: '012180001234567890',
-        bank_name: 'BBVA Bancomer',
-        bank_holder: 'Rodrigo Salinas Motoluv',
-        rating: 5.0,
-        total_sales: 18,
-      },
-    },
-    {
-      id: 'seller_demo_01',
-      email: 'demo@motoluv.mx',
-      name: 'Demo Motoluv',
-      phone: '+52 55 0000 0000',
-      city: 'Ciudad de México',
-      role: 'both',
-      passwordHash: bcrypt.hashSync('demo1234', 10),
-      created_at: new Date().toISOString(),
-      bank_clabe: '012180004567890123',
-      bank_name: 'Santander México',
-      bank_holder: 'Demo Motoluv',
-      rating: 4.9,
-      operations: 24,
-      buyer_profile: { shipping_city: 'Ciudad de México', favorites: [] },
-      seller_profile: {
-        bank_clabe: '012180004567890123',
-        bank_name: 'Santander México',
-        bank_holder: 'Demo Motoluv',
-        rating: 4.9,
-        total_sales: 24,
-      },
-    },
-    {
-      id: 'user_comprador_demo',
-      email: 'comprador@motoluv.mx',
-      name: 'Comprador Motoluv',
-      phone: '+52 55 1122 3344',
-      city: 'Guadalajara',
-      role: 'comprador',
-      passwordHash: bcrypt.hashSync('comprador123', 10),
-      created_at: new Date().toISOString(),
-      rating: 5.0,
-      operations: 4,
-      buyer_profile: { shipping_city: 'Guadalajara', favorites: [] },
-    },
-    {
-      id: 'user_vendedor_demo',
-      email: 'vendedor@motoluv.mx',
-      name: 'Vendedor Certificado',
-      phone: '+52 55 9988 7766',
-      city: 'Monterrey',
-      role: 'vendedor',
-      passwordHash: bcrypt.hashSync('vendedor123', 10),
-      created_at: new Date().toISOString(),
-      bank_clabe: '012180009988776655',
-      bank_name: 'Banorte',
-      bank_holder: 'Vendedor Certificado',
-      rating: 4.8,
-      operations: 12,
-      seller_profile: {
-        bank_clabe: '012180009988776655',
-        bank_name: 'Banorte',
-        bank_holder: 'Vendedor Certificado',
-        rating: 4.8,
-        total_sales: 12,
-      },
-    }
-  ];
-
-  for (const u of defaultUsers) {
-    db.users.set(u.id, u);
-    db.usersByEmail.set(u.email.toLowerCase(), u);
-  }
 
   const motoImages = [
     'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=800',
@@ -429,7 +286,7 @@ function seedDatabase() {
     const moto: Moto = {
       id,
       owner_id: 'user_admin_demo',
-      owner_name: 'Rodrigo Salinas Motoluv',
+      owner_name: 'DEMO MOTOLUV',
       brand: s.brand,
       model: s.model,
       year: s.year,
@@ -464,13 +321,13 @@ function seedDatabase() {
   });
 }
 
-// Auth Middleware
+// Auth Middleware (Validating Supabase Auth JWT tokens)
 async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ detail: 'No autenticado' });
 
-  // 1. If Supabase Server is configured, verify with Supabase Auth
+  // 1. If Supabase Server is configured with service_role, verify directly with Supabase Auth
   if (supabaseServer) {
     try {
       const { data: { user: supaUser }, error } = await supabaseServer.auth.getUser(token);
@@ -491,35 +348,30 @@ async function authenticateToken(req: Request, res: Response, next: NextFunction
     }
   }
 
-  // 2. Decode Supabase JWT payload if signature check is delegated
+  // 2. Decode Supabase JWT payload securely if server is running standalone
   try {
-    const decoded = jwt.decode(token) as any;
-    if (decoded && (decoded.sub || decoded.id)) {
-      const userId = decoded.sub || decoded.id;
-      const metadata = decoded.user_metadata || {};
-      (req as any).user = {
-        id: userId,
-        email: decoded.email || '',
-        name: metadata.full_name || metadata.name || decoded.email?.split('@')[0] || 'Usuario',
-        phone: metadata.phone || '',
-        city: metadata.city || 'Ciudad de México',
-        role: metadata.role || 'both',
-      };
-      return next();
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
+      const decoded = JSON.parse(payloadJson);
+      if (decoded && (decoded.sub || decoded.id)) {
+        if (decoded.exp && Date.now() >= decoded.exp * 1000) {
+          return res.status(401).json({ detail: 'Sesión expirada' });
+        }
+        const userId = decoded.sub || decoded.id;
+        const metadata = decoded.user_metadata || {};
+        (req as any).user = {
+          id: userId,
+          email: decoded.email || '',
+          name: metadata.full_name || metadata.name || decoded.email?.split('@')[0] || 'Usuario',
+          phone: metadata.phone || '',
+          city: metadata.city || 'Ciudad de México',
+          role: metadata.role || 'both',
+        };
+        return next();
+      }
     }
   } catch (decodeErr) {
-    // continue
-  }
-
-  // 3. Fallback for demo users
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
-    const user = db.users.get(payload.sub);
-    if (user) {
-      (req as any).user = user;
-      return next();
-    }
-  } catch {
     // continue
   }
 
@@ -552,167 +404,10 @@ api.get('/', (_req, res) => {
   res.json({ message: 'Motoluv API', auth: 'Supabase Auth', version: '1.0', motos_count: db.motos.size });
 });
 
-  // Auth Routes (Supabase Proxy / Fallback helpers)
-  api.post('/auth/register', async (req, res) => {
-    const { email, name, password, phone, city, role } = req.body;
-    if (!email || !password || !name) {
-      return res.status(400).json({ detail: 'Campos requeridos faltantes' });
-    }
-    const cleanEmail = email.toLowerCase().trim();
-
-    // If Supabase server is connected, attempt registration through Supabase Admin
-    if (supabaseServer) {
-      try {
-        const { data: supaAuth, error: supaErr } = await supabaseServer.auth.admin.createUser({
-          email: cleanEmail,
-          password: password,
-          email_confirm: true,
-          user_metadata: {
-            full_name: name.trim(),
-            name: name.trim(),
-            phone: (phone || '').trim(),
-            city: (city || 'Ciudad de México').trim(),
-            role: role || 'both',
-          },
-        });
-
-        if (supaErr) {
-          // If already exists or error, return friendly message
-          return res.status(400).json({ detail: supaErr.message });
-        }
-
-        if (supaAuth?.user) {
-          const newUser = {
-            id: supaAuth.user.id,
-            email: cleanEmail,
-            name: name.trim(),
-            phone: (phone || '').trim(),
-            city: (city || 'Ciudad de México').trim(),
-            role: role || 'both',
-            created_at: supaAuth.user.created_at,
-          };
-          triggerN8nHubspotWebhook('user.registered', newUser);
-          return res.json({ success: true, user: newUser });
-        }
-      } catch (err: any) {
-        console.error('Supabase server register exception:', err);
-        return res.status(400).json({ detail: err.message || 'Error al registrar en Supabase' });
-      }
-    }
-
-    // Fallback for standalone demo
-    const id = `user_${Math.random().toString(36).slice(2, 10)}`;
-    const user: User = {
-      id,
-      email: cleanEmail,
-      name: name.trim(),
-      phone: (phone || '').trim(),
-      city: (city || 'Ciudad de México').trim(),
-      role: role || 'both',
-      passwordHash: bcrypt.hashSync(password, 10),
-      created_at: new Date().toISOString(),
-      rating: 5.0,
-      operations: 0,
-      buyer_profile: { shipping_city: city || 'Ciudad de México', favorites: [] },
-      seller_profile: { rating: 5.0, total_sales: 0 },
-    };
-    db.users.set(id, user);
-    db.usersByEmail.set(cleanEmail, user);
-    triggerN8nHubspotWebhook('user.registered', user);
-
-    const token = jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
-  });
-
-  api.post('/auth/login', async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ detail: 'Ingresa correo y contraseña' });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-
-    // 1. Supabase Auth if connected
-    if (supabaseServer) {
-      try {
-        const { data: supaAuth, error: supaErr } = await supabaseServer.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password,
-        });
-
-        if (!supaErr && supaAuth?.user && supaAuth.session) {
-          const supaUser = supaAuth.user;
-          const metadata = supaUser.user_metadata || {};
-          const userObj = {
-            id: supaUser.id,
-            email: supaUser.email,
-            name: metadata.full_name || metadata.name || supaUser.email?.split('@')[0] || 'Usuario',
-            phone: metadata.phone || '',
-            city: metadata.city || 'Ciudad de México',
-            role: metadata.role || 'both',
-            created_at: supaUser.created_at,
-          };
-          return res.json({
-            access_token: supaAuth.session.access_token,
-            token: supaAuth.session.access_token,
-            token_type: 'bearer',
-            user: userObj,
-          });
-        }
-      } catch (authErr: any) {
-        console.warn('Supabase auth login check exception:', authErr?.message || authErr);
-      }
-    }
-
-    // 2. Demo memory match
-    const user = db.usersByEmail.get(cleanEmail);
-    if (user && user.passwordHash && bcrypt.compareSync(password, user.passwordHash)) {
-      const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
-    }
-
-    return res.status(401).json({ detail: 'Correo o contraseña incorrectos. Verifica tus credenciales.' });
-  });
-
-  api.post('/auth/oauth', (req, res) => {
-    const { provider, email, name, avatar } = req.body;
-    if (!email) {
-      return res.status(400).json({ detail: 'Email de OAuth no provisto' });
-    }
-
-    let user = db.usersByEmail.get(email);
-    if (!user) {
-      const id = `user_${Math.random().toString(36).slice(2, 10)}`;
-      user = {
-        id,
-        email,
-        name: name || email.split('@')[0],
-        phone: '',
-        city: 'Ciudad de México',
-        role: 'both',
-        passwordHash: '',
-        created_at: new Date().toISOString(),
-        avatar: avatar || '',
-        provider: provider || 'google',
-        buyer_profile: { shipping_city: 'Ciudad de México', favorites: [] },
-        seller_profile: { rating: 5.0, total_sales: 0 },
-        rating: 5.0,
-        operations: 0,
-      };
-      db.users.set(id, user);
-      db.usersByEmail.set(email, user);
-
-      triggerN8nHubspotWebhook('user.registered', user);
-    }
-
-    const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
-  });
-
-  api.get('/auth/me', authenticateToken, (req, res) => {
-    const user = (req as any).user;
-    return res.json(user);
-  });
+api.get('/auth/me', authenticateToken, (req, res) => {
+  const user = (req as any).user;
+  return res.json(user);
+});
 
   api.patch('/auth/role', authenticateToken, async (req, res) => {
     const user = (req as any).user;
