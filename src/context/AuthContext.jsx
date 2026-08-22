@@ -100,15 +100,27 @@ export const AuthProvider = ({ children }) => {
       const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
         if (!mounted) return;
 
+        console.log(`[Supabase Auth Event: ${event}]`, {
+          hasSession: Boolean(currentSession),
+          userId: currentSession?.user?.id || null,
+          userEmail: currentSession?.user?.email || null,
+        });
+
         if (currentSession?.user) {
           setSession(currentSession);
           const userObj = await buildUserObject(currentSession.user, currentSession);
-          setUser(userObj);
-          if (userObj?.role === 'comprador') setActiveView('comprador');
-          else setActiveView('vendedor');
-        } else {
-          setSession(null);
-          setUser(null);
+          if (mounted) {
+            setUser(userObj);
+            if (userObj?.role === 'comprador') setActiveView('comprador');
+            else setActiveView('vendedor');
+            setLoading(false);
+          }
+        } else if (event === 'SIGNED_OUT' || (!currentSession && event !== 'INITIAL_SESSION')) {
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+          }
         }
       });
       subscription = authListener.subscription;
@@ -127,18 +139,37 @@ export const AuthProvider = ({ children }) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    console.log('--- [INTENTO DE LOGIN CON SUPABASE AUTH] ---');
+    console.log('Email:', cleanEmail);
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password,
     });
 
     if (error) {
-      console.error('Error en Supabase signInWithPassword:', error);
+      console.error('=== [SUPABASE AUTH LOGIN ERROR] ===');
+      console.error('error.message:', error.message);
+      console.error('error.code:', error.code);
+      console.error('error.status:', error.status);
+      console.error('error.name:', error.name);
+      console.error('===================================');
+
       const friendlyMessage = formatSupabaseAuthError(error);
       const customErr = new Error(friendlyMessage);
       customErr.original = error;
+      customErr.code = error.code;
+      customErr.status = error.status;
       throw customErr;
     }
+
+    console.log('=== [SUPABASE AUTH LOGIN SUCCESS] ===');
+    console.log('data.user.id (UUID):', data?.user?.id);
+    console.log('data.user.email:', data?.user?.email);
+    console.log('data.session exists:', Boolean(data?.session));
+    console.log('data.session.expires_at:', data?.session?.expires_at);
+    console.log('=====================================');
 
     if (data?.session) {
       setSession(data.session);

@@ -1,33 +1,51 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react';
 import { toast } from '../hooks/use-toast';
 import { useAuth } from '../context/AuthContext';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, loginWithOAuth } = useAuth();
+  const location = useLocation();
+  const { user, loading: authLoading, login, loginWithOAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(null);
 
+  // Redirigir si ya tiene sesión activa
+  useEffect(() => {
+    if (!authLoading && user) {
+      const destination = location.state?.from?.pathname || '/panel';
+      navigate(destination, { replace: true });
+    }
+  }, [user, authLoading, navigate, location]);
+
   const submit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
-      toast({ title: 'Campos requeridos', description: 'Por favor ingresa tu correo y contraseña.' });
+      toast({ 
+        title: 'Campos requeridos', 
+        description: 'Por favor ingresa tu correo y contraseña.',
+        variant: 'destructive'
+      });
       return;
     }
     setLoading(true);
     try {
       const u = await login(email, password);
-      toast({ title: 'Bienvenido de vuelta', description: `Hola ${u?.name ? u.name.split(' ')[0] : 'usuario'}, sesión iniciada correctamente.` });
-      setTimeout(() => navigate('/panel'), 350);
+      toast({ 
+        title: 'Bienvenido de vuelta', 
+        description: `Hola ${u?.name ? u.name.split(' ')[0] : 'usuario'}, sesión iniciada correctamente.` 
+      });
+      const destination = location.state?.from?.pathname || '/panel';
+      navigate(destination, { replace: true });
     } catch (err) {
       console.error('Error al iniciar sesión:', err);
       toast({
         title: 'Error al iniciar sesión',
         description: err?.message || 'Correo o contraseña incorrectos. Verifica tus credenciales.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
