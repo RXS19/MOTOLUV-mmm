@@ -283,21 +283,94 @@ function sanitizeUser(u: User) {
 function seedDatabase() {
   if (db.motos.size > 0) return;
 
-  const sellerId = 'seller_demo_01';
-  const demoSeller: User = {
-    id: sellerId,
-    email: 'demo@motoluv.mx',
-    name: 'Demo Motoluv',
-    phone: '+52 55 0000 0000',
-    city: 'Ciudad de México',
-    role: 'vendedor',
-    passwordHash: bcrypt.hashSync('demo1234', 10),
-    created_at: new Date().toISOString(),
-    rating: 4.8,
-    operations: 24,
-  };
-  db.users.set(sellerId, demoSeller);
-  db.usersByEmail.set(demoSeller.email, demoSeller);
+  const defaultUsers: User[] = [
+    {
+      id: 'user_admin_demo',
+      email: 'admin.demo@motoluv.mx',
+      name: 'Rodrigo Salinas Motoluv',
+      phone: '5544332211',
+      city: 'Ciudad de México',
+      role: 'both',
+      passwordHash: bcrypt.hashSync('MotoluvSecure2026!', 10),
+      created_at: new Date().toISOString(),
+      bank_clabe: '012180001234567890',
+      bank_name: 'BBVA Bancomer',
+      bank_holder: 'Rodrigo Salinas Motoluv',
+      rating: 5.0,
+      operations: 18,
+      buyer_profile: { shipping_city: 'Ciudad de México', favorites: [] },
+      seller_profile: {
+        bank_clabe: '012180001234567890',
+        bank_name: 'BBVA Bancomer',
+        bank_holder: 'Rodrigo Salinas Motoluv',
+        rating: 5.0,
+        total_sales: 18,
+      },
+    },
+    {
+      id: 'seller_demo_01',
+      email: 'demo@motoluv.mx',
+      name: 'Demo Motoluv',
+      phone: '+52 55 0000 0000',
+      city: 'Ciudad de México',
+      role: 'both',
+      passwordHash: bcrypt.hashSync('demo1234', 10),
+      created_at: new Date().toISOString(),
+      bank_clabe: '012180004567890123',
+      bank_name: 'Santander México',
+      bank_holder: 'Demo Motoluv',
+      rating: 4.9,
+      operations: 24,
+      buyer_profile: { shipping_city: 'Ciudad de México', favorites: [] },
+      seller_profile: {
+        bank_clabe: '012180004567890123',
+        bank_name: 'Santander México',
+        bank_holder: 'Demo Motoluv',
+        rating: 4.9,
+        total_sales: 24,
+      },
+    },
+    {
+      id: 'user_comprador_demo',
+      email: 'comprador@motoluv.mx',
+      name: 'Comprador Motoluv',
+      phone: '+52 55 1122 3344',
+      city: 'Guadalajara',
+      role: 'comprador',
+      passwordHash: bcrypt.hashSync('comprador123', 10),
+      created_at: new Date().toISOString(),
+      rating: 5.0,
+      operations: 4,
+      buyer_profile: { shipping_city: 'Guadalajara', favorites: [] },
+    },
+    {
+      id: 'user_vendedor_demo',
+      email: 'vendedor@motoluv.mx',
+      name: 'Vendedor Certificado',
+      phone: '+52 55 9988 7766',
+      city: 'Monterrey',
+      role: 'vendedor',
+      passwordHash: bcrypt.hashSync('vendedor123', 10),
+      created_at: new Date().toISOString(),
+      bank_clabe: '012180009988776655',
+      bank_name: 'Banorte',
+      bank_holder: 'Vendedor Certificado',
+      rating: 4.8,
+      operations: 12,
+      seller_profile: {
+        bank_clabe: '012180009988776655',
+        bank_name: 'Banorte',
+        bank_holder: 'Vendedor Certificado',
+        rating: 4.8,
+        total_sales: 12,
+      },
+    }
+  ];
+
+  for (const u of defaultUsers) {
+    db.users.set(u.id, u);
+    db.usersByEmail.set(u.email.toLowerCase(), u);
+  }
 
   const motoImages = [
     'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=800',
@@ -355,8 +428,8 @@ function seedDatabase() {
 
     const moto: Moto = {
       id,
-      owner_id: sellerId,
-      owner_name: demoSeller.name,
+      owner_id: 'user_admin_demo',
+      owner_name: 'Rodrigo Salinas Motoluv',
       brand: s.brand,
       model: s.model,
       year: s.year,
@@ -434,25 +507,28 @@ api.get('/', (_req, res) => {
     if (!email || !password || !name) {
       return res.status(400).json({ detail: 'Campos requeridos faltantes' });
     }
-    if (db.usersByEmail.has(email)) {
+    const cleanEmail = email.toLowerCase().trim();
+    if (db.usersByEmail.has(cleanEmail)) {
       return res.status(400).json({ detail: 'Email ya registrado' });
     }
 
     const id = `user_${Math.random().toString(36).slice(2, 10)}`;
     const user: User = {
       id,
-      email,
-      name,
-      phone: phone || '',
-      city: city || '',
-      role: role || 'comprador',
+      email: cleanEmail,
+      name: name.trim(),
+      phone: (phone || '').trim(),
+      city: (city || 'Ciudad de México').trim(),
+      role: role || 'both',
       passwordHash: bcrypt.hashSync(password, 10),
       created_at: new Date().toISOString(),
       rating: 5.0,
       operations: 0,
+      buyer_profile: { shipping_city: city || 'Ciudad de México', favorites: [] },
+      seller_profile: { rating: 5.0, total_sales: 0 },
     };
     db.users.set(id, user);
-    db.usersByEmail.set(email, user);
+    db.usersByEmail.set(cleanEmail, user);
 
     // Sync to Supabase Database if connected
     if (supabaseServer) {
@@ -464,7 +540,7 @@ api.get('/', (_req, res) => {
             name: user.name,
             phone: user.phone || '',
             city: user.city || '',
-            role: user.role || 'comprador',
+            role: user.role || 'both',
             created_at: user.created_at,
           }]);
           if (error) console.warn('Supabase user insert sync error:', error.message);
@@ -482,15 +558,74 @@ api.get('/', (_req, res) => {
     return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
   });
 
-  api.post('/auth/login', (req, res) => {
+  api.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
-    const user = db.usersByEmail.get(email);
-    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-      return res.status(401).json({ detail: 'Credenciales inválidas' });
+    if (!email || !password) {
+      return res.status(400).json({ detail: 'Ingresa correo y contraseña' });
     }
 
-    const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
+    const cleanEmail = email.toLowerCase().trim();
+    let user = db.usersByEmail.get(cleanEmail);
+
+    // 1. Check in-memory match
+    if (user && user.passwordHash && bcrypt.compareSync(password, user.passwordHash)) {
+      const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
+    }
+
+    // 2. If not found in memory, try authenticating against Supabase Auth if connected
+    if (supabaseServer) {
+      try {
+        const { data: supaAuth, error: supaErr } = await supabaseServer.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        });
+
+        if (!supaErr && supaAuth?.user) {
+          const supaUser = supaAuth.user;
+          // Check if profile exists in supabase users table
+          const { data: dbUserData } = await supabaseServer
+            .from('users')
+            .select('*')
+            .eq('id', supaUser.id)
+            .single();
+
+          const loadedUser: User = {
+            id: supaUser.id,
+            email: cleanEmail,
+            name: dbUserData?.name || (supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || cleanEmail.split('@')[0]),
+            phone: dbUserData?.phone || supaUser.user_metadata?.phone || '',
+            city: dbUserData?.city || supaUser.user_metadata?.city || 'Ciudad de México',
+            role: dbUserData?.role || supaUser.user_metadata?.role || 'both',
+            passwordHash: bcrypt.hashSync(password, 10),
+            created_at: dbUserData?.created_at || supaUser.created_at || new Date().toISOString(),
+            bank_clabe: dbUserData?.bank_account?.bank_clabe || '',
+            bank_name: dbUserData?.bank_account?.bank_name || '',
+            bank_holder: dbUserData?.bank_account?.bank_holder || '',
+            rating: 5.0,
+            operations: 0,
+            buyer_profile: { shipping_city: dbUserData?.city || 'Ciudad de México', favorites: [] },
+            seller_profile: {
+              bank_clabe: dbUserData?.bank_account?.bank_clabe || '',
+              bank_name: dbUserData?.bank_account?.bank_name || '',
+              bank_holder: dbUserData?.bank_account?.bank_holder || '',
+              rating: 5.0,
+              total_sales: 0,
+            },
+          };
+
+          db.users.set(loadedUser.id, loadedUser);
+          db.usersByEmail.set(cleanEmail, loadedUser);
+
+          const token = jwt.sign({ sub: loadedUser.id }, JWT_SECRET, { expiresIn: '7d' });
+          return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(loadedUser) });
+        }
+      } catch (authErr: any) {
+        console.warn('Supabase auth login check exception:', authErr?.message || authErr);
+      }
+    }
+
+    return res.status(401).json({ detail: 'Correo o contraseña incorrectos. Verifica tus credenciales.' });
   });
 
   api.post('/auth/oauth', (req, res) => {

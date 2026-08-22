@@ -147,8 +147,38 @@ const LoginPage = () => {
         </div>
       </div>
 
-      <div className="mt-6 text-center text-[11px] text-zinc-600">
-        Cuenta demo: <span className="text-zinc-400">demo@motoluv.mx</span> / <span className="text-zinc-400">demo1234</span>
+      {/* Cuentas de prueba rápidas para acceso en 1 clic */}
+      <div className="mt-6 bg-[#111112] border border-white/5 rounded-md p-4 space-y-2">
+        <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider text-center">
+          Cuentas de prueba disponibles (Haz clic para autocompletar):
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('admin.demo@motoluv.mx');
+              setPassword('MotoluvSecure2026!');
+            }}
+            className="text-left p-2.5 bg-[#0a0a0a] hover:bg-zinc-900 border border-white/5 hover:border-red-brand/40 rounded transition-colors"
+          >
+            <div className="text-xs font-semibold text-white">Rodrigo Salinas (Dual)</div>
+            <div className="text-[10px] text-zinc-400 truncate">admin.demo@motoluv.mx</div>
+            <div className="text-[9px] text-red-brand font-mono">MotoluvSecure2026!</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('demo@motoluv.mx');
+              setPassword('demo1234');
+            }}
+            className="text-left p-2.5 bg-[#0a0a0a] hover:bg-zinc-900 border border-white/5 hover:border-red-brand/40 rounded transition-colors"
+          >
+            <div className="text-xs font-semibold text-white">Demo Motoluv (Vendedor)</div>
+            <div className="text-[10px] text-zinc-400 truncate">demo@motoluv.mx</div>
+            <div className="text-[9px] text-red-brand font-mono">demo1234</div>
+          </button>
+        </div>
       </div>
     </div>
   );
