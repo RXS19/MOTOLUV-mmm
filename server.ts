@@ -1202,9 +1202,8 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
     return res.json({ ok: true, seeded: db.motos.size });
   });
 
-  // Mount API router (mount on both /api and root to handle any Vercel/proxy path rewriting)
+  // Mount API router
   app.use('/api', api);
-  app.use(api);
 
   async function startServer() {
     // Vite middleware for development
