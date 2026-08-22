@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
+import { motos as fallbackMotos } from '../mock';
 
 const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BACKEND_URL) || '';
 export const API = `${BACKEND_URL}/api`;
@@ -10,14 +11,27 @@ export const USE_SUPABASE = false;
 // Helper: resolve relative image URLs (e.g. /uploads/xxx.jpg) with backend host and safe fallbacks
 export const resolveImageUrl = (url, fallbackType = 'moto') => resolveSafeImageUrl(url, fallbackType);
 
-
-const api = axios.create({ baseURL: API });
+const api = axios.create({ baseURL: API, timeout: 8000 });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('motoluv_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+function getFallbackMotos(params = {}) {
+  let list = [...fallbackMotos];
+  if (params.brand && params.brand !== 'all') list = list.filter((m) => m.brand === params.brand);
+  if (params.category && params.category !== 'all') list = list.filter((m) => m.category === params.category);
+  if (params.city && params.city !== 'all') list = list.filter((m) => m.city === params.city);
+  if (params.featured !== undefined) list = list.filter((m) => m.featured === (params.featured === 'true' || params.featured === true));
+  if (params.q) {
+    const qStr = String(params.q).toLowerCase();
+    list = list.filter((m) => `${m.brand} ${m.model}`.toLowerCase().includes(qStr));
+  }
+  const max = params.limit ? parseInt(String(params.limit), 10) : 100;
+  return list.slice(0, max);
+}
 
 export const authApi = {
   register: (data) => api.post('/auth/register', data).then((r) => r.data),
@@ -29,12 +43,36 @@ export const authApi = {
 };
 
 export const motoApi = {
-  list: (params = {}) => api.get('/motos', { params }).then((r) => r.data),
-  get: (id) => api.get(`/motos/${id}`).then((r) => r.data),
+  list: async (params = {}) => {
+    try {
+      const res = await api.get('/motos', { params });
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        return res.data;
+      }
+      return getFallbackMotos(params);
+    } catch {
+      return getFallbackMotos(params);
+    }
+  },
+  get: async (id) => {
+    try {
+      const res = await api.get(`/motos/${id}`);
+      if (res.data && res.data.id) {
+        return res.data;
+      }
+      const found = fallbackMotos.find((m) => m.id === id);
+      if (found) return found;
+      return fallbackMotos[0];
+    } catch {
+      const found = fallbackMotos.find((m) => m.id === id);
+      if (found) return found;
+      return fallbackMotos[0];
+    }
+  },
   create: (data) => api.post('/motos', data).then((r) => r.data),
   update: (id, data) => api.patch(`/motos/${id}`, data).then((r) => r.data),
   remove: (id) => api.delete(`/motos/${id}`).then((r) => r.data),
-  mine: () => api.get('/my/motos').then((r) => r.data),
+  mine: () => api.get('/my/motos').then((r) => r.data).catch(() => []),
 };
 
 export const offerApi = {

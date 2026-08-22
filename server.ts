@@ -398,21 +398,23 @@ function authenticateToken(req: Request, res: Response, next: NextFunction) {
 
 export const app = express();
 
-async function startServer() {
-  app.use(cors());
-  app.use(express.json());
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(UPLOAD_DIR));
 
-  // Serve upload files
-  app.use('/uploads', express.static(UPLOAD_DIR));
+// Seed database immediately on module initialization
+seedDatabase();
 
-  // Seed on startup
-  seedDatabase();
+export const api = express.Router();
 
-  const api = express.Router();
+api.get('/health', (_req, res) => {
+  return res.json({ status: 'ok', motos_count: db.motos.size, timestamp: new Date().toISOString() });
+});
 
-  api.get('/', (_req, res) => {
-    res.json({ message: 'Motoluv API', version: '1.0' });
-  });
+api.get('/', (_req, res) => {
+  res.json({ message: 'Motoluv API', version: '1.0', motos_count: db.motos.size });
+});
 
   // Auth Routes
   api.post('/auth/register', (req, res) => {
@@ -1127,32 +1129,34 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
     return res.json({ ok: true, seeded: db.motos.size });
   });
 
+  // Mount API router
   app.use('/api', api);
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else if (!process.env.VERCEL) {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  async function startServer() {
+    // Vite middleware for development
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else if (!process.env.VERCEL) {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (_req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    if (!process.env.VERCEL) {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server listening on http://0.0.0.0:${PORT}`);
+      });
+    }
   }
 
-  if (!process.env.VERCEL) {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server listening on http://0.0.0.0:${PORT}`);
-    });
-  }
-}
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+  });
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-});
-
-export default app;
+  export default app;
