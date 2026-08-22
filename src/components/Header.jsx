@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bike, Store, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, ShoppingCart } from 'lucide-react';
+import { Bike, Store, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, ShoppingCart, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { MotoluvLogo } from './MotoluvLogo';
@@ -109,6 +109,7 @@ const Header = () => {
                     </div>
                   </div>
                   <div className="py-2">
+                    <DropdownLink to="/panel/perfil" icon={User} label="Mi Perfil" onClick={() => setDropdownOpen(false)} />
                     <DropdownLink to="/panel" icon={LayoutDashboard} label="Panel de Vendedor" onClick={() => { setActiveView('vendedor'); setDropdownOpen(false); }} />
                     <DropdownLink to="/panel/mis-ofertas" icon={Tag} label="Mis Ofertas (Comprador)" onClick={() => { setActiveView('comprador'); setDropdownOpen(false); }} />
                     <DropdownLink to="/panel/mis-motos" icon={Bike} label="Mis Publicaciones" onClick={() => { setActiveView('vendedor'); setDropdownOpen(false); }} />
@@ -155,7 +156,8 @@ const Header = () => {
           <div className="pt-3 border-t border-white/5 flex flex-col gap-2">
             {user ? (
               <>
-                <Link to="/panel" onClick={() => setOpen(false)} className="flex items-center gap-2 text-zinc-300"><LayoutDashboard size={16} /> Panel</Link>
+                <Link to="/panel/perfil" onClick={() => setOpen(false)} className="flex items-center gap-2 text-zinc-300 hover:text-white"><User size={16} className="text-red-brand" /> Mi Perfil</Link>
+                <Link to="/panel" onClick={() => setOpen(false)} className="flex items-center gap-2 text-zinc-300 hover:text-white"><LayoutDashboard size={16} /> Panel</Link>
                 <button onClick={doLogout} className="text-left text-red-brand flex items-center gap-2"><LogOut size={16} /> Cerrar Sesión</button>
               </>
             ) : (

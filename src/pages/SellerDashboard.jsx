@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bike, Tag, Eye, Plus, ArrowRight, PackageCheck, Calculator, DollarSign, Activity, CheckCircle2 } from 'lucide-react';
+import { Bike, Tag, Eye, Plus, ArrowRight, PackageCheck, Calculator, DollarSign, Activity, CheckCircle2, User, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { motoApi, offerApi } from '../services/api';
 import { calculateCommission } from '../utils/commission';
@@ -70,9 +70,14 @@ const SellerDashboard = () => {
             </h1>
             <p className="text-zinc-400 mt-1 text-sm">Bienvenido, {user?.name}</p>
           </div>
-          <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
-            <Plus size={14} /> Nueva Publicación
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link to="/panel/perfil" className="px-4 py-2.5 bg-[#111112] hover:bg-white/5 border border-white/10 hover:border-white/20 text-zinc-200 text-xs font-bold tracking-wider uppercase rounded-sm inline-flex items-center gap-2 transition-colors">
+              <User size={14} className="text-red-brand" /> Mi Perfil {user?.bank_clabe ? '✓' : ''}
+            </Link>
+            <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
+              <Plus size={14} /> Nueva Publicación
+            </Link>
+          </div>
         </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

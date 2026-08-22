@@ -15,6 +15,8 @@ import BuyerDashboard from './pages/BuyerDashboard';
 import CreateMotoPage from './pages/CreateMotoPage';
 import MyOffersPage from './pages/MyOffersPage';
 import MyMotosPage from './pages/MyMotosPage';
+import ProfilePage from './pages/ProfilePage';
+import BankAccountPage from './pages/BankAccountPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
@@ -42,6 +44,9 @@ function App() {
                 <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
                 <Route path="/privacidad" element={<PrivacyPolicyPage />} />
                 <Route path="/panel" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+                <Route path="/panel/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/panel/cuenta-bancaria" element={<ProtectedRoute role="vendedor"><BankAccountPage /></ProtectedRoute>} />
                 <Route path="/panel/publicar" element={<ProtectedRoute role="vendedor"><CreateMotoPage /></ProtectedRoute>} />
                 <Route path="/panel/mis-motos" element={<ProtectedRoute role="vendedor"><MyMotosPage /></ProtectedRoute>} />
                 <Route path="/panel/mis-ofertas" element={<ProtectedRoute><MyOffersPage /></ProtectedRoute>} />

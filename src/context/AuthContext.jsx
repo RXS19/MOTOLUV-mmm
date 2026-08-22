@@ -230,6 +230,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Actualizar datos completos del perfil (nombre, teléfono, ciudad, CLABE, rol)
+  const updateProfile = async ({ name, phone, city, bank_clabe, bank_name, bank_holder, role }) => {
+    if (!user) throw new Error('Debes estar autenticado para actualizar tu perfil.');
+    const updates = {};
+    if (name !== undefined) {
+      updates.full_name = name.trim();
+      updates.name = name.trim();
+    }
+    if (phone !== undefined) updates.phone = phone.trim();
+    if (city !== undefined) updates.city = city.trim();
+    if (role !== undefined) updates.role = role;
+    if (bank_clabe !== undefined) updates.bank_clabe = bank_clabe.trim();
+    if (bank_name !== undefined) updates.bank_name = bank_name.trim();
+    if (bank_holder !== undefined) updates.bank_holder = bank_holder.trim();
+
+    try {
+      await updateUserProfile(user.id, updates);
+    } catch (err) {
+      console.warn('Error al actualizar en Supabase, aplicando localmente:', err);
+    }
+
+    const updated = {
+      ...user,
+      ...(name !== undefined ? { name: name.trim() } : {}),
+      ...(phone !== undefined ? { phone: phone.trim() } : {}),
+      ...(city !== undefined ? { city: city.trim() } : {}),
+      ...(role !== undefined ? { role } : {}),
+      ...(bank_clabe !== undefined ? { bank_clabe: bank_clabe.trim() } : {}),
+      ...(bank_name !== undefined ? { bank_name: bank_name.trim() } : {}),
+      ...(bank_holder !== undefined ? { bank_holder: bank_holder.trim() } : {}),
+    };
+    setUser(updated);
+    if (role && role !== user.role) {
+      setActiveView(role === 'both' ? 'vendedor' : role);
+    }
+    return updated;
+  };
+
   // Cambiar rol (comprador/vendedor/both)
   const updateRole = async (newRole) => {
     if (!user) return null;
@@ -264,6 +302,7 @@ export const AuthProvider = ({ children }) => {
         loginWithOAuth,
         register,
         logout,
+        updateProfile,
         updateRole,
         updateBank,
         setUser,
