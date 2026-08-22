@@ -14,13 +14,21 @@ const LoginPage = () => {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast({ title: 'Campos requeridos', description: 'Por favor ingresa tu correo y contraseña.' });
+      return;
+    }
     setLoading(true);
     try {
       const u = await login(email, password);
-      toast({ title: 'Bienvenido de vuelta', description: `Hola ${u.name.split(' ')[0]}, sesión iniciada.` });
-      setTimeout(() => navigate('/panel'), 400);
+      toast({ title: 'Bienvenido de vuelta', description: `Hola ${u?.name ? u.name.split(' ')[0] : 'usuario'}, sesión iniciada correctamente.` });
+      setTimeout(() => navigate('/panel'), 350);
     } catch (err) {
-      toast({ title: 'Error al iniciar sesión', description: err?.response?.data?.detail || 'Verifica tus credenciales.' });
+      console.error('Error al iniciar sesión:', err);
+      toast({
+        title: 'Error al iniciar sesión',
+        description: err?.message || 'Correo o contraseña incorrectos. Verifica tus credenciales.',
+      });
     } finally {
       setLoading(false);
     }
@@ -29,12 +37,10 @@ const LoginPage = () => {
   const handleOAuth = async (provider) => {
     setOauthLoading(provider);
     try {
-      const u = await loginWithOAuth(provider);
-      toast({ title: `Acceso con ${provider.toUpperCase()}`, description: `Bienvenido a Motoluv, ${u?.name || 'usuario'}.` });
-      setTimeout(() => navigate('/panel'), 400);
+      await loginWithOAuth(provider);
     } catch (err) {
-      toast({ title: 'Error OAuth', description: err?.message || 'No se pudo completar el inicio de sesión.' });
-    } finally {
+      console.error('Error OAuth:', err);
+      toast({ title: 'Error OAuth', description: err?.message || 'No se pudo completar el inicio de sesión con el proveedor.' });
       setOauthLoading(null);
     }
   };
@@ -124,7 +130,6 @@ const LoginPage = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-zinc-500 uppercase tracking-widest">Contraseña</label>
-              <a href="#" className="text-xs text-red-brand hover:underline">¿Olvidaste?</a>
             </div>
             <div className="relative">
               <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -144,40 +149,6 @@ const LoginPage = () => {
 
         <div className="text-center text-sm text-zinc-500 pt-4 border-t border-white/5">
           ¿No tienes cuenta? <Link to="/registro" className="text-red-brand hover:underline font-semibold">Regístrate gratis</Link>
-        </div>
-      </div>
-
-      {/* Cuentas de prueba rápidas para acceso en 1 clic */}
-      <div className="mt-6 bg-[#111112] border border-white/5 rounded-md p-4 space-y-2">
-        <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider text-center">
-          Cuentas de prueba disponibles (Haz clic para autocompletar):
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('admin.demo@motoluv.mx');
-              setPassword('MotoluvSecure2026!');
-            }}
-            className="text-left p-2.5 bg-[#0a0a0a] hover:bg-zinc-900 border border-white/5 hover:border-red-brand/40 rounded transition-colors"
-          >
-            <div className="text-xs font-semibold text-white">Rodrigo Salinas (Dual)</div>
-            <div className="text-[10px] text-zinc-400 truncate">admin.demo@motoluv.mx</div>
-            <div className="text-[9px] text-red-brand font-mono">MotoluvSecure2026!</div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('demo@motoluv.mx');
-              setPassword('demo1234');
-            }}
-            className="text-left p-2.5 bg-[#0a0a0a] hover:bg-zinc-900 border border-white/5 hover:border-red-brand/40 rounded transition-colors"
-          >
-            <div className="text-xs font-semibold text-white">Demo Motoluv (Vendedor)</div>
-            <div className="text-[10px] text-zinc-400 truncate">demo@motoluv.mx</div>
-            <div className="text-[9px] text-red-brand font-mono">demo1234</div>
-          </button>
         </div>
       </div>
     </div>

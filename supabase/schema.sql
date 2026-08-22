@@ -1,93 +1,114 @@
--- =========================================================
--- ESQUEMA COMPLETO DE BASE DE DATOS Y ROLES PARA MOTOLUV (SUPABASE)
--- =========================================================
+-- =========================================================================
+-- MOTOLUV - ESQUEMA DE BASE DE DATOS SUPABASE, PERFILES Y TRIGGERS DE AUTH
+-- =========================================================================
 
--- Habilitar extensión UUID
+-- 1. Habilitar extensión UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. TABLA PRINCIPAL DE USUARIOS
-CREATE TABLE IF NOT EXISTS public.users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email TEXT UNIQUE NOT NULL,
+-- 2. TABLA PÚBLICA DE PERFILES (SINCRONIZADA CON auth.users)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
   phone TEXT,
-  avatar_url TEXT,
-  roles TEXT[] DEFAULT ARRAY['buyer', 'seller'], -- Soporta ambos perfiles con el mismo correo
+  city TEXT DEFAULT 'Ciudad de México',
+  role TEXT DEFAULT 'both', -- 'comprador', 'vendedor', 'both'
+  bank_clabe TEXT,
+  bank_name TEXT,
+  bank_holder TEXT,
+  rating NUMERIC(3,2) DEFAULT 5.0,
+  operations INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. PERFIL DE COMPRADOR (Información separada de compras)
-CREATE TABLE IF NOT EXISTS public.buyer_profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  shipping_address TEXT,
-  city TEXT,
-  state TEXT,
-  zip_code TEXT,
-  favorites JSONB DEFAULT '[]'::jsonb,
-  saved_offers JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id)
-);
+-- 3. TRIGGER AUTOMÁTICO: Crear / sincronizar perfil al registrar en auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (
+    id,
+    full_name,
+    phone,
+    city,
+    role,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+    COALESCE(NEW.raw_user_meta_data->>'city', 'Ciudad de México'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'both'),
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = COALESCE(EXCLUDED.full_name, profiles.full_name),
+    phone = COALESCE(EXCLUDED.phone, profiles.phone),
+    city = COALESCE(EXCLUDED.city, profiles.city),
+    role = COALESCE(EXCLUDED.role, profiles.role),
+    updated_at = NOW();
 
--- 3. PERFIL DE VENDEDOR (Información bancaria y comisiones)
-CREATE TABLE IF NOT EXISTS public.seller_profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  store_name TEXT,
-  rfc TEXT,
-  bank_name TEXT,
-  bank_clabe TEXT,
-  bank_holder TEXT,
-  total_sales INTEGER DEFAULT 0,
-  rating NUMERIC(3,2) DEFAULT 5.0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id)
-);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. MOTOCICLETAS (Con desglose de comisión del vendedor)
+-- Asociar trigger a auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 4. TABLA DE MOTOCICLETAS
 CREATE TABLE IF NOT EXISTS public.motos (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  seller_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-  seller_email TEXT NOT NULL,
+  id TEXT PRIMARY KEY,
+  title TEXT,
   brand TEXT NOT NULL,
   model TEXT NOT NULL,
   year INTEGER NOT NULL,
   price NUMERIC(10,2) NOT NULL,
-  commission_rate NUMERIC(4,2) NOT NULL, -- e.g. 0.10, 0.08, 0.07, 0.06
-  commission_amount NUMERIC(10,2) NOT NULL, -- e.g. $2,400
-  net_payout NUMERIC(10,2) NOT NULL, -- e.g. $27,600 (Precio - Comisión)
-  km INTEGER NOT NULL,
-  score NUMERIC(3,1) DEFAULT 9.0,
-  city TEXT NOT NULL,
-  status TEXT DEFAULT 'active', -- 'active', 'reserved', 'sold'
+  km INTEGER NOT NULL DEFAULT 0,
+  engine TEXT,
+  color TEXT,
+  category TEXT DEFAULT 'Naked',
+  city TEXT NOT NULL DEFAULT 'Ciudad de México',
+  location TEXT,
   description TEXT,
   images TEXT[] DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  image TEXT,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  owner_name TEXT,
+  score NUMERIC(3,1) DEFAULT 9.0,
+  score_details JSONB DEFAULT '{}'::jsonb,
+  views INTEGER DEFAULT 0,
+  featured BOOLEAN DEFAULT false,
+  status TEXT DEFAULT 'Publicada', -- 'Publicada', 'Apartada', 'Certificación', 'Oferta', 'Proceso de entrega', 'Entregada', 'Vendida'
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. OFERTAS Y TRANSACCIONES
+-- 5. TABLA DE OFERTAS Y APARTADOS
 CREATE TABLE IF NOT EXISTS public.offers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  moto_id UUID REFERENCES public.motos(id) ON DELETE CASCADE,
-  buyer_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-  seller_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-  buyer_email TEXT NOT NULL,
+  id TEXT PRIMARY KEY,
+  moto_id TEXT REFERENCES public.motos(id) ON DELETE CASCADE,
+  buyer_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  buyer_name TEXT,
+  seller_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   amount NUMERIC(10,2) NOT NULL,
-  status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'rejected'
+  package TEXT DEFAULT 'plus', -- 'basico', 'plus', 'total'
+  status TEXT DEFAULT 'pending', -- 'pending', 'accepted', 'rejected', 'completed'
+  is_apartado BOOLEAN DEFAULT false,
   message TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. SOLICITUDES DE RED DE SOCIOS Y ALIANZAS
+-- 6. TABLA DE SOLICITUDES DE SOCIOS Y ALIANZAS
 CREATE TABLE IF NOT EXISTS public.partners (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  position TEXT NOT NULL,
-  company_name TEXT NOT NULL,
+  position TEXT,
+  company_name TEXT,
   category TEXT NOT NULL, -- Talleres, Tiendas, Agencias, Financieras, Eventos
   phone TEXT NOT NULL,
   email TEXT,
@@ -96,14 +117,72 @@ CREATE TABLE IF NOT EXISTS public.partners (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- REGLAS DE SEGURIDAD (ROW LEVEL SECURITY)
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.buyer_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.seller_profiles ENABLE ROW LEVEL SECURITY;
+-- =========================================================================
+-- SEGURIDAD Y POLÍTICAS ROW LEVEL SECURITY (RLS)
+-- =========================================================================
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.motos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.offers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.partners ENABLE ROW LEVEL SECURITY;
 
--- Políticas públicas permisivas para desarrollo
-CREATE POLICY "Permitir lectura publica de motos" ON public.motos FOR SELECT USING (true);
-CREATE POLICY "Permitir insercion publica de partners" ON public.partners FOR INSERT WITH CHECK (true);
+-- Políticas para Profiles
+DROP POLICY IF EXISTS "Public profiles read" ON public.profiles;
+CREATE POLICY "Public profiles read"
+  ON public.profiles FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile"
+  ON public.profiles FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile"
+  ON public.profiles FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+-- Políticas para Motos
+DROP POLICY IF EXISTS "Permitir lectura publica de motos" ON public.motos;
+CREATE POLICY "Permitir lectura publica de motos"
+  ON public.motos FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Usuarios autenticados pueden crear motos" ON public.motos;
+CREATE POLICY "Usuarios autenticados pueden crear motos"
+  ON public.motos FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Propietarios pueden actualizar sus motos" ON public.motos;
+CREATE POLICY "Propietarios pueden actualizar sus motos"
+  ON public.motos FOR UPDATE
+  USING (auth.uid() = owner_id)
+  WITH CHECK (auth.uid() = owner_id);
+
+DROP POLICY IF EXISTS "Propietarios pueden eliminar sus motos" ON public.motos;
+CREATE POLICY "Propietarios pueden eliminar sus motos"
+  ON public.motos FOR DELETE
+  USING (auth.uid() = owner_id);
+
+-- Políticas para Offers
+DROP POLICY IF EXISTS "Lectura de ofertas propias" ON public.offers;
+CREATE POLICY "Lectura de ofertas propias"
+  ON public.offers FOR SELECT
+  USING (auth.uid() = buyer_id OR auth.uid() = seller_id);
+
+DROP POLICY IF EXISTS "Creación de ofertas autenticadas" ON public.offers;
+CREATE POLICY "Creación de ofertas autenticadas"
+  ON public.offers FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Actualización de ofertas por vendedor o comprador" ON public.offers;
+CREATE POLICY "Actualización de ofertas por vendedor o comprador"
+  ON public.offers FOR UPDATE
+  USING (auth.uid() = buyer_id OR auth.uid() = seller_id);
+
+-- Políticas para Partners
+DROP POLICY IF EXISTS "Permitir insercion publica de partners" ON public.partners;
+CREATE POLICY "Permitir insercion publica de partners"
+  ON public.partners FOR INSERT
+  WITH CHECK (true);

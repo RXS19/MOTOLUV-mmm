@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, ArrowLeft, Save, Shield, User } from 'lucide-react';
-import { authApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from '../hooks/use-toast';
 import { MEXICAN_BANKS } from '../data/banks';
 
 const BankAccountPage = () => {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
+  const { user, updateBank } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     clabe: user?.bank_clabe || '',
@@ -35,15 +34,19 @@ const BankAccountPage = () => {
     }
     setLoading(true);
     try {
-      const updated = await authApi.updateBank({
-        clabe: clabeClean, bank_name: form.bank_name, holder: form.holder,
+      await updateBank({
+        clabe: clabeClean,
+        bank_name: form.bank_name,
+        holder: form.holder.trim(),
       });
-      setUser(updated);
       toast({ title: 'Cuenta bancaria guardada', description: 'Tus datos se guardaron de forma segura.' });
       setTimeout(() => navigate('/panel'), 500);
     } catch (err) {
-      toast({ title: 'Error', description: err?.response?.data?.detail || 'No se pudo guardar.' });
-    } finally { setLoading(false); }
+      console.error('Error al actualizar cuenta bancaria:', err);
+      toast({ title: 'Error', description: err?.message || 'No se pudo guardar la cuenta bancaria.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const hasAccount = !!user?.bank_clabe;

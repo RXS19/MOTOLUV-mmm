@@ -1,170 +1,286 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { authApi } from '../services/api';
-import { isSupabaseConfigured, signInWithProvider, supabase } from '../lib/supabase';
+import {
+  supabase,
+  isSupabaseConfigured,
+  signInWithProvider,
+  formatSupabaseAuthError,
+  fetchUserProfile,
+  updateUserProfile,
+} from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState('vendedor'); // 'comprador' or 'vendedor'
 
-  const bootstrap = useCallback(async () => {
-    const token = localStorage.getItem('motoluv_token');
-    if (!token) { setLoading(false); return; }
-    try {
-      const u = await authApi.me();
-      setUser(u);
-      if (u.role === 'comprador') setActiveView('comprador');
-      else if (u.role === 'vendedor' || u.role === 'both') setActiveView('vendedor');
-    } catch {
-      localStorage.removeItem('motoluv_token');
-    } finally {
-      setLoading(false);
+  // Helper para construir el objeto de usuario estandarizado para toda la app
+  const buildUserObject = useCallback(async (authUser, currentSession = null) => {
+    if (!authUser) return null;
+
+    const metadata = authUser.user_metadata || {};
+    let profile = null;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        profile = await fetchUserProfile(authUser.id, metadata);
+      } catch (err) {
+        console.warn('No se pudo cargar profile desde Supabase:', err);
+      }
     }
+
+    const fullName = profile?.full_name || metadata.full_name || metadata.name || (authUser.email ? authUser.email.split('@')[0] : 'Usuario');
+    const role = profile?.role || metadata.role || 'both';
+    const city = profile?.city || metadata.city || 'Ciudad de México';
+    const phone = profile?.phone || metadata.phone || '';
+    const bankClabe = profile?.bank_clabe || metadata.bank_clabe || '';
+    const bankName = profile?.bank_name || metadata.bank_name || '';
+    const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
+
+    return {
+      id: authUser.id,
+      email: authUser.email,
+      name: fullName,
+      phone,
+      city,
+      role,
+      rating: 5.0,
+      operations: 1,
+      bank_clabe: bankClabe,
+      bank_name: bankName,
+      bank_holder: bankHolder,
+      created_at: authUser.created_at || new Date().toISOString(),
+      raw: authUser,
+    };
   }, []);
 
-  useEffect(() => { bootstrap(); }, [bootstrap]);
+  // Inicializar y escuchar cambios de sesión con Supabase Auth
+  useEffect(() => {
+    let mounted = true;
 
-  const login = async (email, password) => {
-    try {
-      const res = await authApi.login({ email, password });
-      localStorage.setItem('motoluv_token', res.access_token);
-      setUser(res.user);
-      if (res.user.role === 'comprador') setActiveView('comprador');
-      else setActiveView('vendedor');
-      return res.user;
-    } catch (err) {
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: supaAuth, error: supaErr } = await supabase.auth.signInWithPassword({
-            email: email.trim().toLowerCase(),
-            password: password,
-          });
-          if (!supaErr && supaAuth?.user) {
-            const fallbackUser = {
-              id: supaAuth.user.id,
-              email: supaAuth.user.email,
-              name: supaAuth.user.user_metadata?.full_name || supaAuth.user.user_metadata?.name || email.split('@')[0],
-              role: supaAuth.user.user_metadata?.role || 'both',
-              city: supaAuth.user.user_metadata?.city || 'Ciudad de México',
-              phone: supaAuth.user.user_metadata?.phone || '',
-              rating: 5.0,
-              operations: 1,
-            };
-            const token = supaAuth.session?.access_token || `token_${supaAuth.user.id}`;
-            localStorage.setItem('motoluv_token', token);
-            setUser(fallbackUser);
-            if (fallbackUser.role === 'comprador') setActiveView('comprador');
-            else setActiveView('vendedor');
-            return fallbackUser;
-          }
-        } catch (supaEx) {
-          console.warn('Direct Supabase login fallback failed:', supaEx);
-        }
+    async function initAuth() {
+      if (!isSupabaseConfigured || !supabase) {
+        console.warn('Supabase no está configurado. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.');
+        if (mounted) setLoading(false);
+        return;
       }
-      throw err;
+
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error al obtener sesión inicial de Supabase:', error);
+        }
+
+        if (mounted) {
+          if (initialSession?.user) {
+            setSession(initialSession);
+            localStorage.setItem('motoluv_token', initialSession.access_token);
+            const userObj = await buildUserObject(initialSession.user, initialSession);
+            setUser(userObj);
+            if (userObj?.role === 'comprador') setActiveView('comprador');
+            else setActiveView('vendedor');
+          } else {
+            setSession(null);
+            setUser(null);
+            localStorage.removeItem('motoluv_token');
+          }
+        }
+      } catch (err) {
+        console.error('Excepción al inicializar sesión:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
-  };
 
-  const loginWithOAuth = async (provider) => {
-    // If Supabase is configured, trigger Supabase OAuth redirect/popup
-    if (isSupabaseConfigured) {
-      await signInWithProvider(provider);
-      return;
+    initAuth();
+
+    // Suscripción reactiva a cambios de autenticación (Login, Logout, Token Refresh)
+    let subscription = null;
+    if (isSupabaseConfigured && supabase) {
+      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+        if (!mounted) return;
+
+        if (currentSession?.user) {
+          setSession(currentSession);
+          localStorage.setItem('motoluv_token', currentSession.access_token);
+          const userObj = await buildUserObject(currentSession.user, currentSession);
+          setUser(userObj);
+          if (userObj?.role === 'comprador') setActiveView('comprador');
+          else setActiveView('vendedor');
+        } else {
+          setSession(null);
+          setUser(null);
+          localStorage.removeItem('motoluv_token');
+        }
+      });
+      subscription = authListener.subscription;
     }
 
-    // Demo/Backend OAuth simulation
-    const simulatedEmail = `usuario.${provider}@motoluv.mx`;
-    const simulatedName = `Usuario ${provider.toUpperCase()}`;
-    const avatar = provider === 'google' 
-      ? 'https://lh3.googleusercontent.com/a/default-user' 
-      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    return () => {
+      mounted = false;
+      if (subscription) subscription.unsubscribe();
+    };
+  }, [buildUserObject]);
 
-    const res = await authApi.oauth({
-      provider,
-      email: simulatedEmail,
-      name: simulatedName,
-      avatar,
+  // LOGIN: Directo con Supabase Auth
+  const login = async (email, password) => {
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase no está configurado. Revisa tus variables de entorno.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
     });
 
-    localStorage.setItem('motoluv_token', res.access_token);
-    setUser(res.user);
-    setActiveView('vendedor');
-    return res.user;
+    if (error) {
+      console.error('Error en Supabase signInWithPassword:', error);
+      const friendlyMessage = formatSupabaseAuthError(error);
+      const customErr = new Error(friendlyMessage);
+      customErr.original = error;
+      throw customErr;
+    }
+
+    if (data?.session) {
+      setSession(data.session);
+      localStorage.setItem('motoluv_token', data.session.access_token);
+    }
+
+    const userObj = await buildUserObject(data.user, data.session);
+    setUser(userObj);
+    if (userObj?.role === 'comprador') setActiveView('comprador');
+    else setActiveView('vendedor');
+    return userObj;
   };
 
-  const register = async (data) => {
-    try {
-      const res = await authApi.register(data);
-      localStorage.setItem('motoluv_token', res.access_token);
-      setUser(res.user);
-      if (data.role) setActiveView(data.role);
-      return res.user;
-    } catch (err) {
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: supaAuth, error: supaErr } = await supabase.auth.signUp({
-            email: data.email.trim().toLowerCase(),
-            password: data.password,
-            options: {
-              data: {
-                full_name: data.name,
-                phone: data.phone || '',
-                city: data.city || 'Ciudad de México',
-                role: data.role || 'both',
-              },
-            },
-          });
-          if (!supaErr && supaAuth?.user) {
-            const fallbackUser = {
-              id: supaAuth.user.id,
-              email: data.email,
-              name: data.name,
-              role: data.role || 'both',
-              city: data.city || 'Ciudad de México',
-              phone: data.phone || '',
-              rating: 5.0,
-              operations: 0,
-            };
-            const token = supaAuth.session?.access_token || `token_${supaAuth.user.id}`;
-            localStorage.setItem('motoluv_token', token);
-            setUser(fallbackUser);
-            return fallbackUser;
-          }
-        } catch (supaEx) {
-          console.warn('Direct Supabase register fallback failed:', supaEx);
-        }
+  // REGISTRO: Directo con Supabase Auth
+  const register = async ({ name, email, phone, city, password, role = 'both' }) => {
+    if (!isSupabaseConfigured || !supabase) {
+      throw new Error('Supabase no está configurado. Revisa tus variables de entorno.');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    const cleanPhone = (phone || '').trim();
+    const cleanCity = (city || 'Ciudad de México').trim();
+
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: {
+        data: {
+          full_name: cleanName,
+          name: cleanName,
+          phone: cleanPhone,
+          city: cleanCity,
+          role: role || 'both',
+        },
+      },
+    });
+
+    if (error) {
+      console.error('Error en Supabase signUp:', error);
+      const friendlyMessage = formatSupabaseAuthError(error);
+      const customErr = new Error(friendlyMessage);
+      customErr.original = error;
+      throw customErr;
+    }
+
+    if (data?.session) {
+      setSession(data.session);
+      localStorage.setItem('motoluv_token', data.session.access_token);
+    }
+
+    // Intentar insertar de inmediato en profiles por redundancia si el trigger estuviera en proceso
+    if (data?.user?.id) {
+      try {
+        await updateUserProfile(data.user.id, {
+          full_name: cleanName,
+          phone: cleanPhone,
+          city: cleanCity,
+          role: role || 'both',
+        });
+      } catch (profileSyncErr) {
+        console.warn('Sync profile redundante notice:', profileSyncErr);
       }
-      throw err;
+    }
+
+    const userObj = await buildUserObject(data.user, data.session);
+    setUser(userObj);
+    if (role === 'comprador') setActiveView('comprador');
+    else setActiveView('vendedor');
+
+    return {
+      ...userObj,
+      session: data.session,
+      requiresEmailConfirmation: !data.session && !data.user?.confirmed_at,
+    };
+  };
+
+  // OAUTH: Google, Apple / iCloud, Facebook
+  const loginWithOAuth = async (provider) => {
+    return await signInWithProvider(provider);
+  };
+
+  // LOGOUT: Directo con Supabase Auth
+  const logout = async () => {
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.warn('Error al cerrar sesión en Supabase:', err);
+    } finally {
+      localStorage.removeItem('motoluv_token');
+      setSession(null);
+      setUser(null);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('motoluv_token');
-    setUser(null);
+  // Cambiar rol (comprador/vendedor/both)
+  const updateRole = async (newRole) => {
+    if (!user) return null;
+    await updateUserProfile(user.id, { role: newRole });
+    const updated = { ...user, role: newRole };
+    setUser(updated);
+    setActiveView(newRole === 'both' ? 'vendedor' : newRole);
+    return updated;
   };
 
-  const updateRole = async (role) => {
-    const u = await authApi.updateRole(role);
-    setUser(u);
-    setActiveView(role === 'both' ? 'vendedor' : role);
-    return u;
+  // Actualizar datos bancarios
+  const updateBank = async ({ clabe, bank_name, holder }) => {
+    if (!user) throw new Error('Debes estar autenticado para actualizar tus datos bancarios.');
+    const updates = {
+      bank_clabe: clabe,
+      bank_name,
+      bank_holder: holder || user.name,
+    };
+    await updateUserProfile(user.id, updates);
+    const updated = { ...user, ...updates };
+    setUser(updated);
+    return updated;
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      login,
-      loginWithOAuth,
-      register,
-      logout,
-      updateRole,
-      setUser,
-      activeView,
-      setActiveView,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        login,
+        loginWithOAuth,
+        register,
+        logout,
+        updateRole,
+        updateBank,
+        setUser,
+        activeView,
+        setActiveView,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

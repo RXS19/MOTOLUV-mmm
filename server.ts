@@ -465,20 +465,65 @@ function seedDatabase() {
 }
 
 // Auth Middleware
-function authenticateToken(req: Request, res: Response, next: NextFunction) {
+async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ detail: 'No autenticado' });
 
+  // 1. If Supabase Server is configured, verify with Supabase Auth
+  if (supabaseServer) {
+    try {
+      const { data: { user: supaUser }, error } = await supabaseServer.auth.getUser(token);
+      if (!error && supaUser) {
+        const metadata = supaUser.user_metadata || {};
+        (req as any).user = {
+          id: supaUser.id,
+          email: supaUser.email || '',
+          name: metadata.full_name || metadata.name || supaUser.email?.split('@')[0] || 'Usuario',
+          phone: metadata.phone || '',
+          city: metadata.city || 'Ciudad de México',
+          role: metadata.role || 'both',
+        };
+        return next();
+      }
+    } catch (supaErr) {
+      console.warn('Supabase token verification check exception:', supaErr);
+    }
+  }
+
+  // 2. Decode Supabase JWT payload if signature check is delegated
+  try {
+    const decoded = jwt.decode(token) as any;
+    if (decoded && (decoded.sub || decoded.id)) {
+      const userId = decoded.sub || decoded.id;
+      const metadata = decoded.user_metadata || {};
+      (req as any).user = {
+        id: userId,
+        email: decoded.email || '',
+        name: metadata.full_name || metadata.name || decoded.email?.split('@')[0] || 'Usuario',
+        phone: metadata.phone || '',
+        city: metadata.city || 'Ciudad de México',
+        role: metadata.role || 'both',
+      };
+      return next();
+    }
+  } catch (decodeErr) {
+    // continue
+  }
+
+  // 3. Fallback for demo users
   try {
     const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
     const user = db.users.get(payload.sub);
-    if (!user) return res.status(401).json({ detail: 'Usuario no encontrado' });
-    (req as any).user = user;
-    next();
+    if (user) {
+      (req as any).user = user;
+      return next();
+    }
   } catch {
-    return res.status(401).json({ detail: 'Token inválido' });
+    // continue
   }
+
+  return res.status(401).json({ detail: 'Token inválido o sesión expirada' });
 }
 
 export const app = express();
@@ -494,24 +539,68 @@ seedDatabase();
 export const api = express.Router();
 
 api.get('/health', (_req, res) => {
-  return res.json({ status: 'ok', motos_count: db.motos.size, timestamp: new Date().toISOString() });
+  return res.json({
+    status: 'ok',
+    auth_provider: 'supabase',
+    supabase_configured: Boolean(supabaseServer),
+    motos_count: db.motos.size,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 api.get('/', (_req, res) => {
-  res.json({ message: 'Motoluv API', version: '1.0', motos_count: db.motos.size });
+  res.json({ message: 'Motoluv API', auth: 'Supabase Auth', version: '1.0', motos_count: db.motos.size });
 });
 
-  // Auth Routes
-  api.post('/auth/register', (req, res) => {
+  // Auth Routes (Supabase Proxy / Fallback helpers)
+  api.post('/auth/register', async (req, res) => {
     const { email, name, password, phone, city, role } = req.body;
     if (!email || !password || !name) {
       return res.status(400).json({ detail: 'Campos requeridos faltantes' });
     }
     const cleanEmail = email.toLowerCase().trim();
-    if (db.usersByEmail.has(cleanEmail)) {
-      return res.status(400).json({ detail: 'Email ya registrado' });
+
+    // If Supabase server is connected, attempt registration through Supabase Admin
+    if (supabaseServer) {
+      try {
+        const { data: supaAuth, error: supaErr } = await supabaseServer.auth.admin.createUser({
+          email: cleanEmail,
+          password: password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: name.trim(),
+            name: name.trim(),
+            phone: (phone || '').trim(),
+            city: (city || 'Ciudad de México').trim(),
+            role: role || 'both',
+          },
+        });
+
+        if (supaErr) {
+          // If already exists or error, return friendly message
+          return res.status(400).json({ detail: supaErr.message });
+        }
+
+        if (supaAuth?.user) {
+          const newUser = {
+            id: supaAuth.user.id,
+            email: cleanEmail,
+            name: name.trim(),
+            phone: (phone || '').trim(),
+            city: (city || 'Ciudad de México').trim(),
+            role: role || 'both',
+            created_at: supaAuth.user.created_at,
+          };
+          triggerN8nHubspotWebhook('user.registered', newUser);
+          return res.json({ success: true, user: newUser });
+        }
+      } catch (err: any) {
+        console.error('Supabase server register exception:', err);
+        return res.status(400).json({ detail: err.message || 'Error al registrar en Supabase' });
+      }
     }
 
+    // Fallback for standalone demo
     const id = `user_${Math.random().toString(36).slice(2, 10)}`;
     const user: User = {
       id,
@@ -529,29 +618,6 @@ api.get('/', (_req, res) => {
     };
     db.users.set(id, user);
     db.usersByEmail.set(cleanEmail, user);
-
-    // Sync to Supabase Database if connected
-    if (supabaseServer) {
-      (async () => {
-        try {
-          const { error } = await supabaseServer.from('users').upsert([{
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            phone: user.phone || '',
-            city: user.city || '',
-            role: user.role || 'both',
-            created_at: user.created_at,
-          }]);
-          if (error) console.warn('Supabase user insert sync error:', error.message);
-          else console.log('User synced to Supabase database successfully:', user.id);
-        } catch (err: any) {
-          console.warn('Supabase user sync exception:', err?.message || err);
-        }
-      })();
-    }
-
-    // Trigger n8n/HubSpot webhook on new user registration
     triggerN8nHubspotWebhook('user.registered', user);
 
     const token = jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '7d' });
@@ -565,15 +631,8 @@ api.get('/', (_req, res) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
-    let user = db.usersByEmail.get(cleanEmail);
 
-    // 1. Check in-memory match
-    if (user && user.passwordHash && bcrypt.compareSync(password, user.passwordHash)) {
-      const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
-    }
-
-    // 2. If not found in memory, try authenticating against Supabase Auth if connected
+    // 1. Supabase Auth if connected
     if (supabaseServer) {
       try {
         const { data: supaAuth, error: supaErr } = await supabaseServer.auth.signInWithPassword({
@@ -581,48 +640,35 @@ api.get('/', (_req, res) => {
           password: password,
         });
 
-        if (!supaErr && supaAuth?.user) {
+        if (!supaErr && supaAuth?.user && supaAuth.session) {
           const supaUser = supaAuth.user;
-          // Check if profile exists in supabase users table
-          const { data: dbUserData } = await supabaseServer
-            .from('users')
-            .select('*')
-            .eq('id', supaUser.id)
-            .single();
-
-          const loadedUser: User = {
+          const metadata = supaUser.user_metadata || {};
+          const userObj = {
             id: supaUser.id,
-            email: cleanEmail,
-            name: dbUserData?.name || (supaUser.user_metadata?.full_name || supaUser.user_metadata?.name || cleanEmail.split('@')[0]),
-            phone: dbUserData?.phone || supaUser.user_metadata?.phone || '',
-            city: dbUserData?.city || supaUser.user_metadata?.city || 'Ciudad de México',
-            role: dbUserData?.role || supaUser.user_metadata?.role || 'both',
-            passwordHash: bcrypt.hashSync(password, 10),
-            created_at: dbUserData?.created_at || supaUser.created_at || new Date().toISOString(),
-            bank_clabe: dbUserData?.bank_account?.bank_clabe || '',
-            bank_name: dbUserData?.bank_account?.bank_name || '',
-            bank_holder: dbUserData?.bank_account?.bank_holder || '',
-            rating: 5.0,
-            operations: 0,
-            buyer_profile: { shipping_city: dbUserData?.city || 'Ciudad de México', favorites: [] },
-            seller_profile: {
-              bank_clabe: dbUserData?.bank_account?.bank_clabe || '',
-              bank_name: dbUserData?.bank_account?.bank_name || '',
-              bank_holder: dbUserData?.bank_account?.bank_holder || '',
-              rating: 5.0,
-              total_sales: 0,
-            },
+            email: supaUser.email,
+            name: metadata.full_name || metadata.name || supaUser.email?.split('@')[0] || 'Usuario',
+            phone: metadata.phone || '',
+            city: metadata.city || 'Ciudad de México',
+            role: metadata.role || 'both',
+            created_at: supaUser.created_at,
           };
-
-          db.users.set(loadedUser.id, loadedUser);
-          db.usersByEmail.set(cleanEmail, loadedUser);
-
-          const token = jwt.sign({ sub: loadedUser.id }, JWT_SECRET, { expiresIn: '7d' });
-          return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(loadedUser) });
+          return res.json({
+            access_token: supaAuth.session.access_token,
+            token: supaAuth.session.access_token,
+            token_type: 'bearer',
+            user: userObj,
+          });
         }
       } catch (authErr: any) {
         console.warn('Supabase auth login check exception:', authErr?.message || authErr);
       }
+    }
+
+    // 2. Demo memory match
+    const user = db.usersByEmail.get(cleanEmail);
+    if (user && user.passwordHash && bcrypt.compareSync(password, user.passwordHash)) {
+      const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
     }
 
     return res.status(401).json({ detail: 'Correo o contraseña incorrectos. Verifica tus credenciales.' });
@@ -656,30 +702,7 @@ api.get('/', (_req, res) => {
       db.users.set(id, user);
       db.usersByEmail.set(email, user);
 
-      if (supabaseServer) {
-        (async () => {
-          try {
-            await supabaseServer.from('users').upsert([{
-              id: user!.id,
-              email: user!.email,
-              name: user!.name,
-              phone: user!.phone || '',
-              city: user!.city || '',
-              role: user!.role || 'both',
-              created_at: user!.created_at,
-            }]);
-          } catch (err: any) {
-            console.warn('Supabase oauth user sync exception:', err?.message || err);
-          }
-        })();
-      }
-
-      // Trigger n8n/HubSpot webhook & Supabase database sync
       triggerN8nHubspotWebhook('user.registered', user);
-    } else {
-      user.role = 'both';
-      user.provider = provider || user.provider;
-      if (avatar && !user.avatar) user.avatar = avatar;
     }
 
     const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
@@ -687,20 +710,28 @@ api.get('/', (_req, res) => {
   });
 
   api.get('/auth/me', authenticateToken, (req, res) => {
-    return res.json(sanitizeUser((req as any).user));
+    const user = (req as any).user;
+    return res.json(user);
   });
 
-  api.patch('/auth/role', authenticateToken, (req, res) => {
-    const user = (req as any).user as User;
+  api.patch('/auth/role', authenticateToken, async (req, res) => {
+    const user = (req as any).user;
     const { role } = req.body;
     if (['comprador', 'vendedor', 'both'].includes(role)) {
       user.role = role;
+      if (supabaseServer) {
+        try {
+          await supabaseServer.from('profiles').update({ role }).eq('id', user.id);
+        } catch (e) {
+          console.warn('Profiles update error:', e);
+        }
+      }
     }
-    return res.json(sanitizeUser(user));
+    return res.json(user);
   });
 
-  const handleBankUpdate = (req: Request, res: Response) => {
-    const user = (req as any).user as User;
+  const handleBankUpdate = async (req: Request, res: Response) => {
+    const user = (req as any).user;
     const { clabe, bank_name, bankName, holder, accountHolder } = req.body;
     const cleanClabe = (clabe || '').replace(/\s/g, '');
     if (!/^\d{18}$/.test(cleanClabe)) {
@@ -716,22 +747,20 @@ api.get('/', (_req, res) => {
     user.bank_holder = (holder || accountHolder || user.name || '').trim();
 
     if (supabaseServer) {
-      (async () => {
-        try {
-          await supabaseServer.from('users').update({
-            bank_account: {
-              bank_name: user.bank_name,
-              bank_clabe: user.bank_clabe,
-              bank_holder: user.bank_holder,
-            }
-          }).eq('id', user.id);
-        } catch (err: any) {
-          console.warn('Supabase bank update sync exception:', err?.message || err);
-        }
-      })();
+      try {
+        await supabaseServer.from('profiles').upsert({
+          id: user.id,
+          bank_name: user.bank_name,
+          bank_clabe: user.bank_clabe,
+          bank_holder: user.bank_holder,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+      } catch (err: any) {
+        console.warn('Supabase bank update sync exception:', err?.message || err);
+      }
     }
 
-    return res.json(sanitizeUser(user));
+    return res.json(user);
   };
 
   api.patch('/auth/bank', authenticateToken, handleBankUpdate);

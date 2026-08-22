@@ -19,37 +19,71 @@ const RegisterPage = () => {
   const handleOAuth = async (provider) => {
     setOauthLoading(provider);
     try {
-      const u = await loginWithOAuth(provider);
-      toast({ title: `Registro exitoso con ${provider.toUpperCase()}`, description: `Bienvenido a Motoluv, ${u?.name || 'usuario'}.` });
-      setTimeout(() => navigate('/panel'), 400);
+      await loginWithOAuth(provider);
     } catch (err) {
-      toast({ title: 'Error OAuth', description: err?.message || 'No se pudo registrar.' });
-    } finally {
+      console.error('Error OAuth:', err);
+      toast({ title: 'Error OAuth', description: err?.message || 'No se pudo conectar con el proveedor.' });
       setOauthLoading(null);
     }
   };
 
   const submit = async (e) => {
     e.preventDefault();
+
+    if (!form.name.trim()) {
+      toast({ title: 'Nombre requerido', description: 'Por favor ingresa tu nombre completo.' });
+      return;
+    }
+    if (!form.email.trim()) {
+      toast({ title: 'Email requerido', description: 'Por favor ingresa un correo electrónico válido.' });
+      return;
+    }
+    if (form.password.length < 6) {
+      toast({ title: 'Contraseña muy corta', description: 'La contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
     if (form.password !== form.confirm) {
-      toast({ title: 'Contraseñas no coinciden', description: 'Verifica los datos.' });
+      toast({ title: 'Contraseñas no coinciden', description: 'Por favor verifica que ambas contraseñas sean idénticas.' });
       return;
     }
     if (!form.terms) {
-      toast({ title: 'Acepta los términos', description: 'Debes aceptar los términos y condiciones.' });
+      toast({ title: 'Acepta los términos', description: 'Debes aceptar los términos y condiciones para continuar.' });
       return;
     }
+
     setLoading(true);
     try {
-      const u = await register({
-        name: form.name, email: form.email, phone: form.phone,
-        city: form.city, password: form.password, role: 'both',
+      const res = await register({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        city: form.city,
+        password: form.password,
+        role: role || 'both',
       });
-      toast({ title: '¡Cuenta creada!', description: `Bienvenido a Motoluv, ${u.name.split(' ')[0]}. Tu correo da acceso a Comprador y Vendedor.` });
-      setTimeout(() => navigate('/panel'), 500);
+
+      if (res?.requiresEmailConfirmation) {
+        toast({
+          title: '¡Cuenta creada!',
+          description: 'Te hemos enviado un correo de confirmación. Revisa tu bandeja de entrada para verificar tu cuenta.',
+        });
+        setTimeout(() => navigate('/iniciar-sesion'), 1800);
+      } else {
+        toast({
+          title: '¡Registro exitoso!',
+          description: `Bienvenido a Motoluv, ${res?.name ? res.name.split(' ')[0] : 'usuario'}. Tu cuenta está lista.`,
+        });
+        setTimeout(() => navigate('/panel'), 400);
+      }
     } catch (err) {
-      toast({ title: 'Error al registrar', description: err?.response?.data?.detail || 'Intenta nuevamente.' });
-    } finally { setLoading(false); }
+      console.error('Error al registrar usuario:', err);
+      toast({
+        title: 'Error al registrar',
+        description: err?.message || 'No fue posible crear la cuenta. Por favor verifica tus datos.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const benefits = [
@@ -171,7 +205,7 @@ const RegisterPage = () => {
                 ))}
               </select>
             </div>
-            <Field icon={Lock} type="password" label="Contraseña" value={form.password} onChange={(v) => update('password', v)} placeholder="Mínimo 8 caracteres" required />
+            <Field icon={Lock} type="password" label="Contraseña" value={form.password} onChange={(v) => update('password', v)} placeholder="Mínimo 6 caracteres" required />
             <Field icon={Lock} type="password" label="Confirmar contraseña" value={form.confirm} onChange={(v) => update('confirm', v)} required />
           </div>
 
