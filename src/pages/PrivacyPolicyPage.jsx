@@ -28,9 +28,6 @@ export default function PrivacyPolicyPage() {
       <main className="max-w-4xl mx-auto px-5 lg:px-8 pt-12 md:pt-16">
         {/* Header Hero */}
         <div className="border-b border-white/10 pb-8 mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-brand/10 border border-red-brand/20 rounded-full text-red-brand text-xs font-bold tracking-widest uppercase mb-4">
-            <ShieldCheck size={14} /> Documento Legal Oficial
-          </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-white mb-3">
             Aviso de Privacidad
           </h1>
