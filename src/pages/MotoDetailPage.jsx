@@ -805,15 +805,13 @@ const MotoDetailPage = () => {
 
             {/* Modal Actions */}
             <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
-              <button
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-brand hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-colors shadow-md"
-              >
-                <Printer size={14} /> Imprimir / Guardar PDF
-              </button>
+              <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                <Shield size={14} className="text-red-brand" />
+                <span>Documento oficial de verificación digital exclusiva en plataforma Motoluv.</span>
+              </div>
               <button
                 onClick={() => setShowCertModal(false)}
-                className="px-5 py-2.5 border border-white/10 hover:border-white/30 text-zinc-300 hover:text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-colors"
+                className="px-6 py-2.5 bg-[#1a1a1d] hover:bg-white/10 border border-white/10 hover:border-white/20 text-zinc-200 hover:text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-colors"
               >
                 Cerrar
               </button>

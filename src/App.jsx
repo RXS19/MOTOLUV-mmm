@@ -62,9 +62,10 @@ function App() {
 
 import { useAuth } from './context/AuthContext';
 function DashboardRouter() {
-  const { user } = useAuth();
+  const { user, activeView } = useAuth();
   if (!user) return null;
-  return user.role === 'vendedor' || user.role === 'both' ? <SellerDashboard /> : <BuyerDashboard />;
+  const isSeller = activeView === 'vendedor' || (!activeView && (user.role === 'vendedor' || user.role === 'both'));
+  return isSeller ? <SellerDashboard /> : <BuyerDashboard />;
 }
 
 export default App;
