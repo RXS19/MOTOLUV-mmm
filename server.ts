@@ -71,10 +71,9 @@ async function triggerN8nHubspotWebhook(eventType: string, payload: any) {
 
 let aiInstance: GoogleGenAI | null = null;
 function getAIInstance(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (!aiInstance && apiKey) {
+  if (!aiInstance && process.env.GEMINI_API_KEY) {
     aiInstance = new GoogleGenAI({
-      apiKey,
+      apiKey: process.env.GEMINI_API_KEY,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -399,26 +398,21 @@ function authenticateToken(req: Request, res: Response, next: NextFunction) {
 
 export const app = express();
 
-// Base Middlewares configured synchronously
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+async function startServer() {
+  app.use(cors());
+  app.use(express.json());
 
-// Serve upload files
-app.use('/uploads', express.static(UPLOAD_DIR));
+  // Serve upload files
+  app.use('/uploads', express.static(UPLOAD_DIR));
 
-// Seed on startup
-seedDatabase();
+  // Seed on startup
+  seedDatabase();
 
-const api = express.Router();
+  const api = express.Router();
 
-api.get('/', (_req, res) => {
-  res.json({ message: 'Motoluv API', version: '1.0' });
-});
-
-api.get('/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
-});
+  api.get('/', (_req, res) => {
+    res.json({ message: 'Motoluv API', version: '1.0' });
+  });
 
   // Auth Routes
   api.post('/auth/register', (req, res) => {
@@ -1041,7 +1035,7 @@ api.get('/health', (_req, res) => {
 
       // Prepare context of Motoluv
       const activeMotos = Array.from(db.motos.values())
-        .filter((m) => m.status === 'active' || m.status === 'Publicada')
+        .filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada')
         .map((m) => `• ${m.brand} ${m.model} (${m.year}) - $${m.price.toLocaleString()} MXN | ${m.km.toLocaleString()} km | Score: ${m.score}/10 | Ubicación: ${m.city}`);
 
       const systemPrompt = `Eres "Lu", el asistente virtual oficial de Motoluv.
@@ -1070,68 +1064,52 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
       const ai = getAIInstance();
       if (ai) {
         try {
-          // Build alternating conversation history
           const contents: any[] = [];
-          if (Array.isArray(history) && history.length > 0) {
+          if (Array.isArray(history)) {
             for (const h of history) {
-              if (h && typeof h.content === 'string' && h.content.trim()) {
-                const role = h.role === 'user' ? 'user' : 'model';
-                if (contents.length > 0 && contents[contents.length - 1].role === role) {
-                  contents[contents.length - 1].parts[0].text += `\n${h.content}`;
-                } else {
-                  contents.push({
-                    role,
-                    parts: [{ text: h.content }],
-                  });
-                }
+              if (h && h.content) {
+                contents.push({
+                  role: h.role === 'user' ? 'user' : 'model',
+                  parts: [{ text: String(h.content) }],
+                });
               }
             }
           }
-
-          // Add current user message ensuring alternating turns
-          if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
-            contents[contents.length - 1].parts[0].text += `\n${message}`;
-          } else {
-            contents.push({
-              role: 'user',
-              parts: [{ text: message }],
-            });
-          }
+          contents.push({
+            role: 'user',
+            parts: [{ text: message }],
+          });
 
           const response = await ai.models.generateContent({
             model: 'gemini-3.7-flash',
             contents,
             config: {
               systemInstruction: systemPrompt,
-              temperature: 0.7,
             },
           });
 
-          const replyText = response.text;
-          if (replyText) {
-            return res.json({ reply: replyText });
-          }
-        } catch (genErr: any) {
-          console.warn('Gemini API call warning, utilizing intelligent fallback:', genErr?.message || genErr);
+          const replyText = response.text || '¡Hola! Soy Lu 🐾. ¿En qué puedo ayudarte hoy sobre motos o accesorios en Motoluv?';
+          return res.json({ reply: replyText });
+        } catch (geminiErr: any) {
+          console.error('Gemini API execution error:', geminiErr?.message || geminiErr);
+          // Fall through to fallback responses if Gemini fails
         }
       }
 
-      // Smart fallback response generator when AI key is absent or unavailable
+      // Smart fallback response generator when AI key is absent or pending
       let fallback = '';
-      if (lower.includes('hola') || lower.includes('saludos') || lower.includes('buenos') || lower.includes('buenas')) {
-        fallback = '¡Hola, Biker! 🐾 Soy Lu, el asistente virtual oficial de Motoluv. ¿Buscas comprar una moto, equiparte en la tienda o registrar tu negocio en nuestra red de aliados? Cuéntame y con gusto te asesoro. 🏍️';
-      } else if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catálogo') || lower.includes('catalogo') || lower.includes('precio') || lower.includes('venden')) {
-        fallback = `En Motoluv contamos con un catálogo certificado con score de 100 puntos 🏁. Algunas opciones destacadas disponibles hoy:\n\n${activeMotos.slice(0, 3).join('\n')}\n\nPuedes consultar el inventario completo con filtros por marca, categoría y cilindrada en la sección "Catálogo" (/motos).`;
-      } else if (lower.includes('accesorio') || lower.includes('casco') || lower.includes('tienda') || lower.includes('chaqueta') || lower.includes('guante')) {
-        fallback = 'En nuestra Tienda Oficial (/tienda) encontrarás cascos certificados (DOT/ECE), chaquetas con protecciones, guantes tácticos, impermeables y accesorios de primera línea con envío a todo México 🛡️.';
-      } else if (lower.includes('red') || lower.includes('sumate') || lower.includes('súmate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
-        fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller mecánico, tienda de accesorios, agencia de motocicletas, financiera o eres organizador de rodadas y eventos, ingresa a la sección "/sumate" para registrar tu negocio y conectar con miles de motociclistas.';
-      } else if (lower.includes('paquete') || lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro') || lower.includes('proteg') || lower.includes('envio') || lower.includes('envío')) {
-        fallback = 'En Motoluv tu dinero está 100% protegido con transacciones verificadas 🔒. Contamos con 3 paquetes:\n\n1. Básico ($1,900 MXN): Inspección técnica con score de 100 puntos y contrato digital.\n2. Plus ($3,900 MXN): Básico + protección de pago verificada y validación de documentos.\n3. Total ($5,900 MXN): Plus + traslado nacional garantizado hasta tu puerta.';
-      } else if (lower.includes('vender') || lower.includes('publicar') || lower.includes('comision') || lower.includes('comisión')) {
-        fallback = 'Para vender tu moto en Motoluv, crea tu cuenta o inicia sesión con perfil de vendedor y haz clic en "Vender Moto". Publicar es muy fácil: subes fotos, datos de tu moto y calculas tu ganancia neta al instante 🚀.';
+      if (lower.includes('hola') || lower.includes('saludos') || lower.includes('buenos')) {
+        fallback = '¡Hola, Biker! 🐾 Soy Lu, el asistente virtual de Motoluv. ¿Buscas comprar una moto, equiparte en la tienda o registrar tu negocio en nuestra red de aliados? Cuéntame y con gusto te asesoro. 🏍️';
+      } else if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catálogo') || lower.includes('catalogo')) {
+        fallback = `En Motoluv contamos con un catálogo certificado con score de 100 puntos 🏁. Algunas opciones disponibles hoy:\n\n${activeMotos.slice(0, 3).join('\n')}\n\nPuedes consultar el inventario completo en la pestaña "Catálogo" (/motos).`;
+      } else if (lower.includes('accesorio') || lower.includes('casco') || lower.includes('tienda') || lower.includes('chaqueta')) {
+        fallback = 'En nuestra Tienda Oficial (/tienda) encontrarás cascos certificados, chaquetas con protección, guantes y equipamiento de alta calidad 🛡️.';
+      } else if (lower.includes('red') || lower.includes('sumate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
+        fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller, tienda de accesorios, agencia de motocicletas, financiera u organizas eventos, ingresa a "/sumate" para registrar tus datos y conectarte con miles de motociclistas.';
+      } else if (lower.includes('paquete') || lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro')) {
+        fallback = 'En Motoluv tu dinero está 100% protegido con transacciones verificadas 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con envío nacional).';
       } else {
-        fallback = '¡Con gusto te oriento! 🐾 En Motoluv puedes comprar o vender motos seminuevas garantizadas, adquirir equipamiento en la tienda o sumar tu negocio a nuestra red de aliados en "/sumate". ¿En qué te gustaría que te ayude hoy?';
+        fallback = '¡Con gusto te orientó! 🐾 En Motoluv puedes comprar o vender motos seminuevas garantizadas, adquirir accesorios o sumar tu taller o negocio a nuestra red en la sección "/sumate". ¿Qué te gustaría consultar?';
       }
 
       return res.json({ reply: fallback });
@@ -1149,24 +1127,16 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
     return res.json({ ok: true, seeded: db.motos.size });
   });
 
-  // Mount API router synchronously on both /api and / (for Vercel rewrites)
   app.use('/api', api);
-  app.use('/', api);
 
-  // Health and root check
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', server: 'motoluv-backend' });
-  });
-
-async function startServer() {
   // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
@@ -1174,8 +1144,7 @@ async function startServer() {
     });
   }
 
-  // Only bind port if not running in a serverless function environment
-  if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server listening on http://0.0.0.0:${PORT}`);
     });
