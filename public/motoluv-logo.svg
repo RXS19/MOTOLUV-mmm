@@ -1,49 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 320" width="950" height="320" style="background:#000000;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 160" width="680" height="160" style="background:#000000;">
   <defs>
     <style>
-      @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@1,900&amp;family=Orbitron:wght@800;900&amp;family=Barlow+Condensed:ital,wght@1,900&amp;family=Teko:wght@700&amp;display=swap");
-      .moto-brand {
-        font-family: 'Barlow Condensed', 'Orbitron', 'Montserrat', sans-serif;
-        font-weight: 900;
-        font-style: italic;
-        fill: #FFFFFF;
-        font-size: 135px;
-        letter-spacing: 2px;
-      }
-      .luv-brand {
-        font-family: 'Barlow Condensed', 'Orbitron', 'Montserrat', sans-serif;
-        font-weight: 900;
-        font-style: italic;
-        fill: #FFFFFF;
-        font-size: 135px;
-        letter-spacing: 2px;
-      }
-      .sube-slogan {
-        font-family: 'Orbitron', 'Barlow Condensed', sans-serif;
-        font-weight: 900;
-        font-style: italic;
-        fill: #E10600;
-        font-size: 34px;
-        letter-spacing: 12px;
-      }
+      .brand-m { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 900; font-style: italic; }
+      .brand-s { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-weight: 900; font-style: italic; }
     </style>
   </defs>
-
-  <!-- Background -->
   <rect width="100%" height="100%" fill="#000000" />
-
-  <!-- MOTOLUV Brand Row -->
-  <g transform="translate(475, 135)" text-anchor="middle">
-    <!-- MOTO in White -->
-    <text x="-40" y="38" class="moto-brand" text-anchor="end">MOTO</text>
-
-    <!-- Red Pill Container behind LUV with slanted italic feel -->
-    <rect x="-20" y="-85" width="370" height="150" rx="20" ry="20" fill="#E10600" />
-
-    <!-- LUV in White inside the Red Pill -->
-    <text x="165" y="38" class="luv-brand" text-anchor="middle">LUV</text>
+  <g transform="translate(20, 10)">
+    <text x="20" y="88" fill="#FFFFFF" class="brand-m" font-size="92" letter-spacing="4">MOTO</text>
+    <rect x="330" y="8" width="210" height="92" rx="18" ry="18" fill="#E10600" />
+    <text x="435" y="88" fill="#FFFFFF" class="brand-m" font-size="92" letter-spacing="3" text-anchor="middle">LUV</text>
+    <text x="340" y="135" fill="#E10600" class="brand-s" font-size="20" letter-spacing="8" text-anchor="middle">SUBE CONECTA RUEDA</text>
   </g>
-
-  <!-- Slogan: SUBE CONECTA RUEDA -->
-  <text x="495" y="270" class="sube-slogan" text-anchor="middle">SUBE CONECTA RUEDA</text>
 </svg>

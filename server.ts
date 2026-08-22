@@ -545,7 +545,10 @@ api.get('/', (_req, res) => {
     if (brand) list = list.filter((m) => m.brand === brand);
     if (category) list = list.filter((m) => m.category === category);
     if (city) list = list.filter((m) => m.city === city);
-    if (featured !== undefined) list = list.filter((m) => m.featured === (featured === 'true'));
+    if (featured !== undefined) {
+      const isFeat = String(featured).toLowerCase() === 'true' || String(featured) === '1';
+      list = list.filter((m) => Boolean(m.featured) === isFeat);
+    }
     if (q) {
       const queryStr = String(q).toLowerCase();
       list = list.filter(

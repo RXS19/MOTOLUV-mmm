@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bike, Store, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { OFFICIAL_MOTOLUV_LOGO, handleImageError } from '../utils/imageFallback';
+import { MotoluvLogo } from './MotoluvLogo';
 
 const Header = () => {
   const location = useLocation();
@@ -50,14 +50,9 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 bg-[#0a0a0a]/85 backdrop-blur border-b border-white/5">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center group">
-          <div className="relative flex items-center justify-center py-1 px-1.5 rounded bg-black/40 border border-white/10 group-hover:border-[#E10600]/50 transition-colors">
-            <img 
-              src={OFFICIAL_MOTOLUV_LOGO} 
-              alt="Motoluv" 
-              onError={(e) => handleImageError(e, 'logo')}
-              className="h-8 md:h-9 w-auto object-contain rounded-sm" 
-            />
+        <Link to="/" className="flex items-center group" title="Motoluv">
+          <div className="relative flex items-center justify-center py-1 px-2 rounded bg-black/60 border border-white/10 group-hover:border-[#E10600]/60 transition-colors">
+            <MotoluvLogo className="h-7 md:h-8 w-auto" />
           </div>
         </Link>
 

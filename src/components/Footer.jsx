@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
-import { OFFICIAL_MOTOLUV_LOGO, OFFICIAL_NOVATECH_LOGO, handleImageError } from '../utils/imageFallback';
+import { MotoluvLogo } from './MotoluvLogo';
+import { NovatechLogo } from './NovatechLogo';
 
 const Footer = () => {
   return (
@@ -12,25 +13,15 @@ const Footer = () => {
           <div>
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <Link to="/" className="inline-block" aria-label="Motoluv Inicio">
-                <div className="flex items-center justify-center py-1 px-1.5 rounded bg-black/60 border border-white/10 w-fit hover:border-[#E10600]/40 transition-colors">
-                  <img 
-                    src={OFFICIAL_MOTOLUV_LOGO} 
-                    alt="Motoluv" 
-                    onError={(e) => handleImageError(e, 'logo')}
-                    className="h-9 w-auto object-contain rounded-sm" 
-                  />
+                <div className="flex items-center justify-center py-1 px-2 rounded bg-black/60 border border-white/10 w-fit hover:border-[#E10600]/40 transition-colors">
+                  <MotoluvLogo className="h-8 w-auto" />
                 </div>
               </Link>
 
               <div className="h-6 w-px bg-white/15 hidden xs:block" aria-hidden="true" />
 
-              <div className="flex items-center gap-2 py-1.5 px-2.5 rounded bg-black/60 border border-white/10 w-fit hover:border-white/20 transition-colors" title="Novatech Partner">
-                <img 
-                  src={OFFICIAL_NOVATECH_LOGO} 
-                  alt="Novatech" 
-                  onError={(e) => handleImageError(e, 'novatech')}
-                  className="h-5 md:h-6 w-auto object-contain opacity-90 hover:opacity-100 transition-opacity" 
-                />
+              <div className="flex items-center gap-2 py-1 px-2.5 rounded bg-black/60 border border-white/10 w-fit hover:border-white/20 transition-colors" title="Novatech Partner">
+                <NovatechLogo className="h-5 md:h-6 w-auto opacity-90 hover:opacity-100 transition-opacity" />
               </div>
             </div>
             <p className="text-zinc-400 text-sm leading-relaxed max-w-xs">

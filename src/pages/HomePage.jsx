@@ -8,10 +8,10 @@ const HomePage = () => {
   const [featured, setFeatured] = useState([]);
 
   useEffect(() => {
-    motoApi.list({ limit: 6 }).then((data) => {
-      // Prioritize featured, then take 6
-      const sorted = [...data].sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
-      setFeatured(sorted.slice(0, 6));
+    motoApi.list({ featured: true, limit: 12 }).then((data) => {
+      // Exclusively filter and display motorcycles with the featured label
+      const onlyFeatured = (Array.isArray(data) ? data : []).filter((m) => Boolean(m.featured));
+      setFeatured(onlyFeatured.slice(0, 6));
     }).catch(() => setFeatured([]));
   }, []);
 
