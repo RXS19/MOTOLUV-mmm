@@ -67,3 +67,39 @@ export async function signOutSupabase() {
     await supabase.auth.signOut();
   }
 }
+
+/**
+ * Función de prueba sencilla para verificar la conexión con Supabase.
+ * Intenta recuperar un registro de una tabla e imprime en consola el resultado.
+ *
+ * @param {string} [tableName='motos'] - Nombre de la tabla a consultar
+ * @returns {Promise<{ success: boolean, data?: any, error?: any }>}
+ */
+export async function testSupabaseConnection(tableName = 'motos') {
+  if (!isSupabaseConfigured || !supabase) {
+    console.warn('⚠️ Supabase no está configurado en las variables de entorno (VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY).');
+    return { success: false, error: 'Supabase client not configured' };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .limit(1);
+
+    if (error) {
+      console.error(`❌ Error al consultar la tabla '${tableName}' en Supabase:`, error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`✅ ¡Conexión con Supabase exitosa! Se consultó la tabla '${tableName}':`, {
+      registrosRecuperados: data?.length || 0,
+      primerRegistro: data?.[0] || 'Tabla vacía (conexión correcta)',
+    });
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('❌ Ocurrió una excepción al conectar con Supabase:', err.message || err);
+    return { success: false, error: err.message || err };
+  }
+}
