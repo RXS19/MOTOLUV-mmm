@@ -624,6 +624,36 @@ api.get('/', (_req, res) => {
 
     db.motos.set(id, moto);
 
+    // Sync to Supabase Database if connected
+    if (supabaseServer) {
+      (async () => {
+        try {
+          const { error } = await supabaseServer.from('motos').insert([{
+            id: moto.id,
+            brand: moto.brand,
+            model: moto.model,
+            year: moto.year,
+            price: moto.price,
+            km: moto.km,
+            engine: moto.engine,
+            category: moto.category,
+            city: moto.city,
+            description: moto.description,
+            images: moto.images,
+            owner_id: moto.owner_id,
+            owner_name: moto.owner_name,
+            score: moto.score,
+            status: moto.status,
+            created_at: moto.created_at,
+          }]);
+          if (error) console.warn('Supabase moto insert sync error:', error.message);
+          else console.log('Moto synced to Supabase database successfully:', moto.id);
+        } catch (err: any) {
+          console.warn('Supabase moto sync exception:', err?.message || err);
+        }
+      })();
+    }
+
     // Sync listing creation card to n8n / HubSpot
     triggerN8nHubspotWebhook('card.status_created', {
       cardId: `card_${id}`,
@@ -758,16 +788,51 @@ api.get('/', (_req, res) => {
     return res.json(offer);
   });
 
-  // Upload Route
+  // Upload Route with Supabase Storage & Local Disk Fallback
   api.post('/upload', authenticateToken, (req, res) => {
-    upload.single('file')(req, res, (err) => {
+    upload.single('file')(req, res, async (err) => {
       if (err) {
         return res.status(400).json({ detail: err.message || 'Error al subir archivo' });
       }
       if (!req.file) {
         return res.status(400).json({ detail: 'No se envió ningún archivo' });
       }
-      return res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
+
+      // If Supabase Storage is configured, upload directly to Supabase bucket 'motos'
+      if (supabaseServer) {
+        try {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          const fileExt = path.extname(req.file.originalname) || '.jpg';
+          const supabaseFileName = `moto_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
+
+          const { data: uploadData, error: uploadError } = await supabaseServer.storage
+            .from('motos')
+            .upload(supabaseFileName, fileBuffer, {
+              contentType: req.file.mimetype,
+              upsert: true,
+            });
+
+          if (!uploadError && uploadData) {
+            const { data: publicUrlData } = supabaseServer.storage
+              .from('motos')
+              .getPublicUrl(supabaseFileName);
+
+            if (publicUrlData && publicUrlData.publicUrl) {
+              return res.json({
+                url: publicUrlData.publicUrl,
+                filename: supabaseFileName,
+                provider: 'supabase',
+              });
+            }
+          } else {
+            console.warn('Supabase storage upload fallback to local:', uploadError?.message);
+          }
+        } catch (supabaseUploadErr: any) {
+          console.warn('Supabase Storage exception, using local upload:', supabaseUploadErr?.message);
+        }
+      }
+
+      return res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename, provider: 'local' });
     });
   });
 
