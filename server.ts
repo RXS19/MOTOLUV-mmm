@@ -10,9 +10,10 @@ import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 
-// Supabase server client
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+// Supabase server client with URL sanitization (strips /rest/v1 or trailing slashes if pasted directly)
+const rawSupabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 const supabaseServer = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 // n8n & HubSpot Webhook Automation Trigger
@@ -35,21 +36,27 @@ async function triggerN8nHubspotWebhook(eventType: string, payload: any) {
     data: payload,
   };
 
-  // 1. Write user record to Supabase profiles database table
+  // 1. Write user record to Supabase database (syncing to users / profiles table)
   if (supabaseServer && eventType === 'user.registered') {
     try {
-      await supabaseServer.from('profiles').upsert([{
+      const userPayload = {
         id: payload.id,
         email: payload.email,
         name: payload.name,
-        phone: payload.phone,
+        phone: payload.phone || '',
         role: payload.role || 'comprador',
         city: payload.city || '',
         created_at: payload.created_at || new Date().toISOString(),
-      }], { onConflict: 'id' });
+      };
+      
+      const { error: errUsers } = await supabaseServer.from('users').upsert([userPayload], { onConflict: 'id' });
+      if (errUsers) {
+        // Fallback to profiles table if users table has restrictions
+        await supabaseServer.from('profiles').upsert([userPayload], { onConflict: 'id' });
+      }
       console.log('User synced to Supabase database:', payload.email);
-    } catch (err) {
-      console.error('Error writing user to Supabase:', err);
+    } catch (err: any) {
+      console.error('Error writing user to Supabase:', err?.message || err);
     }
   }
 
@@ -447,11 +454,32 @@ api.get('/', (_req, res) => {
     db.users.set(id, user);
     db.usersByEmail.set(email, user);
 
-    // Trigger n8n/HubSpot webhook & Supabase database sync on new user registration
+    // Sync to Supabase Database if connected
+    if (supabaseServer) {
+      (async () => {
+        try {
+          const { error } = await supabaseServer.from('users').upsert([{
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            phone: user.phone || '',
+            city: user.city || '',
+            role: user.role || 'comprador',
+            created_at: user.created_at,
+          }]);
+          if (error) console.warn('Supabase user insert sync error:', error.message);
+          else console.log('User synced to Supabase database successfully:', user.id);
+        } catch (err: any) {
+          console.warn('Supabase user sync exception:', err?.message || err);
+        }
+      })();
+    }
+
+    // Trigger n8n/HubSpot webhook on new user registration
     triggerN8nHubspotWebhook('user.registered', user);
 
     const token = jwt.sign({ sub: id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ access_token: token, token_type: 'bearer', user: sanitizeUser(user) });
+    return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
   });
 
   api.post('/auth/login', (req, res) => {
@@ -462,7 +490,7 @@ api.get('/', (_req, res) => {
     }
 
     const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ access_token: token, token_type: 'bearer', user: sanitizeUser(user) });
+    return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
   });
 
   api.post('/auth/oauth', (req, res) => {
@@ -493,6 +521,24 @@ api.get('/', (_req, res) => {
       db.users.set(id, user);
       db.usersByEmail.set(email, user);
 
+      if (supabaseServer) {
+        (async () => {
+          try {
+            await supabaseServer.from('users').upsert([{
+              id: user!.id,
+              email: user!.email,
+              name: user!.name,
+              phone: user!.phone || '',
+              city: user!.city || '',
+              role: user!.role || 'both',
+              created_at: user!.created_at,
+            }]);
+          } catch (err: any) {
+            console.warn('Supabase oauth user sync exception:', err?.message || err);
+          }
+        })();
+      }
+
       // Trigger n8n/HubSpot webhook & Supabase database sync
       triggerN8nHubspotWebhook('user.registered', user);
     } else {
@@ -502,7 +548,7 @@ api.get('/', (_req, res) => {
     }
 
     const token = jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ access_token: token, token_type: 'bearer', user: sanitizeUser(user) });
+    return res.json({ access_token: token, token, token_type: 'bearer', user: sanitizeUser(user) });
   });
 
   api.get('/auth/me', authenticateToken, (req, res) => {
@@ -518,22 +564,44 @@ api.get('/', (_req, res) => {
     return res.json(sanitizeUser(user));
   });
 
-  api.patch('/auth/bank', authenticateToken, (req, res) => {
+  const handleBankUpdate = (req: Request, res: Response) => {
     const user = (req as any).user as User;
-    const { clabe, bank_name, holder } = req.body;
+    const { clabe, bank_name, bankName, holder, accountHolder } = req.body;
     const cleanClabe = (clabe || '').replace(/\s/g, '');
     if (!/^\d{18}$/.test(cleanClabe)) {
       return res.status(400).json({ detail: 'La CLABE debe tener exactamente 18 dígitos numéricos' });
     }
-    if (!bank_name || !bank_name.trim()) {
+    const finalBankName = (bank_name || bankName || '').trim();
+    if (!finalBankName) {
       return res.status(400).json({ detail: 'Selecciona un banco' });
     }
 
     user.bank_clabe = cleanClabe;
-    user.bank_name = bank_name.trim();
-    user.bank_holder = (holder || '').trim();
+    user.bank_name = finalBankName;
+    user.bank_holder = (holder || accountHolder || user.name || '').trim();
+
+    if (supabaseServer) {
+      (async () => {
+        try {
+          await supabaseServer.from('users').update({
+            bank_account: {
+              bank_name: user.bank_name,
+              bank_clabe: user.bank_clabe,
+              bank_holder: user.bank_holder,
+            }
+          }).eq('id', user.id);
+        } catch (err: any) {
+          console.warn('Supabase bank update sync exception:', err?.message || err);
+        }
+      })();
+    }
+
     return res.json(sanitizeUser(user));
-  });
+  };
+
+  api.patch('/auth/bank', authenticateToken, handleBankUpdate);
+  api.put('/auth/bank-account', authenticateToken, handleBankUpdate);
+  api.patch('/auth/bank-account', authenticateToken, handleBankUpdate);
 
   // Moto Routes
   api.get('/motos', (req, res) => {
@@ -630,6 +698,7 @@ api.get('/', (_req, res) => {
         try {
           const { error } = await supabaseServer.from('motos').insert([{
             id: moto.id,
+            title: `${moto.brand} ${moto.model} ${moto.year}`,
             brand: moto.brand,
             model: moto.model,
             year: moto.year,
@@ -637,12 +706,13 @@ api.get('/', (_req, res) => {
             km: moto.km,
             engine: moto.engine,
             category: moto.category,
-            city: moto.city,
+            location: moto.city,
             description: moto.description,
             images: moto.images,
             owner_id: moto.owner_id,
             owner_name: moto.owner_name,
             score: moto.score,
+            score_details: moto.score_details,
             status: moto.status,
             created_at: moto.created_at,
           }]);
@@ -692,6 +762,22 @@ api.get('/', (_req, res) => {
       });
     }
 
+    if (supabaseServer) {
+      (async () => {
+        try {
+          await supabaseServer.from('motos').update({
+            price: moto.price,
+            status: moto.status,
+            description: moto.description,
+            images: moto.images,
+            location: moto.city,
+          }).eq('id', moto.id);
+        } catch (err: any) {
+          console.warn('Supabase moto update sync exception:', err?.message || err);
+        }
+      })();
+    }
+
     return res.json(moto);
   });
 
@@ -711,6 +797,17 @@ api.get('/', (_req, res) => {
     }
 
     db.motos.delete(req.params.id);
+
+    if (supabaseServer) {
+      (async () => {
+        try {
+          await supabaseServer.from('motos').delete().eq('id', req.params.id);
+        } catch (err: any) {
+          console.warn('Supabase moto delete sync exception:', err?.message || err);
+        }
+      })();
+    }
+
     return res.json({ ok: true });
   });
 
@@ -757,6 +854,27 @@ api.get('/', (_req, res) => {
     }
 
     db.offers.set(id, offer);
+
+    if (supabaseServer) {
+      (async () => {
+        try {
+          await supabaseServer.from('offers').insert([{
+            id: offer.id,
+            moto_id: offer.moto_id,
+            buyer_id: offer.buyer_id,
+            buyer_name: offer.buyer_name,
+            seller_id: offer.seller_id,
+            amount: offer.amount,
+            status: offer.status,
+            message: offer.message,
+            created_at: offer.created_at,
+          }]);
+        } catch (err: any) {
+          console.warn('Supabase offer sync exception:', err?.message || err);
+        }
+      })();
+    }
+
     return res.json(offer);
   });
 
@@ -798,23 +916,35 @@ api.get('/', (_req, res) => {
         return res.status(400).json({ detail: 'No se envió ningún archivo' });
       }
 
-      // If Supabase Storage is configured, upload directly to Supabase bucket 'motos'
+      // If Supabase Storage is configured, upload directly to Supabase bucket ('motos' or 'Motos')
       if (supabaseServer) {
         try {
           const fileBuffer = fs.readFileSync(req.file.path);
           const fileExt = path.extname(req.file.originalname) || '.jpg';
           const supabaseFileName = `moto_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
 
-          const { data: uploadData, error: uploadError } = await supabaseServer.storage
-            .from('motos')
+          // Try 'Motos' or 'motos' bucket
+          let bucketName = 'Motos';
+          let uploadResult = await supabaseServer.storage
+            .from(bucketName)
             .upload(supabaseFileName, fileBuffer, {
               contentType: req.file.mimetype,
               upsert: true,
             });
 
-          if (!uploadError && uploadData) {
+          if (uploadResult.error) {
+            bucketName = 'motos';
+            uploadResult = await supabaseServer.storage
+              .from(bucketName)
+              .upload(supabaseFileName, fileBuffer, {
+                contentType: req.file.mimetype,
+                upsert: true,
+              });
+          }
+
+          if (!uploadResult.error && uploadResult.data) {
             const { data: publicUrlData } = supabaseServer.storage
-              .from('motos')
+              .from(bucketName)
               .getPublicUrl(supabaseFileName);
 
             if (publicUrlData && publicUrlData.publicUrl) {
@@ -825,7 +955,7 @@ api.get('/', (_req, res) => {
               });
             }
           } else {
-            console.warn('Supabase storage upload fallback to local:', uploadError?.message);
+            console.warn('Supabase storage upload fallback to local:', uploadResult.error?.message);
           }
         } catch (supabaseUploadErr: any) {
           console.warn('Supabase Storage exception, using local upload:', supabaseUploadErr?.message);
