@@ -177,10 +177,20 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (error) {
-      console.error('Error en Supabase signUp:', error);
+      console.error('=== [SUPABASE AUTH ERROR EN SIGNUP] ===');
+      console.error('error.message:', error.message);
+      console.error('error.code:', error.code);
+      console.error('error.status:', error.status);
+      console.error('error.name:', error.name);
+      console.error('error.details:', error.details);
+      console.error('error.hint:', error.hint);
+      console.error('======================================');
+
       const friendlyMessage = formatSupabaseAuthError(error);
       const customErr = new Error(friendlyMessage);
       customErr.original = error;
+      customErr.code = error.code;
+      customErr.status = error.status;
       throw customErr;
     }
 

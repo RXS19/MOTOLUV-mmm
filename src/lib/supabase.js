@@ -42,7 +42,13 @@ export function formatSupabaseAuthError(err) {
     return 'Debes confirmar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.';
   }
   if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('over_email_send_rate_limit')) {
-    return 'Has alcanzado el límite de intentos. Por favor espera unos minutos antes de volver a intentar.';
+    return 'Límite de correos por hora alcanzado en Supabase (Rate limit). En el panel de Supabase: Authentication > Providers > Email, desmarca "Confirm email" para registro directo o espera unos minutos.';
+  }
+  if (msg.includes('database error') || msg.includes('error saving new user')) {
+    return 'Error en la base de datos de Supabase al ejecutar el registro o el trigger de profiles.';
+  }
+  if (msg.includes('invalid path') || msg.includes('request url')) {
+    return 'URL de Supabase mal estructurada. Verifica que no contenga sufijos como /rest/v1.';
   }
   if (msg.includes('unable to validate email') || msg.includes('invalid email') || msg.includes('email address')) {
     return 'El formato de correo electrónico no es válido.';
