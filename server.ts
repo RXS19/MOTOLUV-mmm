@@ -190,6 +190,12 @@ interface Moto {
   status: 'active' | 'sold' | 'paused' | 'Publicada' | 'Apartada' | 'Certificación' | 'Oferta' | 'Proceso de entrega' | 'Entregada' | 'Vendida' | string;
   created_at: string;
   score_details: Record<string, number>;
+  scoreDetails?: Record<string, number>;
+  certification_id?: string;
+  certified_date?: string;
+  certifier?: string;
+  certified_status?: string;
+  inspection_notes?: string;
 }
 
 interface Offer {
@@ -309,13 +315,30 @@ function seedDatabase() {
       status: assignedStatus,
       created_at: new Date(Date.now() - i * 3600000).toISOString(),
       score_details: {
-        Motor: Math.min(100, 70 + ((i * 3) % 30)),
-        Frenos: Math.min(100, 75 + ((i * 5) % 25)),
-        Suspensión: Math.min(100, 72 + ((i * 7) % 28)),
-        Transmisión: Math.min(100, 80 + ((i * 4) % 20)),
-        Neumáticos: Math.min(100, 65 + ((i * 6) % 35)),
-        Eléctrico: Math.min(100, 78 + ((i * 2) % 22)),
+        'Motor': Math.min(100, 78 + ((i * 3) % 22)),
+        'Frenos': Math.min(100, 80 + ((i * 5) % 20)),
+        'Suspensión': Math.min(100, 75 + ((i * 7) % 25)),
+        'Transmisión': Math.min(100, 82 + ((i * 4) % 18)),
+        'Neumáticos': Math.min(100, 70 + ((i * 6) % 30)),
+        'Eléctrico': Math.min(100, 80 + ((i * 2) % 20)),
+        'Chasis y Cuadro': Math.min(100, 88 + ((i * 3) % 12)),
+        'Documentación': 100,
       },
+      scoreDetails: {
+        'Motor': Math.min(100, 78 + ((i * 3) % 22)),
+        'Frenos': Math.min(100, 80 + ((i * 5) % 20)),
+        'Suspensión': Math.min(100, 75 + ((i * 7) % 25)),
+        'Transmisión': Math.min(100, 82 + ((i * 4) % 18)),
+        'Neumáticos': Math.min(100, 70 + ((i * 6) % 30)),
+        'Eléctrico': Math.min(100, 80 + ((i * 2) % 20)),
+        'Chasis y Cuadro': Math.min(100, 88 + ((i * 3) % 12)),
+        'Documentación': 100,
+      },
+      certification_id: `CERT-MLV-${2024000 + i + 1}`,
+      certified_date: new Date(Date.now() - (i + 2) * 86400000).toISOString().split('T')[0],
+      certifier: 'Taller Mecánico Certificado Motoluv MX • Inspector #MLV-408',
+      certified_status: 'Aprobada • 150 Puntos Verificados',
+      inspection_notes: `Inspección de 150 puntos completada satisfactoriamente. Compresión de motor verificada en estándar óptimo. Sistema de frenos y suspensión sin holguras ni desgastes anómalos. Sistema eléctrico y arnés íntegro. Libre de reporte de robo, siniestros y con número de serie/VIN cotejado en REPUVE.`,
     };
     db.motos.set(id, moto);
   });

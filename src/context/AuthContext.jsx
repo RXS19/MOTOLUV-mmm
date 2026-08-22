@@ -198,20 +198,7 @@ export const AuthProvider = ({ children }) => {
       setSession(data.session);
     }
 
-    // Intentar insertar de inmediato en profiles por redundancia si el trigger estuviera en proceso
-    if (data?.user?.id) {
-      try {
-        await updateUserProfile(data.user.id, {
-          full_name: cleanName,
-          phone: cleanPhone,
-          city: cleanCity,
-          role: role || 'both',
-        });
-      } catch (profileSyncErr) {
-        console.warn('Sync profile redundante notice:', profileSyncErr);
-      }
-    }
-
+    // Flujo puro de registro con Supabase Auth (sin upsert a profiles)
     const userObj = await buildUserObject(data.user, data.session);
     setUser(userObj);
     if (role === 'comprador') setActiveView('comprador');

@@ -50,9 +50,9 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
           )}
         </div>
 
-        {canSeeScore && moto.score && (
-          <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur text-white text-xs font-medium px-2 py-1 rounded-sm flex items-center gap-1">
-            <Wrench size={11} className="text-red-brand" /> {moto.score.toFixed(1)}/5
+        {canSeeScore && (moto.score !== undefined && moto.score !== null) && (
+          <div className="absolute bottom-3 left-3 bg-black/80 backdrop-blur border border-white/10 text-white text-xs font-bold px-2.5 py-1 rounded-sm flex items-center gap-1.5 shadow">
+            <Wrench size={11} className="text-red-brand" /> Score {Number(moto.score).toFixed(1)}/5
           </div>
         )}
 

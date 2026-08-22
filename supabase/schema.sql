@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. TRIGGER AUTOMÁTICO: Crear / sincronizar perfil al registrar en auth.users
+-- 3. FUNCIÓN DE TRIGGER (CONSERVADA PARA RESTAURACIÓN POSTERIOR):
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER 
 LANGUAGE plpgsql 
@@ -58,11 +58,11 @@ BEGIN
 END;
 $$;
 
--- Asociar trigger a auth.users
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+-- Desactivado temporalmente para prueba diagnóstica (DROP TRIGGER IF EXISTS)
+-- DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- CREATE TRIGGER on_auth_user_created
+--   AFTER INSERT ON auth.users
+--   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- 4. TABLA DE MOTOCICLETAS
 CREATE TABLE IF NOT EXISTS public.motos (
