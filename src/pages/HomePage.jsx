@@ -93,7 +93,7 @@ const HomePage = () => {
       </section>
 
       {/* STATS */}
-      <section className="border-y border-white/5 bg-[#0a0a0a]">
+      <section className="border-y border-black bg-[#0a0a0a]">
         <div className="max-w-7xl mx-auto px-5 lg:px-8 py-14 grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((s, i) => (
             <div key={i} className="text-center md:text-left">
@@ -118,9 +118,12 @@ const HomePage = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-white/5 mt-16 border border-white/5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-16">
           {process.map((p) => (
-            <div key={p.n} className="bg-[#0a0a0a] p-8 hover:bg-[#111112] transition-colors">
+            <div
+              key={p.n}
+              className="bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#2a2a30] hover:to-[#18181c] border border-black rounded-md p-8 transition-all duration-300 shadow-md hover:shadow-xl cursor-default"
+            >
               <div className="font-display font-bold text-red-brand text-5xl mb-6">{p.n}</div>
               <h3 className="font-display font-bold text-white uppercase tracking-wide text-lg mb-3">{p.title}</h3>
               <p className="text-zinc-400 text-sm leading-relaxed">{p.desc}</p>
@@ -143,10 +146,13 @@ const HomePage = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-white/5 mt-16 border border-white/5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-16">
           {features.map((f, i) => (
-            <div key={i} className="bg-[#0a0a0a] p-8 group hover:bg-[#111112] transition-colors">
-              <div className="w-11 h-11 rounded-md border border-[#E10600]/40 bg-[#E10600]/10 flex items-center justify-center mb-5 group-hover:border-[#E10600] transition-colors">
+            <div
+              key={i}
+              className="bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#2a2a30] hover:to-[#18181c] border border-black rounded-md p-8 group transition-all duration-300 shadow-md hover:shadow-xl cursor-default"
+            >
+              <div className="w-11 h-11 rounded-md border border-[#E10600]/40 bg-[#E10600]/10 flex items-center justify-center mb-5 group-hover:border-[#E10600] group-hover:bg-[#E10600]/20 transition-all duration-300">
                 <f.icon size={18} className="text-[#E10600]" />
               </div>
               <h3 className="font-display font-bold text-white uppercase tracking-wide text-base mb-3">{f.title}</h3>
@@ -195,8 +201,8 @@ const HomePage = () => {
         <div className="absolute inset-0 hero-vignette opacity-80" />
 
         <div className="relative z-10 max-w-4xl mx-auto px-5 lg:px-8 py-28 text-center">
-          <span className="inline-flex items-center gap-2 border border-red-brand/60 text-red-brand text-[11px] tracking-widest uppercase px-3 py-1.5 rounded-full mb-8">
-            <Sparkles size={12} /> Sé de los primeros
+          <span className="inline-block border border-red-brand/60 text-red-brand text-[11px] tracking-widest uppercase px-3 py-1.5 rounded-full mb-8">
+            Sé de los primeros
           </span>
           <h2 className="font-display font-bold text-white text-4xl md:text-6xl uppercase leading-tight">
             Una plataforma <br /><span className="text-red-brand">sin precedentes</span>
@@ -209,7 +215,6 @@ const HomePage = () => {
               Crear cuenta gratis <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
             </Link>
             <Link to="/sumate" className="btn-outline inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm border-[#E10600]/60 text-white hover:border-[#E10600]">
-              <Handshake size={16} className="text-[#E10600]" />
               Súmate a nuestra red
             </Link>
             <Link to="/motos" className="btn-outline inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm">

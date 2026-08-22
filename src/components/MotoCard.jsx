@@ -26,7 +26,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   return (
     <Link
       to={`/motos/${moto.id}`}
-      className="moto-card group block bg-[#111112] border border-white/5 rounded-md overflow-hidden"
+      className="moto-card group block bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#242428] hover:to-[#141416] border border-black rounded-md overflow-hidden transition-all duration-300 shadow-md hover:shadow-xl"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
         <img 
@@ -90,7 +90,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
         </div>
 
         {canSeeScore && moto.rating && (
-          <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+          <div className="mt-3 pt-3 border-t border-black flex items-center justify-between text-xs">
             <span className="text-zinc-500 flex items-center gap-1"><Wrench size={11} /> Score Mecánico</span>
             <span className="flex gap-0.5">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -101,7 +101,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
         )}
 
         {/* Apartado Badge Callout */}
-        <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs bg-red-brand/10 -mx-4 -mb-4 px-4 py-2.5 border-t border-red-brand/20">
+        <div className="mt-3 pt-2.5 flex items-center justify-between text-xs bg-red-brand/10 -mx-4 -mb-4 px-4 py-2.5 border-t border-black">
           <span className="text-zinc-300 font-medium text-[11px]">Separación del inventario por <strong className="text-white">24 hrs</strong></span>
           <span className="text-red-brand font-bold uppercase tracking-wider text-[10px] bg-red-brand/10 border border-red-brand/30 px-2 py-0.5 rounded-sm">
             APARTAR

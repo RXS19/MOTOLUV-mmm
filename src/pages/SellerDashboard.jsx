@@ -101,7 +101,7 @@ const SellerDashboard = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-zinc-300">
-              <thead className="bg-[#0a0a0a] uppercase text-[10px] tracking-wider text-zinc-500">
+              <thead className="bg-[#0a0a0a] uppercase text-[10px] tracking-wider text-zinc-500 border-b border-zinc-800/80">
                 <tr>
                   <th className="py-3 px-4">Moto / Publicación</th>
                   <th className="py-3 px-4">Precio Publicado</th>
@@ -110,7 +110,7 @@ const SellerDashboard = () => {
                   <th className="py-3 px-4 text-right">Cambiar Estatus</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-zinc-800/60">
                 {motos.map((m) => {
                   const comm = calculateCommission(m.price);
                   const style = getStatusStyle(m.status);

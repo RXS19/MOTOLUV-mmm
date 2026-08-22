@@ -265,9 +265,9 @@ const MotoDetailPage = () => {
 
           <div className="mt-10">
             <h2 className="font-display font-bold text-white text-2xl uppercase tracking-wide mb-5">Ficha técnica</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/5 border border-white/5 rounded-md overflow-hidden">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
               {Object.entries(specs).map(([k, v]) => (
-                <div key={k} className="bg-[#111112] p-4">
+                <div key={k} className="bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#242428] hover:to-[#141416] border border-black rounded-md p-4 transition-all duration-300">
                   <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">{k}</div>
                   <div className="text-white text-sm font-medium">{v}</div>
                 </div>
@@ -280,19 +280,19 @@ const MotoDetailPage = () => {
               <h2 className="font-display font-bold text-white text-2xl uppercase tracking-wide mb-5 flex items-center gap-3">
                 Score mecánico <span className="text-red-brand text-lg">{moto.score.toFixed(1)}/5</span>
               </h2>
-              <div className="bg-[#111112] border border-white/5 rounded-md p-6 space-y-4">
+              <div className="bg-[#111112] border border-black rounded-md p-6 space-y-4">
                 {Object.entries(moto.score_details || {}).map(([k, v]) => (
                   <div key={k}>
                     <div className="flex items-center justify-between text-sm mb-1.5">
                       <span className="text-zinc-300">{k}</span>
                       <span className="text-white font-medium">{v}%</span>
                     </div>
-                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-black rounded-full overflow-hidden">
                       <div className="h-full bg-red-brand rounded-full transition-all" style={{ width: `${v}%` }} />
                     </div>
                   </div>
                 ))}
-                <p className="text-xs text-zinc-500 pt-3 border-t border-white/5">
+                <p className="text-xs text-zinc-500 pt-3 border-t border-black">
                   Evaluación realizada por mecánicos certificados Motoluv.
                 </p>
               </div>
@@ -301,7 +301,7 @@ const MotoDetailPage = () => {
         </div>
 
         <div className="space-y-5">
-          <div className="bg-[#111112] border border-white/5 rounded-md p-6">
+          <div className="bg-[#111112] border border-black rounded-md p-6">
             <div className="flex items-center justify-end gap-2 mb-2">
               {Boolean(user && (user.id === moto.owner_id || user.id === moto.ownerId || user.id === moto.buyer_id || hasApartado)) && (() => {
                 const style = getStatusStyle(moto.status);
@@ -323,12 +323,12 @@ const MotoDetailPage = () => {
               <span className="text-xs text-zinc-400 ml-1">({moto.views} vistas)</span>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-white/5">
+            <div className="mt-6 pt-6 border-t border-black">
               <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Precio Publicado</div>
               <div className="font-display font-bold text-red-brand text-4xl">${moto.price.toLocaleString()} MXN</div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/5 text-sm">
+            <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-black text-sm">
               <div className="flex items-center gap-2 text-zinc-300"><Calendar size={14} className="text-red-brand" /> {moto.year}</div>
               <div className="flex items-center gap-2 text-zinc-300"><Gauge size={14} className="text-red-brand" /> {moto.km.toLocaleString()} km</div>
               <div className="flex items-center gap-2 text-zinc-300"><Wrench size={14} className="text-red-brand" /> {moto.engine}</div>
@@ -338,7 +338,7 @@ const MotoDetailPage = () => {
           </div>
 
           {/* BLOQUE DE APARTADO */}
-          <div className="bg-[#111112] border border-white/5 rounded-md p-6 relative overflow-hidden">
+          <div className="bg-[#111112] border border-black rounded-md p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-display font-bold text-white uppercase tracking-wide text-base flex items-center gap-2">
                 <BookmarkCheck size={18} className="text-red-brand" /> APARTAR

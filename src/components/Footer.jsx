@@ -6,21 +6,21 @@ import { NovatechLogo } from './NovatechLogo';
 
 const Footer = () => {
   return (
-    <footer className="border-t border-white/5 bg-[#0a0a0a] mt-24">
+    <footer className="border-t border-black bg-[#0a0a0a] mt-24">
       <div className="max-w-7xl mx-auto px-5 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           {/* Brand & Partner */}
           <div>
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <Link to="/" className="inline-block" aria-label="Motoluv Inicio">
-                <div className="flex items-center justify-center py-1 px-2 rounded bg-black/60 border border-white/10 w-fit hover:border-[#E10600]/40 transition-colors">
+                <div className="flex items-center justify-center py-1 px-2 rounded bg-black/60 border border-black w-fit hover:border-[#E10600]/40 transition-colors">
                   <MotoluvLogo className="h-8 w-auto" />
                 </div>
               </Link>
 
-              <div className="h-6 w-px bg-white/15 hidden xs:block" aria-hidden="true" />
+              <div className="h-6 w-px bg-black hidden xs:block" aria-hidden="true" />
 
-              <div className="flex items-center gap-2 py-1 px-2.5 rounded bg-black/60 border border-white/10 w-fit hover:border-white/20 transition-colors" title="Novatech Partner">
+              <div className="flex items-center gap-2 py-1 px-2.5 rounded bg-black/60 border border-black w-fit hover:border-black/60 transition-colors" title="Novatech Partner">
                 <NovatechLogo className="h-5 md:h-6 w-auto opacity-90 hover:opacity-100 transition-opacity" />
               </div>
             </div>
@@ -65,7 +65,7 @@ const Footer = () => {
                   rel="noopener noreferrer"
                   aria-label={label}
                   title={label}
-                  className="w-9 h-9 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:text-red-brand hover:border-red-brand/50 transition-colors"
+                  className="w-9 h-9 rounded-full border border-black flex items-center justify-center text-zinc-400 hover:text-red-brand hover:border-red-brand/50 transition-colors"
                 >
                   <Icon size={14} />
                 </a>
@@ -74,7 +74,7 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="border-t border-white/5 mt-12 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
+        <div className="border-t border-black mt-12 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
           <div>© 2026 Motoluv. Todos los derechos reservados.</div>
           <div className="flex gap-6">
             <a href="#" className="hover:text-white transition-colors">Términos y Condiciones</a>
