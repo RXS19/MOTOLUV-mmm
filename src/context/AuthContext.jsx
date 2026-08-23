@@ -34,10 +34,24 @@ export const AuthProvider = ({ children }) => {
     const fullName = profile?.full_name || metadata.full_name || metadata.name || (authUser.email ? authUser.email.split('@')[0] : 'Usuario');
     const role = profile?.role || metadata.role || 'both';
     const city = profile?.city || metadata.city || 'Ciudad de México';
-    const phone = profile?.phone || metadata.phone || '';
+    const phone = profile?.phone || metadata.phone || metadata.phone_number || metadata.phoneNumber || authUser.phone || metadata.custom_claims?.phone || '';
     const bankClabe = profile?.bank_clabe || metadata.bank_clabe || '';
     const bankName = profile?.bank_name || metadata.bank_name || '';
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
+
+    // Sincronizar automáticamente con Supabase profiles si se detecta teléfono nuevo (por ejemplo desde Google OAuth)
+    if (isSupabaseConfigured && supabase && authUser.id && phone && (!profile || !profile.phone)) {
+      try {
+        updateUserProfile(authUser.id, {
+          phone,
+          full_name: fullName,
+          role,
+          city,
+        });
+      } catch (err) {
+        console.warn('Sync profile phone warning:', err);
+      }
+    }
 
     return {
       id: authUser.id,
@@ -191,7 +205,12 @@ export const AuthProvider = ({ children }) => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
     const cleanPhone = (phone || '').trim();
+    const cleanDigits = cleanPhone.replace(/[^0-9]/g, '');
     const cleanCity = (city || 'Ciudad de México').trim();
+
+    if (!cleanDigits || cleanDigits.length < 10) {
+      throw new Error('El número de teléfono / WhatsApp es obligatorio y debe tener al menos 10 dígitos.');
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,

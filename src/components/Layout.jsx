@@ -6,6 +6,7 @@ import LuChatbot from './LuChatbot';
 import ProductDetailModal from './ProductDetailModal';
 import CartDrawer from './CartDrawer';
 import StripeCheckoutModal from './StripeCheckoutModal';
+import RequirePhoneModal from './RequirePhoneModal';
 
 const Layout = () => {
   return (
@@ -19,6 +20,7 @@ const Layout = () => {
       <ProductDetailModal />
       <CartDrawer />
       <StripeCheckoutModal />
+      <RequirePhoneModal />
     </div>
   );
 };

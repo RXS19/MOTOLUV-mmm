@@ -31,23 +31,32 @@ const RegisterPage = () => {
     e.preventDefault();
 
     if (!form.name.trim()) {
-      toast({ title: 'Nombre requerido', description: 'Por favor ingresa tu nombre completo.' });
+      toast({ title: 'Nombre requerido', description: 'Por favor ingresa tu nombre completo.', variant: 'destructive' });
       return;
     }
     if (!form.email.trim()) {
-      toast({ title: 'Email requerido', description: 'Por favor ingresa un correo electrónico válido.' });
+      toast({ title: 'Email requerido', description: 'Por favor ingresa un correo electrónico válido.', variant: 'destructive' });
+      return;
+    }
+    const cleanPhoneDigits = form.phone.replace(/[^0-9]/g, '');
+    if (!cleanPhoneDigits || cleanPhoneDigits.length < 10) {
+      toast({
+        title: 'Teléfono obligatorio',
+        description: 'Por favor ingresa un número de teléfono / WhatsApp válido de al menos 10 dígitos.',
+        variant: 'destructive',
+      });
       return;
     }
     if (form.password.length < 6) {
-      toast({ title: 'Contraseña muy corta', description: 'La contraseña debe tener al menos 6 caracteres.' });
+      toast({ title: 'Contraseña muy corta', description: 'La contraseña debe tener al menos 6 caracteres.', variant: 'destructive' });
       return;
     }
     if (form.password !== form.confirm) {
-      toast({ title: 'Contraseñas no coinciden', description: 'Por favor verifica que ambas contraseñas sean idénticas.' });
+      toast({ title: 'Contraseñas no coinciden', description: 'Por favor verifica que ambas contraseñas sean idénticas.', variant: 'destructive' });
       return;
     }
     if (!form.terms) {
-      toast({ title: 'Acepta los términos', description: 'Debes aceptar los términos y condiciones para continuar.' });
+      toast({ title: 'Acepta los términos', description: 'Debes aceptar los términos y condiciones para continuar.', variant: 'destructive' });
       return;
     }
 
@@ -56,7 +65,7 @@ const RegisterPage = () => {
       const res = await register({
         name: form.name,
         email: form.email,
-        phone: form.phone,
+        phone: form.phone.trim(),
         city: form.city,
         password: form.password,
         role: role || 'both',
@@ -169,7 +178,7 @@ const RegisterPage = () => {
           <div className="space-y-4">
             <Field icon={User} label="Nombre completo" value={form.name} onChange={(v) => update('name', v)} placeholder="Juan Pérez" required />
             <Field icon={Mail} type="email" label="Email" value={form.email} onChange={(v) => update('email', v)} placeholder="juan@correo.mx" required />
-            <Field icon={Phone} type="tel" label="Teléfono" value={form.phone} onChange={(v) => update('phone', v)} placeholder="+52 56 4304 8865" required />
+            <Field icon={Phone} type="tel" label="Teléfono / WhatsApp (Obligatorio)" value={form.phone} onChange={(v) => update('phone', v)} placeholder="55 1234 5678" required />
             <div>
               <label className="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">Ciudad</label>
               <select value={form.city} onChange={(e) => update('city', e.target.value)} required className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors">
