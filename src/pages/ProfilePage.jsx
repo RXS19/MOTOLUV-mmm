@@ -256,20 +256,43 @@ const ProfilePage = () => {
 
               {/* TELÉFONO */}
               <div className="md:col-span-2">
-                <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
-                  <Phone size={13} className="text-red-brand" /> Teléfono Móvil / WhatsApp <span className="text-red-brand">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                    <Phone size={13} className="text-red-brand" /> Teléfono Móvil / WhatsApp <span className="text-red-brand">*</span>
+                  </label>
+                  {user?.phone_updated_once ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      <Lock size={10} /> Modificación única utilizada
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-400/90 font-medium">
+                      (1 modificación disponible)
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <input
                     type="tel"
                     value={form.phone}
+                    disabled={Boolean(user?.phone_updated_once)}
                     onChange={(e) => update('phone', e.target.value.replace(/[^0-9+\s()-]/g, ''))}
                     placeholder="Ej. +52 56 4304 8865"
-                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-mono tracking-wide"
+                    className={`w-full px-4 py-3 bg-[#0a0a0a] border text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-mono tracking-wide ${
+                      user?.phone_updated_once
+                        ? 'border-white/5 text-zinc-400 cursor-not-allowed bg-[#08080a]'
+                        : 'border-white/10 focus:border-red-brand text-white'
+                    }`}
                   />
+                  {user?.phone_updated_once && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500" title="Número protegido">
+                      <Lock size={15} className="text-zinc-500" />
+                    </div>
+                  )}
                 </div>
                 <p className="text-[11px] text-zinc-500 mt-1.5">
-                  Indispensable para coordinar citas de inspección técnica, entrega de motocicletas y notificaciones en tiempo real.
+                  {user?.phone_updated_once
+                    ? 'Por seguridad antifraude en contratos e inspecciones, tu teléfono está verificado. Para una corrección adicional, solicita asistencia a soporte.'
+                    : 'Indispensable para coordinar citas de inspección técnica, entrega de motocicletas y alertas. Podrás actualizarlo 1 sola vez por seguridad.'}
                 </p>
               </div>
 

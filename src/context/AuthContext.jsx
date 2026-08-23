@@ -35,11 +35,13 @@ export const AuthProvider = ({ children }) => {
     const role = profile?.role || metadata.role || 'both';
     const city = profile?.city || metadata.city || 'Ciudad de México';
     const phone = profile?.phone || metadata.phone || metadata.phone_number || metadata.phoneNumber || authUser.phone || metadata.custom_claims?.phone || '';
+    const phoneUpdatedOnce = Boolean(profile?.phone_updated_once || metadata.phone_updated_once || (profile?.phone_change_count && profile.phone_change_count >= 1));
+    const phoneChangeCount = profile?.phone_change_count ?? (phoneUpdatedOnce ? 1 : 0);
     const bankClabe = profile?.bank_clabe || metadata.bank_clabe || '';
     const bankName = profile?.bank_name || metadata.bank_name || '';
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
 
-    // Sincronizar automáticamente con Supabase profiles si se detecta teléfono nuevo (por ejemplo desde Google OAuth)
+    // Sincronizar automáticamente con profiles si se detecta teléfono nuevo (por ejemplo desde Google OAuth)
     if (isSupabaseConfigured && supabase && authUser.id && phone && (!profile || !profile.phone)) {
       try {
         updateUserProfile(authUser.id, {
@@ -58,6 +60,8 @@ export const AuthProvider = ({ children }) => {
       email: authUser.email,
       name: fullName,
       phone,
+      phone_updated_once: phoneUpdatedOnce,
+      phone_change_count: phoneChangeCount,
       city,
       role,
       rating: 5.0,
@@ -288,23 +292,36 @@ export const AuthProvider = ({ children }) => {
       updates.full_name = name.trim();
       updates.name = name.trim();
     }
-    if (phone !== undefined) updates.phone = phone.trim();
+    const isPhoneChanging = phone !== undefined && user?.phone && phone.trim() !== user.phone.trim();
+    const willBeUpdatedOnce = user?.phone_updated_once || (user?.phone_change_count && user.phone_change_count >= 1) || isPhoneChanging;
+
+    if (phone !== undefined) {
+      updates.phone = phone.trim();
+      if (isPhoneChanging) {
+        updates.phone_updated_once = true;
+        updates.phone_change_count = (user?.phone_change_count || 0) + 1;
+      }
+    }
     if (city !== undefined) updates.city = city.trim();
     if (role !== undefined) updates.role = role;
-    if (bank_clabe !== undefined) updates.bank_clabe = bank_clabe.trim();
+    if (bank_clabe !== undefined) {
+      updates.bank_clabe = bank_clabe.trim();
+      updates.bank_updated_at = new Date().toISOString();
+    }
     if (bank_name !== undefined) updates.bank_name = bank_name.trim();
     if (bank_holder !== undefined) updates.bank_holder = bank_holder.trim();
 
     try {
       await updateUserProfile(user.id, updates);
     } catch (err) {
-      console.warn('Error al actualizar en Supabase, aplicando localmente:', err);
+      console.warn('Error al actualizar perfil, aplicando localmente:', err);
     }
 
     const updated = {
       ...user,
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(phone !== undefined ? { phone: phone.trim() } : {}),
+      ...(isPhoneChanging ? { phone_updated_once: true, phone_change_count: (user?.phone_change_count || 0) + 1 } : {}),
       ...(city !== undefined ? { city: city.trim() } : {}),
       ...(role !== undefined ? { role } : {}),
       ...(bank_clabe !== undefined ? { bank_clabe: bank_clabe.trim() } : {}),

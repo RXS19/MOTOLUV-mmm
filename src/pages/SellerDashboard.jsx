@@ -706,7 +706,7 @@ const SellerDashboard = () => {
                             <span className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1">
                               <Activity size={11} className="text-red-brand" /> Estatus de Operación
                             </span>
-                            <span className="text-[9px] text-zinc-500 font-medium">CRM / Supabase</span>
+                            <span className="text-[9px] text-zinc-500 font-medium">CRM Motoluv</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-[#16161c] rounded-lg border border-white/5">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${style.badgeClass.replace('bg-black/80', '').replace('backdrop-blur', '').replace('border', '')}`}>

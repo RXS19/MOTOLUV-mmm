@@ -42,19 +42,19 @@ export function formatSupabaseAuthError(err) {
     return 'Debes confirmar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.';
   }
   if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('over_email_send_rate_limit')) {
-    return 'Límite de correos por hora alcanzado en Supabase (Rate limit). En el panel de Supabase: Authentication > Providers > Email, desmarca "Confirm email" para registro directo o espera unos minutos.';
+    return 'Límite de solicitudes alcanzado. Por favor espera unos minutos antes de intentar de nuevo.';
   }
   if (msg.includes('database error') || msg.includes('error saving new user')) {
-    return 'Error en la base de datos de Supabase al ejecutar el registro o el trigger de profiles.';
+    return 'Ocurrió un error al procesar el registro de usuario. Por favor intenta más tarde.';
   }
   if (msg.includes('invalid path') || msg.includes('request url')) {
-    return 'URL de Supabase mal estructurada. Verifica que no contenga sufijos como /rest/v1.';
+    return 'Error en la conexión con el servidor. Verifica tu red.';
   }
   if (msg.includes('unable to validate email') || msg.includes('invalid email') || msg.includes('email address')) {
     return 'El formato de correo electrónico no es válido.';
   }
   if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')) {
-    return 'No fue posible conectar con el servicio de autenticación de Supabase. Revisa tu conexión a internet o la configuración del proyecto.';
+    return 'No fue posible conectar con el servicio de autenticación. Revisa tu conexión a internet.';
   }
 
   return err.message || 'Error en la autenticación. Intenta nuevamente.';

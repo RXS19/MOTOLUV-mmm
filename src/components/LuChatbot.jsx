@@ -135,6 +135,46 @@ const LuChatbot = () => {
     }
   };
 
+  const generateClientFallbackReply = (query) => {
+    const lower = (query || '').toLowerCase();
+    
+    // Security check: Block attempts to retrieve confidential user data
+    if (
+      lower.includes('clabe') ||
+      lower.includes('contraseña') ||
+      lower.includes('password') ||
+      lower.includes('jwt') ||
+      lower.includes('token') ||
+      lower.includes('cuenta bancaria') ||
+      lower.includes('tarjeta') ||
+      lower.includes('cvv') ||
+      lower.includes('secret')
+    ) {
+      return 'Por políticas de privacidad y estricta seguridad, jamás puedo solicitar ni compartir información confidencial como números CLABE, contraseñas o datos de pago. 🔒 Si necesitas asistencia con tu cuenta, escribe a contacto@motoluv.mx';
+    }
+
+    if (lower.includes('hola') || lower.includes('buenos') || lower.includes('buenas') || lower.includes('que tal') || lower.includes('saludos')) {
+      return '¡Hola! 🐾 Soy Lu, el asistente oficial de Motoluv. ¿En qué te puedo asesorar hoy? Puedo ayudarte a buscar motocicletas en el catálogo, conocer nuestros paquetes de inspección, equiparte en la tienda o registrarte en nuestra red de aliados. 🏍️';
+    }
+    if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catalogo') || lower.includes('catálogo') || lower.includes('inventario') || lower.includes('vender')) {
+      return 'En Motoluv contamos con un inventario verificado con Score de 100 puntos y certificación mecánica completa 🏁.\n\n• Puedes explorar todas las marcas y modelos disponibles en la pestaña "Catálogo" (/motos).\n• Si quieres vender, activa tu perfil de vendedor y publica tu moto con fotos y kilometraje.';
+    }
+    if (lower.includes('tienda') || lower.includes('casco') || lower.includes('accesorio') || lower.includes('chaqueta') || lower.includes('guantes') || lower.includes('intercom')) {
+      return '¡Claro! En nuestra Tienda Oficial (/tienda) encontrarás cascos de marcas líderes, chaquetas con armadura de protección, guantes tácticos y accesorios con envío a todo México 🛡️.';
+    }
+    if (lower.includes('red') || lower.includes('sumate') || lower.includes('súmate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
+      return '¡Únete a nuestra Red de Socios! 🤝 Si tienes un taller mecánico certificado, tienda de accesorios, agencia de motocicletas, financiera o eres organizador de rodadas, ingresa a la sección "/sumate" para registrar tu negocio.';
+    }
+    if (lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro') || lower.includes('paquete') || lower.includes('pago') || lower.includes('precio') || lower.includes('costo')) {
+      return 'En Motoluv protegemos tu dinero al 100% 🔒. Nuestros paquetes de servicio:\n\n1. Básico ($1,900 MXN): Inspección de 100 puntos y contrato digital.\n2. Plus ($3,900 MXN): Básico + protección de pago y validación de documentos.\n3. Total ($5,900 MXN): Plus + traslado nacional garantizado a tu domicilio.';
+    }
+    if (lower.includes('telefono') || lower.includes('teléfono') || lower.includes('contacto') || lower.includes('whatsapp') || lower.includes('celular')) {
+      return 'El teléfono / WhatsApp es un dato obligatorio en tu cuenta para coordinar inspecciones mecánicas y entregas seguras. Puedes verificarlo y editarlo en tu perfil.';
+    }
+    
+    return '¡Con gusto te oriento! 🐾 En Motoluv puedes comprar motos seminuevas certificadas, equiparte con los mejores accesorios o sumar tu negocio a nuestra red de aliados. ¿Te gustaría ver el catálogo de motos o conocer la tienda?';
+  };
+
   const handleSend = async (textToSend) => {
     const query = textToSend || input;
     if (!query.trim() || loading) return;
@@ -159,7 +199,7 @@ const LuChatbot = () => {
         }));
 
       const res = await chatApi.send(query, historyFormatted);
-      const replyText = res?.reply || '¡Hola! Estoy aquí para ayudarte en Motoluv.';
+      const replyText = res?.reply || generateClientFallbackReply(query);
 
       const luMsg = {
         id: `lu_${Date.now()}`,
@@ -170,12 +210,14 @@ const LuChatbot = () => {
 
       setMessages((prev) => [...prev, luMsg]);
     } catch (err) {
+      console.warn('Chat API fallback to instant client-engine:', err);
+      const fallbackReply = generateClientFallbackReply(query);
       setMessages((prev) => [
         ...prev,
         {
-          id: `lu_err_${Date.now()}`,
+          id: `lu_fb_${Date.now()}`,
           sender: 'lu',
-          text: '¡Ocurrió un pequeño inconveniente en la línea ⚡! Pero puedes explorar nuestras motos en el catálogo.',
+          text: fallbackReply,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);

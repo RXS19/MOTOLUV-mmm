@@ -44,12 +44,12 @@ const RequirePhoneModal = () => {
 
       toast({
         title: 'Teléfono registrado',
-        description: 'Tu número de teléfono ha sido vinculado y guardado exitosamente en la base de datos de Supabase.',
+        description: 'Tu número de teléfono ha sido vinculado y guardado exitosamente en tu cuenta.',
       });
       setIsOpen(false);
     } catch (err) {
-      console.error('Error al guardar teléfono en Supabase:', err);
-      setErrorMsg(err?.message || 'Error al guardar el teléfono en Supabase.');
+      console.error('Error al guardar teléfono:', err);
+      setErrorMsg(err?.message || 'Error al guardar el teléfono en tu perfil.');
       toast({
         title: 'Error al sincronizar',
         description: 'No se pudo guardar el teléfono. Intenta nuevamente.',
@@ -121,7 +121,7 @@ const RequirePhoneModal = () => {
           <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1.5">
             <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium">
               <Lock size={12} className="text-emerald-400 flex-shrink-0" />
-              <span>Tus datos están protegidos y encriptados en Supabase.</span>
+              <span>Tus datos están protegidos y encriptados con seguridad bancaria.</span>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium">
               <Shield size={12} className="text-red-brand flex-shrink-0" />
@@ -136,7 +136,7 @@ const RequirePhoneModal = () => {
             className="w-full py-3.5 px-5 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-brand/25 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {saving ? (
-              <span>Guardando en Supabase...</span>
+              <span>Guardando información...</span>
             ) : (
               <>
                 <span>Guardar y Continuar</span>
