@@ -39,7 +39,7 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
     {
       id: 1,
       title: 'Inspección certificada en curso',
-      desc: 'El especialista técnico está validando los 150 puntos de control.',
+      desc: 'El especialista técnico está validando el peritaje y certificación vehicular.',
       time: 'Hace 2h',
       unread: true,
     },

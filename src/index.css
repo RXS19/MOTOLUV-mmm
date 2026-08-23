@@ -113,3 +113,10 @@ code {
         border-bottom-color: inherit;
     }
 }
+
+@media print {
+    .print-disabled, body, [data-certificate="true"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+}

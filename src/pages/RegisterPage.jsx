@@ -195,7 +195,7 @@ const RegisterPage = () => {
           <div className="space-y-4">
             <Field icon={User} label="Nombre completo" value={form.name} onChange={(v) => update('name', v)} placeholder="Juan Pérez" required />
             <Field icon={Mail} type="email" label="Email" value={form.email} onChange={(v) => update('email', v)} placeholder="juan@correo.mx" required />
-            <Field icon={Phone} type="tel" label="Teléfono" value={form.phone} onChange={(v) => update('phone', v)} placeholder="+52 55 1234 5678" required />
+            <Field icon={Phone} type="tel" label="Teléfono" value={form.phone} onChange={(v) => update('phone', v)} placeholder="+52 56 4304 8865" required />
             <div>
               <label className="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">Ciudad</label>
               <select value={form.city} onChange={(e) => update('city', e.target.value)} required className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors">

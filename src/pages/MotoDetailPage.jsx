@@ -121,7 +121,7 @@ const MotoDetailPage = () => {
         });
 
         toast({
-          title: '¡Apartado con Clip México Exitoso!',
+          title: '¡Apartado Exitoso!',
           description: `Has apartado ${moto.brand} ${moto.model} con $600 MXN. Ref: ${clipReq.clipReference}`,
         });
       } else {
@@ -208,8 +208,8 @@ const MotoDetailPage = () => {
   const certFolio = moto?.certification_id || `CERT-MLV-${2024000 + (parseInt(String(moto?.id).replace(/\D/g, '')) || 101)}`;
   const certDate = moto?.certified_date || '2024-05-15';
   const certInspector = moto?.certifier || 'Taller Mecánico Especializado Motoluv MX • Inspector #MLV-408';
-  const certStatus = moto?.certified_status || 'Aprobada • 150 Puntos Verificados';
-  const certNotes = moto?.inspection_notes || 'Inspección técnica de 150 puntos completada satisfactoriamente. Compresión de motor verificada en estándar óptimo. Sistema de frenos y suspensión sin holguras ni desgastes anómalos. Sistema eléctrico y arnés íntegro. Libre de reporte de robo, siniestros y con número de serie/VIN cotejado en REPUVE.';
+  const certStatus = moto?.certified_status || 'Aprobada • Certificación Integral';
+  const certNotes = moto?.inspection_notes || 'Inspección técnica y peritaje integral completados satisfactoriamente. Compresión de motor verificada en estándar óptimo. Sistema de frenos y suspensión sin holguras ni desgastes anómalos. Sistema eléctrico y arnés íntegro. Libre de reporte de robo, siniestros y con número de serie/VIN cotejado en REPUVE.';
 
   return (
     <div className="max-w-7xl mx-auto px-5 lg:px-8 py-8">
@@ -299,7 +299,7 @@ const MotoDetailPage = () => {
             </div>
           </div>
 
-          {/* REPORTE DE CERTIFICACIÓN E INSPECCIÓN MECÁNICA (150 PUNTOS) */}
+          {/* REPORTE DE CERTIFICACIÓN E INSPECCIÓN MECÁNICA */}
           <div className="mt-12">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div>
@@ -307,7 +307,7 @@ const MotoDetailPage = () => {
                   <span className="px-2.5 py-1 bg-red-brand/10 border border-red-brand/30 text-red-brand text-[10px] font-extrabold uppercase tracking-widest rounded-sm inline-flex items-center gap-1.5">
                     <ShieldCheck size={13} /> Certificación Oficial Motoluv
                   </span>
-                  <span className="text-zinc-500 text-xs">• 150 Puntos Verificados</span>
+                  <span className="text-zinc-500 text-xs">• Inspección Certificada</span>
                 </div>
                 <h2 className="font-display font-bold text-white text-2xl md:text-3xl uppercase tracking-wide mt-1.5 flex items-center gap-3">
                   Reporte de Certificación
@@ -406,7 +406,7 @@ const MotoDetailPage = () => {
                 <div className="pt-3 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-500">
                   <div className="flex items-center gap-2">
                     <Award size={14} className="text-red-brand" />
-                    <span>Inspección de 150 puntos avalada con sello digital de garantía Motoluv.</span>
+                    <span>Inspección integral avalada con sello digital de garantía Motoluv.</span>
                   </div>
                   <button
                     onClick={() => setShowCertModal(true)}
@@ -426,7 +426,7 @@ const MotoDetailPage = () => {
                     Reporte de Certificación Bloqueado
                   </h3>
                   <p className="text-zinc-400 text-xs leading-relaxed">
-                    Esta motocicleta cuenta con certificación técnica de 150 puntos y folio oficial. Inicia sesión o regístrate de forma gratuita para desbloquear el score por sistemas, diagnóstico de compresión y certificado digital de peritaje.
+                    Esta motocicleta cuenta con certificación técnica integral y folio oficial. Inicia sesión o regístrate de forma gratuita para desbloquear el score por sistemas, diagnóstico de compresión y certificado digital de peritaje.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -677,20 +677,17 @@ const MotoDetailPage = () => {
 
             <div className="space-y-3">
               <label className="text-xs text-zinc-400 uppercase tracking-wider block">Método de Confirmación y Pago</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'clip', label: '⚡ Clip México' },
-                  { id: 'card', label: '💳 Tarjeta' },
-                  { id: 'spei', label: '🏦 SPEI' },
+                  { id: 'card', label: 'Tarjeta Bancaria' },
+                  { id: 'spei', label: 'Transferencia SPEI' },
                 ].map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setApartadoPaymentMethod(m.id)}
-                    className={`py-2 px-3 border text-xs font-bold rounded-sm uppercase tracking-wider transition-colors ${
+                    className={`py-2 px-3 border text-xs font-bold rounded-sm uppercase tracking-wider transition-colors text-center ${
                       apartadoPaymentMethod === m.id
-                        ? m.id === 'clip'
-                          ? 'border-orange-500 bg-orange-500/20 text-orange-400 font-extrabold'
-                          : 'border-red-brand bg-red-brand/10 text-white'
+                        ? 'border-red-brand bg-red-brand/10 text-white'
                         : 'border-white/10 text-zinc-400 hover:border-white/20'
                     }`}
                   >
@@ -704,7 +701,7 @@ const MotoDetailPage = () => {
               <button
                 onClick={handlePerformApartado}
                 disabled={apartadoLoading}
-                className="btn-red w-full py-3.5 text-xs font-bold tracking-widest uppercase rounded-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
+                className="btn-red w-full py-3.5 text-xs font-bold tracking-widest uppercase rounded-sm flex items-center justify-center shadow-lg disabled:opacity-70 text-center"
               >
                 {apartadoLoading ? 'Procesando...' : 'Confirmar y Pagar $600.00 MXN'}
               </button>
@@ -738,7 +735,7 @@ const MotoDetailPage = () => {
                   Certificado de Inspección Mecánica y Legal
                 </h3>
                 <p className="text-zinc-400 text-xs">
-                  Dictamen técnico y validación vehicular de 150 puntos de control
+                  Dictamen técnico y validación vehicular integral
                 </p>
               </div>
 
@@ -774,7 +771,7 @@ const MotoDetailPage = () => {
             {/* Detailed Inspection Matrix */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Award size={14} className="text-red-brand" /> Resultados por Módulo de Inspección (150 Puntos)
+                <Award size={14} className="text-red-brand" /> Resultados por Módulo de Inspección Certificada
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(scoreDetails).map(([cat, val]) => (

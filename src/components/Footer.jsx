@@ -49,7 +49,7 @@ const Footer = () => {
             <h4 className="text-xs tracking-widest uppercase text-zinc-500 mb-4">Contacto</h4>
             <ul className="space-y-3 text-sm text-zinc-300">
               <li className="flex items-center gap-2"><Mail size={14} className="text-red-brand" /> contacto@motoluv.mx</li>
-              <li className="flex items-center gap-2"><Phone size={14} className="text-red-brand" /> +52 55 1234 5678</li>
+              <li className="flex items-center gap-2"><Phone size={14} className="text-red-brand" /> +52 56 4304 8865</li>
               <li className="flex items-center gap-2"><MapPin size={14} className="text-red-brand" /> Ciudad de México, MX</li>
             </ul>
             <div className="flex gap-3 mt-6">

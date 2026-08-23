@@ -140,7 +140,7 @@ const PartnersPage = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field icon={Phone} label="Teléfono" type="tel" required value={form.phone} onChange={(v) => update('phone', v)} placeholder="+52 55 1234 5678" />
+              <Field icon={Phone} label="Teléfono" type="tel" required value={form.phone} onChange={(v) => update('phone', v)} placeholder="+52 56 4304 8865" />
               <Field icon={Mail} label="Email" type="email" value={form.email} onChange={(v) => update('email', v)} placeholder="contacto@empresa.mx" />
             </div>
 

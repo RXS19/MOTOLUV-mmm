@@ -264,7 +264,7 @@ const ProfilePage = () => {
                     type="tel"
                     value={form.phone}
                     onChange={(e) => update('phone', e.target.value.replace(/[^0-9+\s()-]/g, ''))}
-                    placeholder="Ej. +52 55 1234 5678"
+                    placeholder="Ej. +52 56 4304 8865"
                     className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-mono tracking-wide"
                   />
                 </div>

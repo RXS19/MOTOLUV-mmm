@@ -115,8 +115,8 @@ export const motos = modelData.map((m, i) => ({
   certification_id: `CERT-MLV-${2024000 + i + 1}`,
   certified_date: new Date(Date.now() - (i + 2) * 86400000).toISOString().split('T')[0],
   certifier: 'Taller Mecánico Especializado Motoluv MX • Perito #MLV-408',
-  certified_status: 'Aprobada • 150 Puntos Verificados',
-  inspection_notes: `Inspección de 150 puntos completada satisfactoriamente. Compresión de motor verificada en estándar óptimo. Sistema de frenos y suspensión sin holguras ni desgastes anómalos. Sistema eléctrico y arnés íntegro. Libre de reporte de robo, siniestros y con número de serie/VIN cotejado en REPUVE.`,
+  certified_status: 'Aprobada • Certificación Integral',
+  inspection_notes: `Inspección técnica integral completada satisfactoriamente. Compresión de motor verificada en estándar óptimo. Sistema de frenos y suspensión sin holguras ni desgastes anómalos. Sistema eléctrico y arnés íntegro. Libre de reporte de robo, siniestros y con número de serie/VIN cotejado en REPUVE.`,
 }));
 
 export const accessories = [

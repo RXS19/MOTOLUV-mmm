@@ -47,7 +47,6 @@ const DashboardSidebar = ({ activeTab = 'resumen', setActiveTab, mode = 'comprad
     { id: 'inspecciones', label: 'Mis inspecciones', icon: ShieldCheck, path: '/panel?tab=inspecciones' },
     { id: 'compras', label: 'Mis compras', icon: ShoppingBag, path: '/panel?tab=compras' },
     { id: 'pagos', label: 'Pagos y facturación', icon: CreditCard, path: '/panel?tab=pagos' },
-    { id: 'mensajes', label: 'Mensajes', icon: MessageSquare, badge: 2, path: '/panel?tab=mensajes' },
     { id: 'configuracion', label: 'Configuración', icon: Settings, path: '/panel/perfil' },
   ];
 
@@ -60,7 +59,6 @@ const DashboardSidebar = ({ activeTab = 'resumen', setActiveTab, mode = 'comprad
     { id: 'proceso', label: 'Ventas en proceso', icon: Clock, path: '/panel?tab=proceso' },
     { id: 'completadas', label: 'Ventas completadas', icon: CheckCircle2, path: '/panel?tab=completadas' },
     { id: 'pagos', label: 'Pagos y facturación', icon: CreditCard, path: '/panel/cuenta-bancaria' },
-    { id: 'mensajes', label: 'Mensajes', icon: MessageSquare, badge: 1, path: '/panel?tab=mensajes' },
     { id: 'configuracion', label: 'Configuración', icon: Settings, path: '/panel/perfil' },
   ];
 
@@ -150,7 +148,7 @@ const DashboardSidebar = ({ activeTab = 'resumen', setActiveTab, mode = 'comprad
                 Nuestro equipo está para ayudarte.
               </p>
               <a
-                href="https://wa.me/5215500000000?text=Hola%20Motoluv,%20necesito%20asistencia%20en%20mi%20panel"
+                href="https://wa.me/525643048865?text=Hola%20Motoluv,%20necesito%20asistencia%20en%20mi%20panel"
                 target="_blank"
                 rel="noreferrer"
                 className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-red-brand hover:text-red-400 transition-colors"

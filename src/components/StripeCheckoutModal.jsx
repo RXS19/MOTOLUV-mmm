@@ -101,9 +101,9 @@ const StripeCheckoutModal = () => {
         setClipData(clipReq);
         setStep('success');
         clearSelectedCart();
-        toast({ title: '¡Pago Procesado con Clip México!', description: `Orden ${orderRes.order.orderId} confirmada.` });
+        toast({ title: '¡Pago Procesado Exitosamente!', description: `Orden ${orderRes.order.orderId} confirmada.` });
       } else {
-        // Process via Stripe
+        // Process via Card
         if (!cardNumber || !cardExpiry || !cardCvc) {
           toast({ title: 'Datos de Tarjeta Faltantes', description: 'Ingresa los datos de tu tarjeta bancaria.', variant: 'destructive' });
           setStep('form');
@@ -335,36 +335,16 @@ const StripeCheckoutModal = () => {
                 </div>
               </div>
 
-              {/* Section 2: Payment Provider Selection (Clip vs Stripe) */}
+              {/* Section 2: Payment Method Selection */}
               <div className="space-y-3 pt-3 border-t border-white/10">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                    <CreditCard size={14} className="text-red-brand" /> 2. Pasarela y Método de Pago
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                    2. Método de Pago
                   </h4>
-                  <span className="text-[10px] text-zinc-500 font-mono">PAGOS SEGUROS EN MÉXICO</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">PAGOS CIFRADOS 256-BIT</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentProvider('clip')}
-                    className={`p-3 rounded-lg border text-left transition-all relative ${
-                      paymentProvider === 'clip'
-                        ? 'border-orange-500 bg-orange-500/10 text-white shadow-lg'
-                        : 'border-white/10 bg-[#0a0a0a] text-zinc-400 hover:border-white/20'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs flex items-center gap-1.5 text-orange-400">
-                        ⚡ Clip México
-                      </span>
-                      {paymentProvider === 'clip' && (
-                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-400">Tarjetas, Clip QR o Link directo de pago en México</p>
-                  </button>
-
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setPaymentProvider('stripe')}
@@ -375,45 +355,58 @@ const StripeCheckoutModal = () => {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-xs flex items-center gap-1.5 text-zinc-200">
-                        💳 Tarjeta Bancaria (Stripe)
+                      <span className="font-bold text-xs text-zinc-200">
+                        Tarjeta Bancaria (Débito / Crédito)
                       </span>
                     </div>
-                    <p className="text-[10px] text-zinc-400">Visa, Mastercard, Amex con procesamiento Stripe</p>
+                    <p className="text-[10px] text-zinc-400">Visa, Mastercard y American Express con encriptación bancaria</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentProvider('clip')}
+                    className={`p-3 rounded-lg border text-left transition-all relative ${
+                      paymentProvider === 'clip'
+                        ? 'border-red-brand bg-red-brand/10 text-white shadow-lg'
+                        : 'border-white/10 bg-[#0a0a0a] text-zinc-400 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-xs text-zinc-200">
+                        Transferencia SPEI y Medios Digitales
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400">Transferencia interbancaria inmediata y pago digital en línea</p>
                   </button>
                 </div>
 
                 {paymentProvider === 'clip' ? (
-                  <div className="p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-orange-300 pb-2 border-b border-orange-500/10">
-                      <span>Procesamiento vía Clip México</span>
-                      <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-mono">
-                        CLIP PAY
+                  <div className="p-4 bg-[#0a0a0a] border border-white/10 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-white pb-2 border-b border-white/5">
+                      <span>Procesamiento Digital Inmediato</span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-mono">
+                        CUSTODIA ACTIVA
                       </span>
                     </div>
                     <p className="text-xs text-zinc-300 leading-relaxed">
-                      Al dar clic en confirmar, se creará el registro de compra con <strong>Clip México</strong>.
-                      Podrás pagar mediante tarjeta, generar tu código QR o usar tu Link de Pago de Clip de manera instantánea.
+                      Al dar clic en confirmar, se creará el registro de compra con custodia segura de Motoluv.
+                      Recibirás tu comprobante digital y la confirmación de tu pedido al instante.
                     </p>
-                    <div className="flex items-center gap-2 text-[11px] text-zinc-400 pt-1">
-                      <ShieldCheck size={14} className="text-orange-400" />
-                      <span>Transacción respaldada por la infraestructura de Clip México.</span>
+                    <div className="text-[11px] text-zinc-400 pt-1">
+                      Transacción respaldada por la infraestructura bancaria certificada.
                     </div>
                   </div>
                 ) : (
                   <div className="p-4 bg-[#0a0a0a] border border-white/10 rounded-lg space-y-3">
                     <div>
                       <label className="text-[11px] text-zinc-400 font-medium block mb-1">Número de Tarjeta</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(e.target.value)}
-                          placeholder="4242 4242 4242 4242"
-                          className="w-full px-3 py-2.5 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none pl-9"
-                        />
-                        <CreditCard size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                      </div>
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        placeholder="4242 4242 4242 4242"
+                        className="w-full px-3 py-2.5 bg-[#111112] border border-white/10 rounded focus:border-red-brand text-xs text-white font-mono outline-none"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -443,20 +436,13 @@ const StripeCheckoutModal = () => {
                 )}
               </div>
 
-              {/* Submit CTA */}
+              {/* Submit CTA - NO ISOTIPOS, CLEAN UNIFIED BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-4 font-bold text-xs uppercase tracking-widest rounded-md shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
-                  paymentProvider === 'clip'
-                    ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-950/40'
-                    : 'bg-red-brand hover:bg-red-600 text-white shadow-red-900/30'
-                }`}
+                className="w-full py-4 font-bold text-xs uppercase tracking-widest rounded-md shadow-lg bg-red-brand hover:bg-red-600 text-white shadow-red-900/30 transition-all disabled:opacity-50 text-center"
               >
-                <ShieldCheck size={16} />
-                <span>
-                  CONFIRMAR Y PAGAR CON {paymentProvider === 'clip' ? 'CLIP MÉXICO' : 'STRIPE'} (${totalAmount.toLocaleString()} MXN)
-                </span>
+                CONFIRMAR Y PAGAR (${totalAmount.toLocaleString()} MXN)
               </button>
             </form>
           )}
