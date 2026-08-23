@@ -110,9 +110,9 @@ const MyMotosPage = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => handleBoost(motos[0])}
-            className="px-4 py-3 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-sm shadow-md flex items-center gap-1.5 uppercase tracking-wider"
+            className="px-5 py-3 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-sm shadow-md flex items-center justify-center uppercase tracking-wider transition-all"
           >
-            <Zap size={14} className="fill-white" /> Destacar Publicación
+            Destacar Publicación
           </button>
           <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
             <Plus size={14} /> Nueva Publicación
@@ -167,20 +167,19 @@ const MyMotosPage = () => {
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-white/5">
-                      <label className="block text-[10px] uppercase tracking-wider text-zinc-500 mb-1 flex items-center gap-1">
-                        <Activity size={10} className="text-red-brand" /> Estatus de la Operación
-                      </label>
-                      <select
-                        value={style.label}
-                        onChange={(e) => updateStatus(m.id, e.target.value)}
-                        className="w-full bg-[#0a0a0a] text-zinc-200 border border-white/10 hover:border-red-brand/50 text-xs py-2 px-3 rounded-sm outline-none cursor-pointer focus:border-red-brand font-medium"
-                      >
-                        {OPERATION_STATUSES.map((st) => (
-                          <option key={st} value={st} className="bg-[#111112] text-white">
-                            {st}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                          <Activity size={10} className="text-red-brand" /> Estatus de Operación
+                        </span>
+                        <span className="text-[9px] text-zinc-500 font-medium">CRM / Supabase</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2.5 bg-[#0a0a0a] rounded-sm border border-white/5">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${style.badgeClass.replace('bg-black/80', '').replace('backdrop-blur', '').replace('border', '')}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
+                          {style.label}
+                        </span>
+                        <span className="text-[10px] text-zinc-500">Sincronizado</span>
+                      </div>
                     </div>
                   </div>
                 </div>

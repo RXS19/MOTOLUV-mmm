@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowDown, Clock, Users, Shield, Wrench, Sparkles, CheckCircle, Eye, FileText, Handshake } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
+import bobberImage from '../assets/images/cinematic_bobber_rider_1787497883792.jpg';
 
 const HomePage = () => {
   const [featured, setFeatured] = useState([]);
@@ -190,12 +191,12 @@ const HomePage = () => {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-70" />
         <div
-          className="absolute inset-0 opacity-55"
+          className="absolute inset-0 opacity-60"
           style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920')",
+            backgroundImage: `url(${bobberImage})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'grayscale(0.3) brightness(0.65) contrast(1.1)',
+            filter: 'brightness(0.7) contrast(1.15)',
           }}
         />
         <div className="absolute inset-0 hero-vignette opacity-80" />

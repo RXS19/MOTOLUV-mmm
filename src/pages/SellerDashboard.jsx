@@ -310,9 +310,8 @@ const SellerDashboard = () => {
             {/* Greeting Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span>Hola, {firstName}</span>
-                  <span className="text-2xl">👋</span>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                  Hola, {firstName}
                 </h1>
                 <p className="text-zinc-400 text-xs sm:text-sm mt-1">
                   Administra tus publicaciones y ventas en Motoluv.
@@ -322,9 +321,8 @@ const SellerDashboard = () => {
               <div className="flex items-center gap-2.5">
                 <button
                   onClick={() => handleOpenBoostModal()}
-                  className="px-4 py-2 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-red-brand/20 flex items-center gap-2 transition-all"
+                  className="px-4 py-2 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-red-brand/20 flex items-center justify-center transition-all"
                 >
-                  <Zap size={15} className="fill-white" />
                   <span>Destacar Publicación</span>
                 </button>
                 <Link
@@ -442,10 +440,9 @@ const SellerDashboard = () => {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleOpenBoostModal(pub)}
-                              className="px-3 py-1.5 bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                              className="px-3 py-1.5 bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold rounded-lg transition-colors flex items-center justify-center"
                               title="Destacar publicación"
                             >
-                              <Zap size={12} className="fill-red-brand" />
                               <span>Destacar</span>
                             </button>
                             <Link
@@ -612,8 +609,8 @@ const SellerDashboard = () => {
                     }}
                   />
                   <div className="relative z-10 space-y-3 max-w-[220px]">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-brand/20 border border-red-brand/40 text-red-brand text-[10px] font-bold uppercase">
-                      <Zap size={10} className="fill-red-brand" /> 5x Más Visitas
+                    <div className="inline-flex items-center px-2 py-0.5 rounded bg-red-brand/20 border border-red-brand/40 text-red-brand text-[10px] font-bold uppercase">
+                      5x Más Visitas
                     </div>
                     <h3 className="text-base font-bold text-white leading-tight">
                       ¿Necesitas vender más rápido?
@@ -623,9 +620,8 @@ const SellerDashboard = () => {
                     </p>
                     <button
                       onClick={() => handleOpenBoostModal()}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-lg transition-colors shadow-md"
+                      className="inline-flex items-center justify-center px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-lg transition-colors shadow-md"
                     >
-                      <Zap size={13} className="fill-white" />
                       <span>Destacar mi publicación</span>
                     </button>
                   </div>
@@ -648,9 +644,8 @@ const SellerDashboard = () => {
               <div className="flex items-center gap-2.5">
                 <button
                   onClick={() => handleOpenBoostModal()}
-                  className="px-4 py-2 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5"
+                  className="px-4 py-2 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center"
                 >
-                  <Zap size={14} className="fill-white" />
                   <span>Destacar Publicación</span>
                 </button>
                 <Link
@@ -705,22 +700,21 @@ const SellerDashboard = () => {
                           </span>
                         </div>
 
-                        {/* Status selector */}
+                        {/* Status indicator (Read-only, synchronized with Supabase & CRM) */}
                         <div className="pt-2 border-t border-white/5">
-                          <label className="block text-[10px] uppercase tracking-wider text-zinc-500 mb-1 flex items-center gap-1">
-                            <Activity size={11} className="text-red-brand" /> Estatus de Operación
-                          </label>
-                          <select
-                            value={style.label}
-                            onChange={(e) => handleStatusChange(m.id, e.target.value)}
-                            className="w-full bg-[#16161c] text-zinc-200 border border-white/10 hover:border-red-brand text-xs py-2 px-3 rounded-lg outline-none cursor-pointer focus:border-red-brand font-medium"
-                          >
-                            {OPERATION_STATUSES.map((st) => (
-                              <option key={st} value={st} className="bg-[#111114] text-white">
-                                {st}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                              <Activity size={11} className="text-red-brand" /> Estatus de Operación
+                            </span>
+                            <span className="text-[9px] text-zinc-500 font-medium">CRM / Supabase</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-[#16161c] rounded-lg border border-white/5">
+                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${style.badgeClass.replace('bg-black/80', '').replace('backdrop-blur', '').replace('border', '')}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
+                              {style.label}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">Sincronizado</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -729,9 +723,8 @@ const SellerDashboard = () => {
                       <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
                         <button
                           onClick={() => handleOpenBoostModal(m)}
-                          className="w-full py-2 rounded-lg bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                          className="w-full py-2 rounded-lg bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold transition-colors flex items-center justify-center"
                         >
-                          <Zap size={13} className="fill-red-brand" />
                           <span>Destacar</span>
                         </button>
                         <Link
@@ -811,12 +804,6 @@ const SellerDashboard = () => {
                       </span>
                     </div>
                   </div>
-
-                  {off.message && (
-                    <div className="p-3 bg-white/[0.02] border border-white/5 rounded-lg text-xs text-zinc-300 italic">
-                      "{off.message}"
-                    </div>
-                  )}
 
                   {off.status === 'Pendiente' && (
                     <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
@@ -1247,9 +1234,10 @@ const SellerDashboard = () => {
                     <span className="text-zinc-500 block">Correo Electrónico:</span>
                     <span className="text-white font-semibold">{user?.email || 'vendedor@motoluv.mx'}</span>
                   </div>
-                  <div>
-                    <span className="text-zinc-500 block">Teléfono / WhatsApp de Enlace:</span>
-                    <span className="text-white font-semibold">+52 56 4304 8865</span>
+                  <div className="pt-2 border-t border-white/5">
+                    <span className="text-zinc-400 text-[11px] block">
+                      Tus canales de contacto directo son gestionados de forma segura y confidencial por la plataforma Motoluv.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1368,18 +1356,7 @@ const SellerDashboard = () => {
                   required
                   value={counterPrice}
                   onChange={(e) => setCounterPrice(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-[#16161c] border border-white/10 rounded-xl text-white font-bold text-sm outline-none focus:border-red-brand"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-zinc-400 font-medium block mb-1">Mensaje para el comprador (Opcional)</label>
-                <textarea
-                  value={counterNote}
-                  onChange={(e) => setCounterNote(e.target.value)}
-                  placeholder="Ej. Te puedo incluir el servicio recién hecho si cerramos en este precio."
-                  rows={3}
-                  className="w-full px-3.5 py-2 bg-[#16161c] border border-white/10 rounded-xl text-white text-xs outline-none focus:border-red-brand"
+                  className="w-full px-3.5 py-2.5 bg-[#16161c] border border-white/10 rounded-xl text-white font-bold text-sm outline-none focus:border-red-brand"
                 />
               </div>
 

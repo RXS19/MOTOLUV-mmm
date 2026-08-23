@@ -76,12 +76,6 @@ const OfferRow = ({ offer, isSeller, onUpdate }) => {
         </div>
       </div>
 
-      {offer.message && (
-        <p className="text-xs text-zinc-300 italic bg-white/[0.02] p-2.5 rounded border border-white/5">
-          "{offer.message}"
-        </p>
-      )}
-
       {isSeller && (offer.status === 'pending' || offer.status === 'Pendiente' || !offer.status) && (
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
           <button

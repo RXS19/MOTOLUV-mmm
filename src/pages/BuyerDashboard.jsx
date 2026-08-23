@@ -248,9 +248,8 @@ const BuyerDashboard = () => {
             {/* Greeting Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span>Hola, {firstName}</span>
-                  <span className="text-2xl">👋</span>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                  Hola, {firstName}
                 </h1>
                 <p className="text-zinc-400 text-xs sm:text-sm mt-1">
                   Este es el resumen de tu actividad y compras protegidas en Motoluv.
@@ -795,9 +794,10 @@ const BuyerDashboard = () => {
                     <span className="text-zinc-500 block">Correo Electrónico:</span>
                     <span className="text-white font-semibold">{user?.email || 'comprador@motoluv.mx'}</span>
                   </div>
-                  <div>
-                    <span className="text-zinc-500 block">Teléfono de Contacto:</span>
-                    <span className="text-white font-semibold">+52 56 4304 8865</span>
+                  <div className="pt-2 border-t border-white/5">
+                    <span className="text-zinc-400 text-[11px] block">
+                      Tus datos personales y canales de enlace son protegidos y gestionados de forma segura y confidencial por Motoluv.
+                    </span>
                   </div>
                 </div>
               </div>

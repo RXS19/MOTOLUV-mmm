@@ -570,16 +570,11 @@ const MotoDetailPage = () => {
                   ))}
                 </div>
 
-                <div className="mt-4 space-y-3 pt-2 border-t border-white/5">
+                <div className="mt-4 pt-2 border-t border-white/5">
                   <div>
                     <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Monto de oferta final (MXN)</label>
                     <input type="number" value={offerAmount} onChange={(e) => setOfferAmount(e.target.value)}
                       className="w-full px-4 py-2.5 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Mensaje adicional (opcional)</label>
-                    <textarea value={offerMsg} onChange={(e) => setOfferMsg(e.target.value)} rows={2} placeholder="Escribe cualquier duda o detalle sobre la entrega..."
-                      className="w-full px-4 py-2.5 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 resize-none" />
                   </div>
                 </div>
 
