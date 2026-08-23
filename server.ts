@@ -8,11 +8,18 @@ import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 
-// Supabase server client with URL sanitization - ONLY using SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
-const rawSupabaseUrl = (process.env.SUPABASE_URL || '').trim();
+// Supabase server client with URL sanitization - Supporting both service role and anon credentials
+const rawSupabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
 const supabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
-const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-const supabaseServer = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const supabaseKey = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  ''
+).trim();
+const supabaseServer = (supabaseUrl && supabaseKey && !supabaseUrl.includes('your-supabase-project'))
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 // n8n & HubSpot Webhook Automation Trigger
 async function triggerN8nHubspotWebhook(eventType: string, payload: any) {
@@ -805,39 +812,43 @@ api.get('/auth/me', authenticateToken, (req, res) => {
           const fileExt = path.extname(req.file.originalname) || '.jpg';
           const supabaseFileName = `moto_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${fileExt}`;
 
-          // Try 'Motos' or 'motos' bucket
-          let bucketName = 'Motos';
-          let uploadResult = await supabaseServer.storage
-            .from(bucketName)
-            .upload(supabaseFileName, fileBuffer, {
-              contentType: req.file.mimetype,
-              upsert: true,
-            });
+          // Try candidate storage buckets
+          const candidateBuckets = ['motos', 'Motos', 'images', 'uploads', 'vehicles', 'public', 'motoluv'];
+          let uploadedPublicUrl: string | null = null;
+          let activeBucket = '';
 
-          if (uploadResult.error) {
-            bucketName = 'motos';
-            uploadResult = await supabaseServer.storage
-              .from(bucketName)
-              .upload(supabaseFileName, fileBuffer, {
-                contentType: req.file.mimetype,
-                upsert: true,
-              });
+          for (const bName of candidateBuckets) {
+            try {
+              const uploadResult = await supabaseServer.storage
+                .from(bName)
+                .upload(supabaseFileName, fileBuffer, {
+                  contentType: req.file.mimetype,
+                  upsert: true,
+                });
+
+              if (!uploadResult.error && uploadResult.data) {
+                const { data: publicUrlData } = supabaseServer.storage
+                  .from(bName)
+                  .getPublicUrl(supabaseFileName);
+
+                if (publicUrlData && publicUrlData.publicUrl) {
+                  uploadedPublicUrl = publicUrlData.publicUrl;
+                  activeBucket = bName;
+                  break;
+                }
+              }
+            } catch {
+              // continue to next bucket
+            }
           }
 
-          if (!uploadResult.error && uploadResult.data) {
-            const { data: publicUrlData } = supabaseServer.storage
-              .from(bucketName)
-              .getPublicUrl(supabaseFileName);
-
-            if (publicUrlData && publicUrlData.publicUrl) {
-              return res.json({
-                url: publicUrlData.publicUrl,
-                filename: supabaseFileName,
-                provider: 'supabase',
-              });
-            }
-          } else {
-            console.warn('Supabase storage upload fallback to local:', uploadResult.error?.message);
+          if (uploadedPublicUrl) {
+            return res.json({
+              url: uploadedPublicUrl,
+              filename: supabaseFileName,
+              provider: 'supabase',
+              bucket: activeBucket,
+            });
           }
         } catch (supabaseUploadErr: any) {
           console.warn('Supabase Storage exception, using local upload:', supabaseUploadErr?.message);

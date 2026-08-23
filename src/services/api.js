@@ -90,12 +90,69 @@ export const offerApi = {
 
 export const uploadApi = {
   image: async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await api.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    // 1. Direct upload to Supabase Storage if configured on client
+    if (isSupabaseConfigured && supabase) {
+      const candidateBuckets = ['motos', 'Motos', 'images', 'uploads', 'vehicles', 'public', 'motoluv'];
+      const fileExt = file.name ? file.name.split('.').pop() || 'jpg' : 'jpg';
+      const cleanFileName = `moto_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+
+      for (const bucket of candidateBuckets) {
+        try {
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .upload(cleanFileName, file, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: file.type || 'image/jpeg',
+            });
+
+          if (!error && data) {
+            const { data: publicUrlData } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(cleanFileName);
+
+            if (publicUrlData && publicUrlData.publicUrl) {
+              return {
+                url: publicUrlData.publicUrl,
+                filename: cleanFileName,
+                provider: 'supabase',
+                bucket,
+              };
+            }
+          }
+        } catch (storageErr) {
+          // try next bucket
+        }
+      }
+    }
+
+    // 2. Fallback to backend /api/upload endpoint
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res?.data?.url) {
+        return res.data;
+      }
+    } catch (backendErr) {
+      console.warn('Backend upload fallback failed, using local preview:', backendErr);
+    }
+
+    // 3. Fallback to client-side Data URL so the user is never blocked
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve({
+          url: reader.result,
+          filename: file.name || `photo_${Date.now()}.jpg`,
+          provider: 'client_base64',
+        });
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
     });
-    return res.data; // { url: '/uploads/xxx.jpg', filename }
   },
 };
 
