@@ -500,8 +500,8 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     if (status) {
       list = list.filter((m) => m.status === status);
     } else {
-      // By default list active operations (Publicada, active, Apartada, Certificación, Oferta, Proceso de entrega)
-      list = list.filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada');
+      // By default list only approved active operations (Publicada, active, Apartada, Certificación, Oferta, Proceso de entrega)
+      list = list.filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada' && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'pending' && m.status !== 'pending_review');
     }
 
     if (brand) list = list.filter((m) => m.brand === brand);
@@ -532,8 +532,14 @@ api.get('/auth/me', authenticateToken, (req, res) => {
 
   api.post('/motos', authenticateToken, (req, res) => {
     const user = (req as any).user as User;
-    if (!['vendedor', 'both'].includes(user.role)) {
-      return res.status(403).json({ detail: 'Necesitas perfil de vendedor' });
+    // Auto-upgrade user role to 'both' if they are posting a motorcycle
+    if (user.role === 'comprador') {
+      user.role = 'both';
+      if (supabaseServer) {
+        try {
+          supabaseServer.from('profiles').update({ role: 'both' }).eq('id', user.id);
+        } catch {}
+      }
     }
 
     const { brand, model, year, km, color, engine, category, city, price, description, images } = req.body;
@@ -548,14 +554,14 @@ api.get('/auth/me', authenticateToken, (req, res) => {
       id,
       owner_id: user.id,
       owner_name: user.name,
-      brand,
-      model,
+      brand: brand || 'Motocicleta',
+      model: model || '',
       year: parseInt(year, 10) || 2024,
       km: parseInt(km, 10) || 0,
       color: color || '',
       engine: engine || '',
       category: category || 'Naked',
-      city: city || '',
+      city: city || 'Ciudad de México',
       price: numericPrice,
       commission_rate: comm.commission_rate,
       commission_amount: comm.commission_amount,
@@ -567,7 +573,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
       rating: 5,
       views: 0,
       featured: false,
-      status: 'Publicada',
+      status: 'En revisión',
       created_at: new Date().toISOString(),
       score_details: {
         Motor: 85,
@@ -617,7 +623,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     triggerN8nHubspotWebhook('card.status_created', {
       cardId: `card_${id}`,
       title: `${brand} ${model}`,
-      status: 'Publicada',
+      status: 'En revisión',
       userId: user.id,
       userEmail: user.email,
       motoId: id,
@@ -1141,20 +1147,21 @@ Tu tono es amable, apasionado por las motos, servicial y profesional. NUNCA te a
 
 REGLA DE SEGURIDAD ABSOLUTA:
 Jamás reveles o solicites información confidencial de usuarios (cuentas bancarias, contraseñas, datos personales privados, etc.).
+NUNCA incluyas rutas técnicas, URLs o slashes como /motos, /tienda, /sumate en tus respuestas. Refiérete siempre a las secciones por su nombre natural (Catálogo de motocicletas, Tienda oficial de accesorios, Red de Socios).
 
 INFORMACIÓN DEL SITIO MOTOLUV:
 - Qué es Motoluv: El marketplace más seguro de compra y venta de motocicletas seminuevas en México.
 - Eslogan: SUBE · CONECTA · RUEDA.
-- Garantía y Protección: Motoluv resguarda la operación con transacciones y pagos verificados hasta que se complete la entrega.
+- Protección y Transparencia: Motoluv resguarda la operación con transacciones y pagos verificados hasta que se complete la inspección y entrega.
 - Paquetes de Servicio:
   1. Básico ($1,900 MXN): Inspección técnica con Score de 100 puntos y contrato digital.
   2. Plus ($3,900 MXN): Básico + protección de pago verificada y validación de documentos.
-  3. Total ($5,900 MXN): Plus + traslado nacional garantizado hasta tu puerta.
-- Red de Socios ("Súmate a nuestra red"): Talleres mecánicos, tiendas de accesorios, agencias de motocicletas, financieras y organizadores de eventos pueden registrarse en la sección "/sumate".
+  3. Total ($5,900 MXN): Plus + gestión integral de trámites y traslado logístico entre centros autorizados.
+- Red de Socios ("Súmate a nuestra red"): Talleres mecánicos, tiendas de accesorios, agencias de motocicletas, financieras y organizadores de eventos pueden registrarse en la sección de aliados y socios.
 - Inventario actual de motocicletas disponibles:
 ${activeMotos.slice(0, 10).join('\n')}
 
-- Tienda de equipamiento disponible (/tienda):
+- Tienda de equipamiento oficial:
 Cascos de marcas reconocidas, chaquetas con armadura, guantes tácticos, intercomunicadores y accesorios.
 
 Responde siempre en español, de forma concisa, clara y amigable con emojis acordes (🏍️, 🐾, ⚡, 🛡️).`;
@@ -1199,22 +1206,22 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
       if (lower.includes('hola') || lower.includes('saludos') || lower.includes('buenos')) {
         fallback = '¡Hola, Biker! 🐾 Soy Lu, el asistente virtual de Motoluv. ¿Buscas comprar una moto, equiparte en la tienda o registrar tu negocio en nuestra red de aliados? Cuéntame y con gusto te asesoro. 🏍️';
       } else if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catálogo') || lower.includes('catalogo')) {
-        fallback = `En Motoluv contamos con un catálogo certificado con score de 100 puntos 🏁. Algunas opciones disponibles hoy:\n\n${activeMotos.slice(0, 3).join('\n')}\n\nPuedes consultar el inventario completo en la pestaña "Catálogo" (/motos).`;
+        fallback = `En Motoluv contamos con un catálogo certificado con score de 100 puntos 🏁. Algunas opciones disponibles hoy:\n\n${activeMotos.slice(0, 3).join('\n')}\n\nPuedes consultar el inventario completo en el Catálogo de motocicletas.`;
       } else if (lower.includes('accesorio') || lower.includes('casco') || lower.includes('tienda') || lower.includes('chaqueta')) {
-        fallback = 'En nuestra Tienda Oficial (/tienda) encontrarás cascos certificados, chaquetas con protección, guantes y equipamiento de alta calidad 🛡️.';
+        fallback = 'En nuestra Tienda Oficial de equipamiento encontrarás cascos certificados, chaquetas con protección, guantes y accesorios de alta calidad 🛡️.';
       } else if (lower.includes('red') || lower.includes('sumate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
-        fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller, tienda de accesorios, agencia de motocicletas, financiera u organizas eventos, ingresa a "/sumate" para registrar tus datos y conectarte con miles de motociclistas.';
-      } else if (lower.includes('paquete') || lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro')) {
-        fallback = 'En Motoluv tu dinero está 100% protegido con transacciones verificadas 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con envío nacional).';
+        fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller, tienda de accesorios, agencia de motocicletas, financiera u organizas eventos, ingresa a la sección de aliados para registrar tus datos y conectarte con miles de motociclistas.';
+      } else if (lower.includes('paquete') || lower.includes('inspeccion') || lower.includes('inspección') || lower.includes('seguro')) {
+        fallback = 'En Motoluv tu compra está 100% protegida con transacciones verificadas 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con gestión y traslado logístico).';
       } else {
-        fallback = '¡Con gusto te orientó! 🐾 En Motoluv puedes comprar o vender motos seminuevas garantizadas, adquirir accesorios o sumar tu taller o negocio a nuestra red en la sección "/sumate". ¿Qué te gustaría consultar?';
+        fallback = '¡Con gusto te oriento! 🐾 En Motoluv puedes comprar o vender motos seminuevas certificadas, adquirir accesorios o sumar tu taller o negocio a nuestra red de aliados. ¿Qué te gustaría consultar?';
       }
 
       return res.json({ reply: fallback });
     } catch (err: any) {
       console.error('Chat API Error:', err);
       return res.json({
-        reply: '¡Ups! Ocurrió un pequeño inconveniente en el camino ⚡. Pero puedes explorar nuestro catálogo de motos en /motos o ingresar a la tienda.',
+        reply: '¡Ups! Ocurrió un pequeño inconveniente en el camino ⚡. Pero puedes explorar nuestro catálogo de motos o equiparte en la tienda oficial.',
       });
     }
   });

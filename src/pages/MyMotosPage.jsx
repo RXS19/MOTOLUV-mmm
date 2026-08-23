@@ -120,6 +120,14 @@ const MyMotosPage = () => {
         </div>
       </div>
 
+      <div className="mb-6 p-4 bg-[#111112] border border-amber-500/30 rounded-md flex items-start gap-3 text-xs text-zinc-300">
+        <div className="w-2 h-2 rounded-full bg-amber-400 mt-1 flex-shrink-0 animate-pulse" />
+        <div>
+          <span className="font-bold text-white block mb-0.5">Control de Calidad e Inspección Previa</span>
+          Toda motocicleta publicada entra en estatus <strong className="text-amber-400 font-bold">"En revisión"</strong> para validación técnica y documental antes de mostrarse en el catálogo público de compradores.
+        </div>
+      </div>
+
       {loading ? (
         <div className="text-center py-20 text-zinc-500">Cargando...</div>
       ) : motos.length === 0 ? (

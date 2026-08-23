@@ -79,12 +79,20 @@ const CreateMotoPage = () => {
         ...form,
         year: Number(form.year), km: Number(form.km), price: Number(form.price),
         images: images,
+        status: 'En revisión',
       };
       const moto = await motoApi.create(payload);
-      toast({ title: '¡Publicación creada!', description: `Tu ${moto.brand} ${moto.model} ya está en el catálogo.` });
-      setTimeout(() => navigate('/panel/mis-motos'), 500);
+      toast({
+        title: 'Publicación enviada a revisión',
+        description: `Tu ${moto?.brand || form.brand} ${moto?.model || form.model} fue enviada a validación previa antes de publicarse en el catálogo.`,
+      });
+      setTimeout(() => navigate('/panel/mis-motos'), 600);
     } catch (err) {
-      toast({ title: 'Error al publicar', description: err?.response?.data?.detail || 'Intenta de nuevo.' });
+      console.error('Error al publicar moto:', err);
+      toast({
+        title: 'Error al procesar la publicación',
+        description: err?.response?.data?.detail || err?.message || 'Revisa tu conexión o intenta nuevamente.',
+      });
     } finally { setLoading(false); }
   };
 
@@ -132,10 +140,10 @@ const CreateMotoPage = () => {
                 <div className="p-4 bg-[#0a0a0a] border border-red-brand/30 rounded-md space-y-3">
                   <div className="flex items-center justify-between text-xs text-zinc-400 border-b border-white/5 pb-2">
                     <span className="flex items-center gap-1.5 font-medium text-white">
-                      <Calculator size={14} className="text-red-brand" /> Regla de Comisión Aplicada
+                      <Calculator size={14} className="text-red-brand" /> Desglose Estimado de Venta
                     </span>
                     <span className="bg-red-brand/10 text-red-brand font-bold px-2 py-0.5 rounded-sm border border-red-brand/30">
-                      Tasa del {comm.percentageLabel}
+                      Servicio Motoluv
                     </span>
                   </div>
 
@@ -146,7 +154,7 @@ const CreateMotoPage = () => {
                     </div>
 
                     <div className="bg-[#111112] p-2.5 rounded-sm border border-white/5">
-                      <span className="text-zinc-500 block text-[10px] uppercase">Comisión Motoluv ({comm.percentageLabel})</span>
+                      <span className="text-zinc-500 block text-[10px] uppercase">Comisión por Gestión</span>
                       <span className="text-red-brand font-bold text-sm">-${comm.commissionAmount.toLocaleString()} MXN</span>
                     </div>
 

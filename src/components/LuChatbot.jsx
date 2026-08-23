@@ -154,19 +154,19 @@ const LuChatbot = () => {
     }
 
     if (lower.includes('hola') || lower.includes('buenos') || lower.includes('buenas') || lower.includes('que tal') || lower.includes('saludos')) {
-      return '¡Hola! 🐾 Soy Lu, el asistente oficial de Motoluv. ¿En qué te puedo asesorar hoy? Puedo ayudarte a buscar motocicletas en el catálogo, conocer nuestros paquetes de inspección, equiparte en la tienda o registrarte en nuestra red de aliados. 🏍️';
+      return '¡Hola! 🐾 Soy Lu, el asistente oficial de Motoluv. ¿En qué te puedo asesorar hoy? Puedo ayudarte a explorar motocicletas verificadas, conocer los paquetes de inspección, equiparte en la tienda oficial o registrarte en nuestra red de aliados. 🏍️';
     }
     if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catalogo') || lower.includes('catálogo') || lower.includes('inventario') || lower.includes('vender')) {
-      return 'En Motoluv contamos con un inventario verificado con Score de 100 puntos y certificación mecánica completa 🏁.\n\n• Puedes explorar todas las marcas y modelos disponibles en la pestaña "Catálogo" (/motos).\n• Si quieres vender, activa tu perfil de vendedor y publica tu moto con fotos y kilometraje.';
+      return 'En Motoluv contamos con un inventario verificado con Score de 100 puntos y certificación mecánica completa 🏁.\n\n• Puedes explorar todas las marcas y modelos disponibles en el catálogo de motocicletas.\n• Si quieres vender, activa tu perfil de vendedor y publica tu moto con fotos y especificaciones.';
     }
     if (lower.includes('tienda') || lower.includes('casco') || lower.includes('accesorio') || lower.includes('chaqueta') || lower.includes('guantes') || lower.includes('intercom')) {
-      return '¡Claro! En nuestra Tienda Oficial (/tienda) encontrarás cascos de marcas líderes, chaquetas con armadura de protección, guantes tácticos y accesorios con envío a todo México 🛡️.';
+      return '¡Claro! En nuestra Tienda Oficial de equipamiento encontrarás cascos de marcas líderes, chaquetas con armadura de protección, guantes tácticos y accesorios con envío a todo México 🛡️.';
     }
     if (lower.includes('red') || lower.includes('sumate') || lower.includes('súmate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
-      return '¡Únete a nuestra Red de Socios! 🤝 Si tienes un taller mecánico certificado, tienda de accesorios, agencia de motocicletas, financiera o eres organizador de rodadas, ingresa a la sección "/sumate" para registrar tu negocio.';
+      return '¡Únete a nuestra Red de Socios! 🤝 Si tienes un taller mecánico certificado, tienda de accesorios, agencia de motocicletas, financiera o eres organizador de rodadas, ingresa a la sección de aliados para registrar tu negocio.';
     }
-    if (lower.includes('garantia') || lower.includes('garantía') || lower.includes('seguro') || lower.includes('paquete') || lower.includes('pago') || lower.includes('precio') || lower.includes('costo')) {
-      return 'En Motoluv protegemos tu dinero al 100% 🔒. Nuestros paquetes de servicio:\n\n1. Básico ($1,900 MXN): Inspección de 100 puntos y contrato digital.\n2. Plus ($3,900 MXN): Básico + protección de pago y validación de documentos.\n3. Total ($5,900 MXN): Plus + traslado nacional garantizado a tu domicilio.';
+    if (lower.includes('paquete') || lower.includes('pago') || lower.includes('precio') || lower.includes('costo') || lower.includes('inspeccion') || lower.includes('inspección') || lower.includes('seguridad')) {
+      return 'En Motoluv protegemos tu compra al 100% 🔒. Nuestros paquetes de servicio:\n\n1. Básico ($1,900 MXN): Inspección mecánica de 100 puntos y contrato digital.\n2. Plus ($3,900 MXN): Básico + custodia segura de pago y validación documental.\n3. Total ($5,900 MXN): Plus + gestión integral de trámites y traslado logístico entre centros autorizados.';
     }
     if (lower.includes('telefono') || lower.includes('teléfono') || lower.includes('contacto') || lower.includes('whatsapp') || lower.includes('celular')) {
       return 'El teléfono / WhatsApp es un dato obligatorio en tu cuenta para coordinar inspecciones mecánicas y entregas seguras. Puedes verificarlo y editarlo en tu perfil.';
@@ -230,7 +230,7 @@ const LuChatbot = () => {
     '🏍️ Ver motos en catálogo',
     '🛡️ Tienda de accesorios',
     '🤝 Súmate a nuestra red',
-    '🔒 ¿Cómo funciona la garantía?',
+    '🔍 Paquetes de inspección',
   ];
 
   const containerStyle = position

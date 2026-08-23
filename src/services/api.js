@@ -53,11 +53,11 @@ export const motoApi = {
     try {
       const res = await api.get('/motos', { params });
       if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data;
+        return res.data.filter((m) => m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'pending');
       }
-      return getFallbackMotos(params);
+      return getFallbackMotos(params).filter((m) => m.status !== 'En revisión');
     } catch {
-      return getFallbackMotos(params);
+      return getFallbackMotos(params).filter((m) => m.status !== 'En revisión');
     }
   },
   get: async (id) => {
@@ -66,19 +66,108 @@ export const motoApi = {
       if (res.data && res.data.id) {
         return res.data;
       }
+      const localMotos = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      const foundLocal = localMotos.find((m) => m.id === id);
+      if (foundLocal) return foundLocal;
       const found = fallbackMotos.find((m) => m.id === id);
       if (found) return found;
       return fallbackMotos[0];
     } catch {
+      const localMotos = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      const foundLocal = localMotos.find((m) => m.id === id);
+      if (foundLocal) return foundLocal;
       const found = fallbackMotos.find((m) => m.id === id);
       if (found) return found;
       return fallbackMotos[0];
     }
   },
-  create: (data) => api.post('/motos', data).then((r) => r.data),
+  create: async (data) => {
+    try {
+      const res = await api.post('/motos', data);
+      if (res.data) {
+        // Save local backup
+        const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+        localStorage.setItem('motoluv_custom_motos', JSON.stringify([res.data, ...existing]));
+        return res.data;
+      }
+    } catch (apiErr) {
+      console.warn('Backend /motos failed, attempting direct storage/fallback:', apiErr?.message);
+      // Construct fallback moto record
+      const defaultImg = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800';
+      const imgs = data.images && data.images.length > 0 ? data.images : [defaultImg];
+      const fallbackRecord = {
+        id: `moto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        brand: data.brand || 'Motocicleta',
+        model: data.model || '',
+        year: Number(data.year) || 2024,
+        km: Number(data.km) || 0,
+        color: data.color || '',
+        engine: data.engine || '',
+        category: data.category || 'Naked',
+        city: data.city || 'Ciudad de México',
+        price: Number(data.price) || 0,
+        description: data.description || '',
+        images: imgs,
+        image: imgs[0],
+        score: 4.8,
+        rating: 5,
+        views: 1,
+        featured: false,
+        status: 'En revisión',
+        created_at: new Date().toISOString(),
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) {
+            fallbackRecord.owner_id = session.user.id;
+            fallbackRecord.owner_name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Vendedor';
+          }
+          await supabase.from('motos').insert([{
+            id: fallbackRecord.id,
+            title: `${fallbackRecord.brand} ${fallbackRecord.model} ${fallbackRecord.year}`,
+            brand: fallbackRecord.brand,
+            model: fallbackRecord.model,
+            year: fallbackRecord.year,
+            price: fallbackRecord.price,
+            km: fallbackRecord.km,
+            engine: fallbackRecord.engine,
+            category: fallbackRecord.category,
+            location: fallbackRecord.city,
+            description: fallbackRecord.description,
+            images: fallbackRecord.images,
+            owner_id: fallbackRecord.owner_id,
+            status: fallbackRecord.status,
+            created_at: fallbackRecord.created_at,
+          }]);
+        } catch (supaErr) {
+          console.warn('Supabase direct insert error:', supaErr);
+        }
+      }
+
+      const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      localStorage.setItem('motoluv_custom_motos', JSON.stringify([fallbackRecord, ...existing]));
+      return fallbackRecord;
+    }
+  },
   update: (id, data) => api.patch(`/motos/${id}`, data).then((r) => r.data),
   remove: (id) => api.delete(`/motos/${id}`).then((r) => r.data),
-  mine: () => api.get('/my/motos').then((r) => r.data).catch(() => []),
+  mine: async () => {
+    try {
+      const res = await api.get('/my/motos');
+      const custom = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      const combined = [...(Array.isArray(res.data) ? res.data : [])];
+      for (const c of custom) {
+        if (!combined.some((m) => m.id === c.id)) {
+          combined.unshift(c);
+        }
+      }
+      return combined;
+    } catch {
+      return JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+    }
+  },
 };
 
 export const offerApi = {

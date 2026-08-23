@@ -1,4 +1,5 @@
 export const OPERATION_STATUSES = [
+  'En revisión',
   'Publicada',
   'Apartada',
   'Certificación',
@@ -9,7 +10,8 @@ export const OPERATION_STATUSES = [
 ];
 
 export function normalizeStatus(rawStatus) {
-  if (!rawStatus) return 'Publicada';
+  if (!rawStatus) return 'En revisión';
+  if (rawStatus === 'pending' || rawStatus === 'pending_review' || rawStatus === 'revision' || rawStatus === 'En revision') return 'En revisión';
   if (rawStatus === 'active') return 'Publicada';
   if (rawStatus === 'reserved') return 'Apartada';
   if (rawStatus === 'sold') return 'Vendida';
@@ -19,6 +21,12 @@ export function normalizeStatus(rawStatus) {
 export function getStatusStyle(rawStatus) {
   const status = normalizeStatus(rawStatus);
   switch (status) {
+    case 'En revisión':
+      return {
+        label: 'En revisión',
+        badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+        dotClass: 'bg-amber-400 animate-pulse',
+      };
     case 'Publicada':
       return {
         label: 'Publicada',
