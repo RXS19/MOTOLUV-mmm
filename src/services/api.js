@@ -1,12 +1,11 @@
 import axios from 'axios';
-import { resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
-import { motos as fallbackMotos } from '../mock';
+import { resolveSafeImageUrl } from '../utils/imageFallback';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_BACKEND_URL) || '';
 export const API = `${BACKEND_URL}/api`;
 
-// Helper: resolve relative image URLs (e.g. /uploads/xxx.jpg) with backend host and safe fallbacks
+// Helper: resolve relative image URLs with safe fallbacks
 export const resolveImageUrl = (url, fallbackType = 'moto') => resolveSafeImageUrl(url, fallbackType);
 
 const api = axios.create({ baseURL: API, timeout: 8000 });
@@ -25,19 +24,41 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-function getFallbackMotos(params = {}) {
-  let list = [...fallbackMotos];
-  if (params.brand && params.brand !== 'all') list = list.filter((m) => m.brand === params.brand);
-  if (params.category && params.category !== 'all') list = list.filter((m) => m.category === params.category);
-  if (params.city && params.city !== 'all') list = list.filter((m) => m.city === params.city);
-  if (params.featured !== undefined) list = list.filter((m) => m.featured === (params.featured === 'true' || params.featured === true));
-  if (params.q) {
-    const qStr = String(params.q).toLowerCase();
-    list = list.filter((m) => `${m.brand} ${m.model}`.toLowerCase().includes(qStr));
-  }
-  const max = params.limit ? parseInt(String(params.limit), 10) : 100;
-  return list.slice(0, max);
-}
+const formatMotoRecord = (m) => {
+  if (!m) return null;
+  const imgs = Array.isArray(m.images) && m.images.length > 0 
+    ? m.images 
+    : (m.image ? [m.image] : []);
+  
+  return {
+    id: String(m.id),
+    title: m.title || `${m.brand || ''} ${m.model || ''} ${m.year || ''}`.trim(),
+    brand: m.brand || '',
+    model: m.model || '',
+    year: Number(m.year) || 0,
+    price: Number(m.price) || 0,
+    km: Number(m.km) || 0,
+    engine: m.engine || '',
+    color: m.color || '',
+    category: m.category || 'Naked',
+    city: m.city || m.location || 'Ciudad de México',
+    location: m.location || m.city || 'Ciudad de México',
+    description: m.description || '',
+    images: imgs,
+    image: imgs[0] || m.image || null,
+    score: m.score !== undefined && m.score !== null ? Number(m.score) : null,
+    score_details: m.score_details || m.scoreDetails || {},
+    scoreDetails: m.scoreDetails || m.score_details || {},
+    rating: m.rating !== undefined && m.rating !== null ? Number(m.rating) : null,
+    views: Number(m.views) || 0,
+    featured: Boolean(m.featured),
+    status: m.status || 'Publicada',
+    owner_id: m.owner_id || null,
+    owner_name: m.owner_name || null,
+    created_at: m.created_at || new Date().toISOString(),
+    updated_at: m.updated_at || new Date().toISOString(),
+  };
+};
 
 export const authApi = {
   register: (data) => api.post('/auth/register', data).then((r) => r.data),
@@ -50,188 +71,373 @@ export const authApi = {
 
 export const motoApi = {
   list: async (params = {}) => {
+    // 1. Prioridad: Consultar directamente en Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        let query = supabase.from('motos').select('*');
+
+        if (params.featured === true || params.featured === 'true') {
+          query = query.eq('featured', true);
+        }
+        if (params.brand && params.brand !== 'all') {
+          query = query.eq('brand', params.brand);
+        }
+        if (params.category && params.category !== 'all') {
+          query = query.eq('category', params.category);
+        }
+        if (params.city && params.city !== 'all') {
+          query = query.or(`city.eq.${params.city},location.eq.${params.city}`);
+        }
+        if (params.limit) {
+          query = query.limit(parseInt(String(params.limit), 10));
+        }
+
+        const { data, error } = await query;
+        if (!error && Array.isArray(data)) {
+          let list = data
+            .map(formatMotoRecord)
+            .filter((m) => m && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'rejected' && m.status !== 'Rechazada');
+
+          if (params.q) {
+            const qStr = String(params.q).toLowerCase();
+            list = list.filter((m) => `${m.brand} ${m.model}`.toLowerCase().includes(qStr));
+          }
+          return list;
+        }
+      } catch (err) {
+        console.warn('Error querying Supabase motos:', err);
+      }
+    }
+
+    // 2. Intentar backend /api/motos si está disponible
     try {
       const res = await api.get('/motos', { params });
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data.filter((m) => m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'pending');
+      if (Array.isArray(res.data)) {
+        return res.data
+          .map(formatMotoRecord)
+          .filter((m) => m && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'rejected' && m.status !== 'Rechazada');
       }
-      return getFallbackMotos(params).filter((m) => m.status !== 'En revisión');
-    } catch {
-      return getFallbackMotos(params).filter((m) => m.status !== 'En revisión');
+    } catch (err) {
+      console.warn('Backend /motos request failed:', err?.message);
     }
+
+    // 3. Si no hay datos en BD o backend, retornar arreglo vacío (NUNCA datos mock)
+    return [];
   },
+
   get: async (id) => {
+    if (!id) return null;
+
+    // 1. Prioridad: Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('motos')
+          .select('*')
+          .eq('id', String(id))
+          .maybeSingle();
+
+        if (!error && data) {
+          return formatMotoRecord(data);
+        }
+      } catch (err) {
+        console.warn('Error fetching moto from Supabase:', err);
+      }
+    }
+
+    // 2. Intentar backend
     try {
       const res = await api.get(`/motos/${id}`);
       if (res.data && res.data.id) {
-        return res.data;
+        return formatMotoRecord(res.data);
       }
-      const localMotos = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-      const foundLocal = localMotos.find((m) => m.id === id);
-      if (foundLocal) return foundLocal;
-      const found = fallbackMotos.find((m) => m.id === id);
-      if (found) return found;
-      return fallbackMotos[0];
-    } catch {
-      const localMotos = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-      const foundLocal = localMotos.find((m) => m.id === id);
-      if (foundLocal) return foundLocal;
-      const found = fallbackMotos.find((m) => m.id === id);
-      if (found) return found;
-      return fallbackMotos[0];
+    } catch (err) {
+      console.warn('Backend /motos/:id request failed:', err?.message);
     }
+
+    // 3. No encontrado: devolver null (NUNCA fallback)
+    return null;
   },
+
   create: async (data) => {
+    let sessionUser = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        sessionUser = session?.user || null;
+      } catch {}
+    }
+
+    const defaultImg = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800';
+    const imgs = Array.isArray(data.images) && data.images.length > 0 
+      ? data.images 
+      : (data.image ? [data.image] : [defaultImg]);
+
+    const motoId = `moto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const motoRecord = {
+      id: motoId,
+      title: `${data.brand || ''} ${data.model || ''} ${data.year || ''}`.trim(),
+      brand: data.brand || 'Motocicleta',
+      model: data.model || '',
+      year: Number(data.year) || new Date().getFullYear(),
+      price: Number(data.price) || 0,
+      km: Number(data.km) || 0,
+      engine: data.engine || '',
+      color: data.color || '',
+      category: data.category || 'Naked',
+      city: data.city || 'Ciudad de México',
+      location: data.city || 'Ciudad de México',
+      description: data.description || '',
+      images: imgs,
+      image: imgs[0] || defaultImg,
+      owner_id: sessionUser?.id || data.owner_id || null,
+      owner_name: sessionUser?.user_metadata?.full_name || sessionUser?.email?.split('@')[0] || 'Vendedor',
+      views: 0,
+      featured: false,
+      status: 'En revisión',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Guardar en Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: insertedData, error: supaErr } = await supabase
+          .from('motos')
+          .insert([motoRecord])
+          .select('*')
+          .single();
+
+        if (!supaErr && insertedData) {
+          return formatMotoRecord(insertedData);
+        }
+      } catch (supaErr) {
+        console.warn('Supabase direct insert error:', supaErr);
+      }
+    }
+
+    // 2. Intentar backend
     try {
       const res = await api.post('/motos', data);
       if (res.data) {
-        // Save local backup
-        const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-        localStorage.setItem('motoluv_custom_motos', JSON.stringify([res.data, ...existing]));
-        return res.data;
+        return formatMotoRecord(res.data);
       }
-    } catch (apiErr) {
-      console.warn('Backend /motos failed, attempting direct storage/fallback:', apiErr?.message);
-      // Construct fallback moto record
-      const defaultImg = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800';
-      const imgs = data.images && data.images.length > 0 ? data.images : [defaultImg];
-      const fallbackRecord = {
-        id: `moto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        brand: data.brand || 'Motocicleta',
-        model: data.model || '',
-        year: Number(data.year) || 2024,
-        km: Number(data.km) || 0,
-        color: data.color || '',
-        engine: data.engine || '',
-        category: data.category || 'Naked',
-        city: data.city || 'Ciudad de México',
-        price: Number(data.price) || 0,
-        description: data.description || '',
-        images: imgs,
-        image: imgs[0],
-        score: 4.8,
-        rating: 5,
-        views: 1,
-        featured: false,
-        status: 'En revisión',
-        created_at: new Date().toISOString(),
-      };
-
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) {
-            fallbackRecord.owner_id = session.user.id;
-            fallbackRecord.owner_name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Vendedor';
-          }
-          await supabase.from('motos').insert([{
-            id: fallbackRecord.id,
-            title: `${fallbackRecord.brand} ${fallbackRecord.model} ${fallbackRecord.year}`,
-            brand: fallbackRecord.brand,
-            model: fallbackRecord.model,
-            year: fallbackRecord.year,
-            price: fallbackRecord.price,
-            km: fallbackRecord.km,
-            engine: fallbackRecord.engine,
-            category: fallbackRecord.category,
-            location: fallbackRecord.city,
-            description: fallbackRecord.description,
-            images: fallbackRecord.images,
-            owner_id: fallbackRecord.owner_id,
-            status: fallbackRecord.status,
-            created_at: fallbackRecord.created_at,
-          }]);
-        } catch (supaErr) {
-          console.warn('Supabase direct insert error:', supaErr);
-        }
-      }
-
-      const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-      localStorage.setItem('motoluv_custom_motos', JSON.stringify([fallbackRecord, ...existing]));
-      return fallbackRecord;
+    } catch (backendErr) {
+      console.warn('Backend /motos failed:', backendErr?.message);
     }
+
+    return motoRecord;
   },
+
   update: async (id, data) => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        if (data.status === 'Rechazada' || data.status === 'rejected') {
+          await supabase.from('motos').delete().eq('id', String(id));
+          return { deleted: true, status: 'Rechazada' };
+        } else {
+          const { data: updatedData, error } = await supabase
+            .from('motos')
+            .update({ ...data, updated_at: new Date().toISOString() })
+            .eq('id', String(id))
+            .select('*')
+            .single();
+
+          if (!error && updatedData) {
+            return formatMotoRecord(updatedData);
+          }
+        }
+      } catch (err) {
+        console.warn('Error updating moto in Supabase:', err);
+      }
+    }
+
     try {
       const res = await api.patch(`/motos/${id}`, data);
-      if (data.status === 'Rechazada' || data.status === 'rejected') {
-        const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-        localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
-        if (isSupabaseConfigured && supabase) {
-          try {
-            await supabase.from('motos').delete().eq('id', id);
-          } catch {}
-        }
-      }
       return res.data;
     } catch (err) {
       if (data.status === 'Rechazada' || data.status === 'rejected') {
-        const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-        localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
-        if (isSupabaseConfigured && supabase) {
-          try {
-            await supabase.from('motos').delete().eq('id', id);
-          } catch {}
-        }
         return { deleted: true, status: 'Rechazada' };
       }
       throw err;
     }
   },
+
   remove: async (id) => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error } = await supabase.from('motos').delete().eq('id', String(id));
+        if (error) throw error;
+        return { ok: true };
+      } catch (err) {
+        console.warn('Error deleting moto from Supabase:', err);
+      }
+    }
+
     try {
       const res = await api.delete(`/motos/${id}`);
-      const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-      localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
-      if (isSupabaseConfigured && supabase) {
-        try {
-          await supabase.from('motos').delete().eq('id', id);
-        } catch {}
-      }
       return res.data;
     } catch (err) {
       if (err?.response?.status === 400 || err?.response?.data?.detail) {
         throw new Error(err.response.data.detail || 'No se puede eliminar la publicación');
       }
-      const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-      localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
-      if (isSupabaseConfigured && supabase) {
-        try {
-          await supabase.from('motos').delete().eq('id', id);
-        } catch {}
-      }
       return { ok: true };
     }
   },
+
   mine: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('motos')
+            .select('*')
+            .eq('owner_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data.map(formatMotoRecord);
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying user motos in Supabase:', err);
+      }
+    }
+
     try {
       const res = await api.get('/my/motos');
-      return Array.isArray(res.data) ? res.data : [];
+      return Array.isArray(res.data) ? res.data.map(formatMotoRecord) : [];
     } catch {
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id) {
-            const { data, error } = await supabase
-              .from('motos')
-              .select('*')
-              .eq('owner_id', session.user.id);
-            if (!error && Array.isArray(data)) {
-              return data;
-            }
-          }
-        } catch {}
-      }
       return [];
     }
   },
 };
 
 export const offerApi = {
-  create: (data) => api.post('/offers', data).then((r) => r.data),
-  mine: () => api.get('/my/offers').then((r) => r.data),
-  received: () => api.get('/my/received-offers').then((r) => r.data),
-  updateStatus: (id, status) => api.patch(`/offers/${id}`, { status }).then((r) => r.data),
+  create: async (data) => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const offerRecord = {
+          id: `off_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          moto_id: data.moto_id,
+          buyer_id: session?.user?.id || null,
+          buyer_name: session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Comprador',
+          seller_id: data.seller_id || null,
+          amount: Number(data.amount) || 0,
+          package: data.package || 'plus',
+          status: 'pending',
+          is_apartado: Boolean(data.is_apartado),
+          message: data.message || '',
+          created_at: new Date().toISOString(),
+        };
+
+        const { data: inserted, error } = await supabase
+          .from('offers')
+          .insert([offerRecord])
+          .select('*')
+          .single();
+
+        if (!error && inserted) {
+          return inserted;
+        }
+      } catch (err) {
+        console.warn('Error creating offer in Supabase:', err);
+      }
+    }
+    return api.post('/offers', data).then((r) => r.data);
+  },
+
+  mine: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('offers')
+            .select('*, moto:motos(*)')
+            .eq('buyer_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data.map((o) => ({
+              ...o,
+              moto_brand: o.moto?.brand,
+              moto_model: o.moto?.model,
+              moto_year: o.moto?.year,
+              moto_image: o.moto?.images?.[0] || o.moto?.image,
+              seller_name: o.moto?.owner_name || 'Vendedor Verificado',
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying user offers from Supabase:', err);
+      }
+    }
+
+    try {
+      const res = await api.get('/my/offers');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  received: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('offers')
+            .select('*, moto:motos(*)')
+            .eq('seller_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data.map((o) => ({
+              ...o,
+              motoBrand: o.moto?.brand,
+              motoModel: o.moto?.model,
+              originalPrice: o.moto?.price,
+              offeredAmount: o.amount,
+              buyerName: o.buyer_name || 'Comprador',
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying received offers from Supabase:', err);
+      }
+    }
+
+    try {
+      const res = await api.get('/my/received-offers');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  updateStatus: async (id, status) => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('offers')
+          .update({ status })
+          .eq('id', String(id))
+          .select('*')
+          .single();
+
+        if (!error && data) {
+          return data;
+        }
+      } catch (err) {
+        console.warn('Error updating offer in Supabase:', err);
+      }
+    }
+    return api.patch(`/offers/${id}`, { status }).then((r) => r.data);
+  },
 };
 
 export const uploadApi = {
@@ -266,7 +472,7 @@ export const uploadApi = {
               };
             }
           }
-        } catch (storageErr) {
+        } catch {
           // try next bucket
         }
       }
@@ -286,7 +492,7 @@ export const uploadApi = {
       console.warn('Backend upload fallback failed, using local preview:', backendErr);
     }
 
-    // 3. Fallback to client-side Data URL so the user is never blocked
+    // 3. Fallback to client-side Data URL
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -329,4 +535,3 @@ export const hubspotApi = {
 };
 
 export default api;
-

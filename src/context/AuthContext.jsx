@@ -52,6 +52,9 @@ export const AuthProvider = ({ children }) => {
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
     const bankUpdatedAt = profile?.bank_updated_at || metadata.bank_updated_at || null;
     const avatarUrl = profile?.avatar_url || metadata.avatar_url || metadata.picture || '';
+    const identityVerificationStatus = profile?.identity_verification_status || 'unverified';
+    const rating = profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating) : null;
+    const operations = profile?.operations !== undefined && profile?.operations !== null ? Number(profile.operations) : 0;
 
     return {
       id: authUser.id,
@@ -64,8 +67,9 @@ export const AuthProvider = ({ children }) => {
       city,
       role,
       avatar_url: avatarUrl,
-      rating: profile?.rating ?? 5.0,
-      operations: profile?.operations ?? 0,
+      identity_verification_status: identityVerificationStatus,
+      rating,
+      operations,
       bank_clabe: bankClabe,
       bank_name: bankName,
       bank_holder: bankHolder,

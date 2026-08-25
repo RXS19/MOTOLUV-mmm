@@ -192,8 +192,9 @@ export async function fetchUserProfile(userId, userMetadata = null) {
     || meta.bank_updated_at 
     || null;
 
-  const rating = profile?.rating ?? 5.0;
-  const operations = profile?.operations ?? 0;
+  const identityVerificationStatus = profile?.identity_verification_status || 'unverified';
+  const rating = profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating) : null;
+  const operations = profile?.operations !== undefined && profile?.operations !== null ? Number(profile.operations) : 0;
   const createdAt = profile?.created_at || new Date().toISOString();
   const updatedAt = profile?.updated_at || new Date().toISOString();
 
@@ -211,6 +212,7 @@ export async function fetchUserProfile(userId, userMetadata = null) {
     bank_name: bankName,
     bank_holder: bankHolder,
     bank_updated_at: bankUpdatedAt,
+    identity_verification_status: identityVerificationStatus,
     rating,
     operations,
     created_at: createdAt,

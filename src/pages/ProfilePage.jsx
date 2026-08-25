@@ -6,6 +6,7 @@ import {
   Phone, 
   CreditCard, 
   Shield, 
+  ShieldCheck,
   CheckCircle2, 
   Save, 
   ArrowLeft, 
@@ -15,7 +16,11 @@ import {
   Bike, 
   Sparkles,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  FileCheck,
+  Check,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured, logAuthDiagnostic, fetchUserProfile } from '../lib/supabase';
@@ -26,11 +31,16 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const { user: authContextUser, updateProfile, activeView } = useAuth();
   const loadedUserIdRef = useRef(null);
+  const ineFileInputRef = useRef(null);
 
   // Estados de ciclo de vida: 'loading' | 'loaded' | 'error'
   const [pageStatus, setPageStatus] = useState('loading');
   const [errorMessage, setErrorMessage] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Estados para la carga de INE
+  const [ineUploading, setIneUploading] = useState(false);
+  const [ineUploadedNotice, setIneUploadedNotice] = useState(false);
 
   // Perfil unificado en memoria
   const [profileData, setProfileData] = useState(() => ({
@@ -48,8 +58,9 @@ const ProfilePage = () => {
     bank_name: authContextUser?.bank_name || '',
     bank_holder: authContextUser?.bank_holder || authContextUser?.full_name || authContextUser?.name || '',
     bank_updated_at: authContextUser?.bank_updated_at || null,
-    rating: authContextUser?.rating ?? 5.0,
-    operations: authContextUser?.operations ?? 0,
+    identity_verification_status: authContextUser?.identity_verification_status || 'unverified',
+    rating: authContextUser?.rating !== undefined && authContextUser?.rating !== null ? Number(authContextUser.rating) : null,
+    operations: authContextUser?.operations !== undefined && authContextUser?.operations !== null ? Number(authContextUser.operations) : 0,
     created_at: authContextUser?.created_at || new Date().toISOString(),
     updated_at: authContextUser?.updated_at || new Date().toISOString(),
   }));
@@ -179,8 +190,12 @@ const ProfilePage = () => {
       || authContextUser?.bank_updated_at 
       || null;
 
-    const resolvedRating = profile?.rating ?? authContextUser?.rating ?? 5.0;
-    const resolvedOperations = profile?.operations ?? authContextUser?.operations ?? 0;
+    const resolvedIdentityVerificationStatus = profile?.identity_verification_status 
+      || authContextUser?.identity_verification_status 
+      || 'unverified';
+
+    const resolvedRating = profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating) : (authContextUser?.rating !== undefined && authContextUser?.rating !== null ? Number(authContextUser.rating) : null);
+    const resolvedOperations = profile?.operations !== undefined && profile?.operations !== null ? Number(profile.operations) : (authContextUser?.operations !== undefined && authContextUser?.operations !== null ? Number(authContextUser.operations) : 0);
     const resolvedCreatedAt = profile?.created_at || authContextUser?.created_at || new Date().toISOString();
     const resolvedUpdatedAt = profile?.updated_at || authContextUser?.updated_at || new Date().toISOString();
 
@@ -199,6 +214,7 @@ const ProfilePage = () => {
       bank_name: resolvedBankName,
       bank_holder: resolvedBankHolder,
       bank_updated_at: resolvedBankUpdatedAt,
+      identity_verification_status: resolvedIdentityVerificationStatus,
       rating: resolvedRating,
       operations: resolvedOperations,
       created_at: resolvedCreatedAt,
@@ -230,38 +246,103 @@ const ProfilePage = () => {
     loadProfile();
   }, [loadProfile]);
 
-  const updateField = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  /**
+   * Manejo de subida segura de INE al bucket privado 'identity-documents'
+   */
+  const handleUploadIne = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Formato de archivo no válido',
+        description: 'Por favor sube tu INE en formato JPG, PNG, WEBP o PDF.',
+        variant: 'destructive',
+      });
+      if (ineFileInputRef.current) ineFileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: 'Archivo demasiado grande',
+        description: 'El tamaño máximo permitido para la INE es de 10 MB.',
+        variant: 'destructive',
+      });
+      if (ineFileInputRef.current) ineFileInputRef.current.value = '';
+      return;
+    }
+
+    setIneUploading(true);
+    try {
+      const userId = profileData.id || authContextUser?.id;
+      if (!userId) {
+        throw new Error('No se encontró una sesión activa de usuario.');
+      }
+
+      const fileExt = file.name.split('.').pop() || (file.type === 'application/pdf' ? 'pdf' : 'jpg');
+      const cleanPath = `${userId}/${Date.now()}_ine.${fileExt}`;
+
+      if (!isSupabaseConfigured || !supabase) {
+        throw new Error('El servicio de almacenamiento seguro no está disponible.');
+      }
+
+      const { error } = await supabase.storage
+        .from('identity-documents')
+        .upload(cleanPath, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setIneUploadedNotice(true);
+      toast({
+        title: 'INE recibida correctamente',
+        description: 'Tu documento fue recibido de forma segura y cifrada. Tu identidad está pendiente de revisión por el equipo de Motoluv.',
+      });
+    } catch (err) {
+      console.error('Error al subir INE:', err);
+      toast({
+        title: 'No se pudo subir la identificación',
+        description: err?.message || 'Ocurrió un error al enviar tu documento. Intenta nuevamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIneUploading(false);
+      if (ineFileInputRef.current) ineFileInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * Guardar cambios del perfil
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const cleanName = (form.name || '').trim();
-    if (!cleanName) {
+    if (!form.name || !form.name.trim()) {
       toast({
-        title: 'Nombre requerido',
-        description: 'Por favor ingresa tu nombre completo.',
+        title: 'Campo obligatorio',
+        description: 'El nombre completo es requerido para tu cuenta.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Validación de CLABE si aplica
-    const clabeClean = form.bank_clabe ? String(form.bank_clabe).replace(/\s/g, '').replace(/\D/g, '') : '';
-    if (showSellerClabe && clabeClean) {
-      if (!/^\d{18}$/.test(clabeClean)) {
+    if (showSellerClabe && form.bank_clabe) {
+      const cleanClabe = form.bank_clabe.replace(/\D/g, '');
+      if (cleanClabe.length !== 18) {
         toast({
           title: 'CLABE inválida',
-          description: 'La CLABE interbancaria debe tener exactamente 18 dígitos numéricos.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      if (!form.bank_name) {
-        toast({
-          title: 'Banco requerido',
-          description: 'Selecciona la institución bancaria correspondiente a tu CLABE.',
+          description: 'La CLABE interbancaria debe contener exactamente 18 dígitos numéricos.',
           variant: 'destructive',
         });
         return;
@@ -270,55 +351,39 @@ const ProfilePage = () => {
 
     setIsSaving(true);
     try {
-      // Guardar cambios: actualiza exclusivamente public.profiles
-      const updatedUser = await updateProfile({
-        name: cleanName,
-        phone: (form.phone || '').trim(),
-        city: (form.city || '').trim(),
+      const updates = {
+        name: form.name.trim(),
+        city: form.city.trim(),
         role: form.role,
-        ...(showSellerClabe
-          ? {
-              bank_clabe: clabeClean,
-              bank_name: form.bank_name,
-              bank_holder: (form.bank_holder || '').trim() || cleanName,
-            }
-          : {}),
-      });
+      };
 
-      // Actualizar estado local inmediato sin recargar la página ni poner pantalla de carga
+      if (!profileData.phone_updated_once && form.phone && form.phone.trim()) {
+        updates.phone = form.phone.trim();
+      }
+
+      if (showSellerClabe) {
+        updates.bank_name = form.bank_name ? form.bank_name.trim() : null;
+        updates.bank_clabe = form.bank_clabe ? form.bank_clabe.replace(/\D/g, '') : null;
+        updates.bank_holder = form.bank_holder ? form.bank_holder.trim() : (form.name ? form.name.trim() : null);
+        updates.bank_updated_at = new Date().toISOString();
+      }
+
+      const updatedUser = await updateProfile(updates);
+
       setProfileData((prev) => ({
         ...prev,
         ...updatedUser,
-        full_name: cleanName,
-        name: cleanName,
-        phone: (form.phone || '').trim(),
-        city: (form.city || '').trim(),
-        role: form.role,
-        bank_clabe: showSellerClabe ? clabeClean : prev.bank_clabe,
-        bank_name: showSellerClabe ? form.bank_name : prev.bank_name,
-        bank_holder: showSellerClabe ? ((form.bank_holder || '').trim() || cleanName) : prev.bank_holder,
-      }));
-
-      setForm((prev) => ({
-        ...prev,
-        name: cleanName,
-        phone: (form.phone || '').trim(),
-        city: (form.city || '').trim(),
-        role: form.role,
-        bank_clabe: showSellerClabe ? clabeClean : prev.bank_clabe,
-        bank_name: showSellerClabe ? form.bank_name : prev.bank_name,
-        bank_holder: showSellerClabe ? ((form.bank_holder || '').trim() || cleanName) : prev.bank_holder,
       }));
 
       toast({
         title: 'Perfil actualizado',
-        description: 'Tus datos se han guardado exitosamente en tu cuenta Motoluv.',
+        description: 'Tus datos han sido guardados correctamente en Motoluv.',
       });
     } catch (err) {
-      console.error('[ProfilePage] Error al actualizar perfil:', err);
+      console.error('[ProfilePage] Error al guardar perfil:', err);
       toast({
         title: 'Error al actualizar',
-        description: err?.message || 'No se pudo guardar la información de tu perfil.',
+        description: err?.message || 'No se pudieron guardar los cambios en la base de datos.',
         variant: 'destructive',
       });
     } finally {
@@ -327,24 +392,25 @@ const ProfilePage = () => {
   };
 
   const handleActivateSeller = () => {
-    updateField('role', 'both');
     setShowSellerClabe(true);
+    updateField('role', profileData.role === 'comprador' ? 'both' : profileData.role);
     toast({
-      title: 'Modo Vendedor Activado',
-      description: 'Ahora puedes registrar tu CLABE interbancaria para recibir los fondos de tus ventas.',
+      title: 'Modo Vendedor Habilitado',
+      description: 'Ahora puedes registrar tu CLABE interbancaria para recibir pagos.',
     });
   };
 
-  const displayName = form.name || profileData.full_name || profileData.name || 'Usuario Motoluv';
-  const initials = String(displayName)
+  const displayName = profileData.full_name || profileData.name || 'Usuario';
+  const initials = displayName
     .split(' ')
     .filter(Boolean)
-    .map((s) => s[0])
     .slice(0, 2)
+    .map((w) => w[0])
     .join('')
-    .toUpperCase() || 'U';
+    .toUpperCase() || 'ML';
 
-  // SKELETON / LOADING STATE: Muestra la estructura sin dejar pantalla vacía
+  const isVerified = profileData.identity_verification_status === 'verified';
+
   if (pageStatus === 'loading') {
     return (
       <div className="min-h-screen py-10" id="profile-loading-view">
@@ -430,9 +496,15 @@ const ProfilePage = () => {
                   <h1 className="font-display font-black text-white text-2xl sm:text-3xl uppercase tracking-wide">
                     {displayName}
                   </h1>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-brand/10 border border-red-brand/30 text-red-brand">
-                    <Shield size={11} /> Cuenta Verificada
-                  </span>
+                  {isVerified ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                      <CheckCircle2 size={11} /> Identidad verificada
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <Shield size={11} /> Identidad pendiente de verificación
+                    </span>
+                  )}
                 </div>
                 <p className="text-zinc-400 text-xs sm:text-sm">{profileData.email}</p>
                 <div className="flex items-center gap-2 pt-1 text-[11px] text-zinc-500">
@@ -462,6 +534,8 @@ const ProfilePage = () => {
 
         {/* Profile Main Form */}
         <form onSubmit={handleSubmit} className="space-y-6" id="profile-edit-form">
+          
+          {/* SECCIÓN 1: INFORMACIÓN PERSONAL */}
           <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6 shadow-xl">
             
             <div className="border-b border-white/5 pb-4 flex items-center justify-between">
@@ -579,7 +653,105 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* SECCIÓN CLABE (SOLO PARA VENDEDORES) */}
+          {/* SECCIÓN 2: VERIFICACIÓN DE IDENTIDAD */}
+          <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6 shadow-xl" id="profile-identity-verification-section">
+            <div className="border-b border-white/5 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display font-bold text-white text-lg uppercase tracking-wide flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-red-brand" /> Verificación de Identidad
+                  </h2>
+                </div>
+                <p className="text-zinc-400 text-xs mt-1">
+                  Validación oficial de identidad mediante INE o documento gubernamental para operaciones seguras
+                </p>
+              </div>
+
+              {isVerified ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-sm text-emerald-400 text-xs font-bold font-mono">
+                  <CheckCircle2 size={13} /> Identidad verificada
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-sm text-amber-400 text-xs font-bold font-mono">
+                  <Shield size={13} /> Pendiente de verificación
+                </div>
+              )}
+            </div>
+
+            {isVerified ? (
+              <div className="bg-[#0a0a0a] border border-emerald-500/20 rounded-sm p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 size={20} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-emerald-300 uppercase tracking-wide">
+                      Identidad Oficial Verificada por Motoluv
+                    </h3>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Tu documento oficial de identificación fue validado con éxito. Tu cuenta goza del sello de confianza verificado para la firma de contratos digitales y transferencias interbancarias en custodia.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="bg-[#0a0a0a] border border-white/5 rounded-sm p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <Shield size={20} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wide">
+                        Identidad pendiente de verificación
+                      </h3>
+                      <p className="text-xs text-zinc-400 leading-relaxed">
+                        Para verificar tu identidad necesitamos revisar tu INE o identificación oficial vigente. Una vez recibido el documento, el equipo de validación técnica de Motoluv revisará y activará tu sello verificado.
+                      </p>
+                    </div>
+                  </div>
+
+                  {ineUploadedNotice && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-sm p-3.5 flex items-start gap-2.5">
+                      <FileCheck size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-emerald-300 leading-relaxed">
+                        <strong>INE recibida:</strong> Tu documento ha sido recibido y resguardado de forma cifrada. Tu identidad está en proceso de revisión por el equipo técnico.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <input
+                      ref={ineFileInputRef}
+                      type="file"
+                      id="ine-file-input"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={handleUploadIne}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      id="upload-ine-btn"
+                      disabled={ineUploading}
+                      onClick={() => ineFileInputRef.current?.click()}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-brand hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-all shadow-md cursor-pointer"
+                    >
+                      <Upload size={14} />
+                      {ineUploading ? 'Subiendo documento cifrado...' : (ineUploadedNotice ? 'Subir otra versión de mi INE' : 'Subir INE')}
+                    </button>
+                    <span className="text-[11px] text-zinc-500">
+                      Formatos soportados: JPG, PNG, WEBP o PDF (Máx. 10 MB)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-[#0a0a0a] border border-white/5 rounded-sm p-4 flex items-start gap-3">
+                  <Lock size={15} className="text-red-brand mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    <strong className="text-zinc-300">Privacidad y Protección de Datos Personales:</strong> Tus documentos de identidad se transmiten mediante canales cifrados SSL/TLS y se resguardan de forma privada. Motoluv <strong className="text-white">nunca</strong> publica ni comparte tus documentos oficiales con otros usuarios ni terceros.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SECCIÓN 3: CLABE (SOLO PARA VENDEDORES) */}
           <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6 shadow-xl" id="profile-clabe-section">
             <div className="border-b border-white/5 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -643,38 +815,36 @@ const ProfilePage = () => {
                       ))}
                     </select>
                     <p className="text-[11px] text-zinc-500 mt-1.5">
-                      Instituciones autorizadas por CNBV y Banxico (SPEI) en México.
+                      Institución bancaria en México regulada por CNBV / Banco de México.
                     </p>
                   </div>
 
-                  {/* CLABE INTERBANCARIA (18 DÍGITOS) */}
+                  {/* NÚMERO CLABE */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                        <CreditCard size={13} className="text-red-brand" /> CLABE Interbancaria (18 dígitos) <span className="text-red-brand">*</span>
-                      </label>
-                      <span className={`text-[11px] font-mono ${(form.bank_clabe || '').length === 18 ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                        {(form.bank_clabe || '').length}/18
-                      </span>
-                    </div>
+                    <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                      <CreditCard size={13} className="text-red-brand" /> CLABE Interbancaria (18 dígitos) <span className="text-red-brand">*</span>
+                    </label>
                     <input
                       id="profile-clabe-input"
                       type="text"
                       maxLength={18}
                       value={form.bank_clabe}
-                      onChange={(e) => updateField('bank_clabe', e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="18 dígitos exactos"
-                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors font-mono tracking-widest placeholder:text-zinc-600"
+                      onChange={(e) => updateField('bank_clabe', e.target.value.replace(/\D/g, ''))}
+                      placeholder="012180015948372615"
+                      className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-mono tracking-wider font-semibold"
                     />
-                    <p className="text-[11px] text-zinc-500 mt-1.5">
-                      Valida que sea tu CLABE estándar SPEI de 18 números.
-                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5">
+                      <span>Exactamente 18 dígitos numéricos sin espacios ni guiones.</span>
+                      <span className={form.bank_clabe?.length === 18 ? 'text-emerald-400 font-bold' : 'text-zinc-500'}>
+                        {form.bank_clabe?.length || 0}/18
+                      </span>
+                    </div>
                   </div>
 
                   {/* TITULAR DE LA CUENTA */}
                   <div className="md:col-span-2">
                     <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
-                      <User size={13} className="text-red-brand" /> Nombre Completo del Titular de la Cuenta
+                      <User size={13} className="text-red-brand" /> Nombre del Titular de la Cuenta <span className="text-red-brand">*</span>
                     </label>
                     <input
                       id="profile-bankholder-input"
@@ -733,7 +903,7 @@ const ProfilePage = () => {
           {/* Form Actions */}
           <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-2">
             <div className="text-xs text-zinc-500 text-center sm:text-left">
-              Los cambios se sincronizan de inmediato con tu cuenta protegida.
+              Los cambios se sincronizan de inmediato con tu cuenta protegida en Supabase.
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto">

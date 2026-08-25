@@ -634,19 +634,25 @@ const MotoDetailPage = () => {
           <div className="bg-[#111112] border border-white/5 rounded-md p-6">
             <h3 className="font-display font-bold text-white uppercase tracking-wide text-sm mb-4">Vendedor</h3>
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-red-brand/20 border border-red-brand/40 flex items-center justify-center">
-                <User size={18} className="text-red-brand" />
+              <div className="w-11 h-11 rounded-full bg-red-brand/20 border border-red-brand/40 flex items-center justify-center font-bold text-red-brand">
+                {moto.owner_name ? moto.owner_name.charAt(0).toUpperCase() : <User size={18} className="text-red-brand" />}
               </div>
               <div>
-                <div className="text-white text-sm font-medium">{moto.owner_name || 'Vendedor Motoluv'}</div>
+                <div className="text-white text-sm font-medium">{moto.owner_name || 'Vendedor en Motoluv'}</div>
                 <div className="flex items-center gap-1 text-xs text-zinc-400">
-                  <Star size={11} className="fill-yellow-400 text-yellow-400" />
-                  4.8 · Usuario verificado
+                  {moto.owner_rating ? (
+                    <>
+                      <Star size={11} className="fill-yellow-400 text-yellow-400" />
+                      <span>{moto.owner_rating} ({moto.owner_operations || 0} operaciones)</span>
+                    </>
+                  ) : (
+                    <span>Vendedor Registrado</span>
+                  )}
                 </div>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-xs text-zinc-400">
-              <Award size={12} className="text-red-brand" /> Publicación verificada por Motoluv
+              <Award size={12} className="text-red-brand" /> Publicación registrada en Motoluv
             </div>
           </div>
         </div>

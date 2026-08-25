@@ -176,9 +176,15 @@ const HomePage = () => {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featured.map((m) => <MotoCard key={m.id} moto={m} />)}
-        </div>
+        {featured.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featured.map((m) => <MotoCard key={m.id} moto={m} />)}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-zinc-500 text-sm">
+            Explora todas las motocicletas verificadas disponibles en nuestro catálogo.
+          </div>
+        )}
 
         <div className="text-center mt-14">
           <Link to="/motos" className="btn-outline group inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm">
