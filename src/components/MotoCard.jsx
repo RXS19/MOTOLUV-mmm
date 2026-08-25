@@ -1,13 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, MapPin, Star, Wrench } from 'lucide-react';
+import { Eye, MapPin, Star, Wrench, Heart } from 'lucide-react';
 import { getStatusStyle } from '../utils/status';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 
 const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const style = getStatusStyle(moto.status);
+  const fav = isFavorite(moto.id);
 
   // Status tags are ONLY visible to the owner of the listing or the linked buyer
   const isOwnerOrLinkedBuyer = Boolean(
@@ -23,20 +26,46 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   // Score is ONLY visible if user is logged in
   const canSeeScore = Boolean(user && showScore);
 
+  const handleFavoriteClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite(moto);
+  };
+
   return (
     <Link
       to={`/motos/${moto.id}`}
-      className="moto-card group block bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#242428] hover:to-[#141416] border border-black rounded-md overflow-hidden transition-all duration-300 shadow-md hover:shadow-xl"
+      className="moto-card group block bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#242428] hover:to-[#141416] border border-black rounded-md overflow-hidden transition-all duration-300 shadow-md hover:shadow-xl relative"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
         <img 
           src={resolveSafeImageUrl(moto.image)} 
           alt={`${moto.brand} ${moto.model}`} 
           onError={(e) => handleImageError(e, 'moto')}
-          className="w-full h-full object-cover" 
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
         />
 
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+        {/* Favorite Heart Button */}
+        <button
+          type="button"
+          onClick={handleFavoriteClick}
+          aria-label={fav ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+          title={fav ? 'Quitar de tus motos guardadas' : 'Guardar en tus motos guardadas'}
+          className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center ${
+            fav
+              ? 'bg-red-brand text-white scale-105 shadow-red-brand/40'
+              : 'bg-black/60 text-white/90 hover:text-white hover:bg-black/90 hover:scale-110 border border-white/10'
+          }`}
+        >
+          <Heart
+            size={16}
+            className={`transition-all duration-200 ${
+              fav ? 'fill-white stroke-white' : 'stroke-current stroke-2 hover:fill-red-brand/40'
+            }`}
+          />
+        </button>
+
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start z-10 pointer-events-none">
           {moto.featured && (
             <div className="bg-red-brand text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-sm flex items-center gap-1 shadow">
               <Wrench size={10} /> DESTACADA

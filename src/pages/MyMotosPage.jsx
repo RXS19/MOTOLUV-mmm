@@ -6,12 +6,18 @@ import { toast } from '../hooks/use-toast';
 import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
 import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 import BoostPublicationModal from '../components/dashboard/BoostPublicationModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 const MyMotosPage = () => {
   const [motos, setMotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [selectedMotoForBoost, setSelectedMotoForBoost] = useState(null);
+
+  // Deletion modal state
+  const [motoToDelete, setMotoToDelete] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -28,11 +34,14 @@ const MyMotosPage = () => {
 
   useEffect(load, []);
 
-  const del = async (id, status, offersCount = 0) => {
+  const initiateDelete = (moto) => {
+    const status = moto.status;
+    const offersCount = moto.offersCount || 0;
+
     if (status === 'Apartada' || status === 'reserved' || status === 'Proceso de entrega') {
       toast({
         title: 'Acción no permitida',
-        description: 'No puedes eliminar una publicación autorizada y apartada. Se encuentra en proceso activo de compraventa.',
+        description: 'No puedes eliminar una publicación apartada. Se encuentra en proceso activo de compraventa.',
         variant: 'destructive',
       });
       return;
@@ -40,15 +49,27 @@ const MyMotosPage = () => {
     if (offersCount > 0) {
       toast({
         title: 'Ofertas activas en proceso',
-        description: 'No puedes eliminar una motocicleta que tiene ofertas activas en proceso. Debes responder o declinar las ofertas primero.',
+        description: 'No puedes eliminar una motocicleta que tiene ofertas activas. Debes responder o declinar las ofertas primero.',
         variant: 'destructive',
       });
       return;
     }
-    if (!window.confirm('¿Estás seguro de eliminar esta publicación de tu inventario?')) return;
+
+    setMotoToDelete(moto);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async (id) => {
+    setDeleteLoading(true);
     try {
       await motoApi.remove(id);
-      toast({ title: 'Publicación eliminada', description: 'La motocicleta ha sido removida de tu inventario correctamente.' });
+      toast({
+        title: 'Publicación eliminada',
+        description: 'La motocicleta ha sido removida de tu inventario correctamente.',
+      });
+      setShowDeleteModal(false);
+      setMotoToDelete(null);
+      setMotos((prev) => prev.filter((m) => m.id !== id));
       load();
     } catch (err) {
       toast({
@@ -56,6 +77,8 @@ const MyMotosPage = () => {
         description: err?.message || 'Ocurrió un error al eliminar la publicación.',
         variant: 'destructive',
       });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -190,7 +213,8 @@ const MyMotosPage = () => {
                       Ver Ficha
                     </Link>
                     <button
-                      onClick={() => del(m.id, m.status, m.offersCount || 0)}
+                      type="button"
+                      onClick={() => initiateDelete(m)}
                       className={`w-10 h-8 rounded-sm border transition-colors flex items-center justify-center ${
                         m.status === 'Apartada' || m.status === 'reserved' || (m.offersCount || 0) > 0
                           ? 'border-white/5 text-zinc-600 hover:text-amber-400 hover:border-amber-500/40'
@@ -213,6 +237,20 @@ const MyMotosPage = () => {
           })}
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          if (!deleteLoading) {
+            setShowDeleteModal(false);
+            setMotoToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        moto={motoToDelete}
+        loading={deleteLoading}
+      />
 
       {/* Boost Modal */}
       <BoostPublicationModal

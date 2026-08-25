@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, ChevronLeft, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle, FileText, Download, Printer, ShieldCheck, CheckCheck } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, ChevronLeft, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle, FileText, Download, Printer, ShieldCheck, CheckCheck, Heart } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
 import { motoApi, offerApi, clipApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 import { toast } from '../hooks/use-toast';
 import { getStatusStyle } from '../utils/status';
 import { handleImageError, resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
@@ -14,6 +15,7 @@ const MotoDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [moto, setMoto] = useState(null);
   const [similar, setSimilar] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,8 @@ const MotoDetailPage = () => {
   const [showApartadoModal, setShowApartadoModal] = useState(false);
   const [apartadoPaymentMethod, setApartadoPaymentMethod] = useState('card');
   const [apartadoLoading, setApartadoLoading] = useState(false);
+
+  const fav = isFavorite(moto?.id);
 
   // Certificate Modal state
   const [showCertModal, setShowCertModal] = useState(false);
@@ -258,6 +262,26 @@ const MotoDetailPage = () => {
                 <Wrench size={11} /> DESTACADA
               </div>
             )}
+
+            {/* Favorite Heart Button on Main Image */}
+            <button
+              type="button"
+              onClick={() => toggleFavorite(moto)}
+              aria-label={fav ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+              title={fav ? 'Quitar de tus motos guardadas' : 'Guardar en tus motos guardadas'}
+              className={`absolute top-4 right-4 z-20 p-2.5 rounded-full transition-all duration-300 shadow-xl flex items-center justify-center ${
+                fav
+                  ? 'bg-red-brand text-white scale-105 shadow-red-brand/50'
+                  : 'bg-black/70 text-white/90 hover:text-white hover:bg-black/90 hover:scale-110 border border-white/10'
+              }`}
+            >
+              <Heart
+                size={18}
+                className={`transition-all duration-200 ${
+                  fav ? 'fill-white stroke-white' : 'stroke-current stroke-2 hover:fill-red-brand/40'
+                }`}
+              />
+            </button>
             {user && moto.score && (
               <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur text-white text-sm font-medium px-3 py-1.5 rounded-sm flex items-center gap-1.5">
                 <Wrench size={13} className="text-red-brand" /> Score {moto.score.toFixed(1)}/5
@@ -485,6 +509,22 @@ const MotoDetailPage = () => {
               <div className="flex items-center gap-2 text-zinc-300"><Wrench size={14} className="text-red-brand" /> {moto.engine}</div>
               <div className="flex items-center gap-2 text-zinc-300"><Palette size={14} className="text-red-brand" /> {moto.color}</div>
               <div className="flex items-center gap-2 text-zinc-300 col-span-2"><MapPin size={14} className="text-red-brand" /> {moto.city}</div>
+            </div>
+
+            {/* Quick Favorites Action Button */}
+            <div className="mt-5 pt-4 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => toggleFavorite(moto)}
+                className={`w-full py-3 px-4 rounded-sm border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all ${
+                  fav
+                    ? 'bg-red-brand/15 border-red-brand/50 text-red-brand hover:bg-red-brand/25 shadow-sm'
+                    : 'bg-[#18181c] border-white/10 text-zinc-300 hover:text-white hover:border-white/20 hover:bg-[#202026]'
+                }`}
+              >
+                <Heart size={16} className={fav ? 'fill-red-brand text-red-brand' : 'text-zinc-400'} />
+                <span>{fav ? 'Guardada en tus favoritos' : 'Guardar en favoritos'}</span>
+              </button>
             </div>
           </div>
 

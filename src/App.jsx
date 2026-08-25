@@ -21,40 +21,43 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { FavoritesProvider } from './context/FavoritesContext';
 import { Toaster } from './components/ui/toaster';
 
 function App() {
   return (
     <div className="App">
       <AuthProvider>
-        <CartProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route element={<Layout />}>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/motos" element={<CatalogPage />} />
-                <Route path="/motos/:id" element={<MotoDetailPage />} />
-                <Route path="/como-funciona" element={<HowItWorksPage />} />
-                <Route path="/sumate" element={<PartnersPage />} />
-                <Route path="/partners" element={<PartnersPage />} />
-                <Route path="/tienda" element={<ShopPage />} />
-                <Route path="/registro" element={<RegisterPage />} />
-                <Route path="/iniciar-sesion" element={<LoginPage />} />
-                <Route path="/aviso-de-privacidad" element={<PrivacyPolicyPage />} />
-                <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
-                <Route path="/privacidad" element={<PrivacyPolicyPage />} />
-                <Route path="/panel" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
-                <Route path="/panel/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                <Route path="/panel/cuenta-bancaria" element={<ProtectedRoute role="vendedor"><BankAccountPage /></ProtectedRoute>} />
-                <Route path="/panel/publicar" element={<ProtectedRoute role="vendedor"><CreateMotoPage /></ProtectedRoute>} />
-                <Route path="/panel/mis-motos" element={<ProtectedRoute role="vendedor"><MyMotosPage /></ProtectedRoute>} />
-                <Route path="/panel/mis-ofertas" element={<ProtectedRoute><MyOffersPage /></ProtectedRoute>} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-          <Toaster />
-        </CartProvider>
+        <FavoritesProvider>
+          <CartProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/motos" element={<CatalogPage />} />
+                  <Route path="/motos/:id" element={<MotoDetailPage />} />
+                  <Route path="/como-funciona" element={<HowItWorksPage />} />
+                  <Route path="/sumate" element={<PartnersPage />} />
+                  <Route path="/partners" element={<PartnersPage />} />
+                  <Route path="/tienda" element={<ShopPage />} />
+                  <Route path="/registro" element={<RegisterPage />} />
+                  <Route path="/iniciar-sesion" element={<LoginPage />} />
+                  <Route path="/aviso-de-privacidad" element={<PrivacyPolicyPage />} />
+                  <Route path="/politica-de-privacidad" element={<PrivacyPolicyPage />} />
+                  <Route path="/privacidad" element={<PrivacyPolicyPage />} />
+                  <Route path="/panel" element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+                  <Route path="/panel/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/panel/cuenta-bancaria" element={<ProtectedRoute role="vendedor"><BankAccountPage /></ProtectedRoute>} />
+                  <Route path="/panel/publicar" element={<ProtectedRoute role="vendedor"><CreateMotoPage /></ProtectedRoute>} />
+                  <Route path="/panel/mis-motos" element={<ProtectedRoute role="vendedor"><MyMotosPage /></ProtectedRoute>} />
+                  <Route path="/panel/mis-ofertas" element={<ProtectedRoute><MyOffersPage /></ProtectedRoute>} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+            <Toaster />
+          </CartProvider>
+        </FavoritesProvider>
       </AuthProvider>
     </div>
   );

@@ -30,13 +30,15 @@ import {
   RefreshCw,
   Building2,
   Check,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { motoApi, offerApi } from '../services/api';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
 import BoostPublicationModal from '../components/dashboard/BoostPublicationModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { calculateCommission } from '../utils/commission';
 import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
@@ -58,6 +60,11 @@ const SellerDashboard = () => {
   const [counterOfferModal, setCounterOfferModal] = useState(null);
   const [counterPrice, setCounterPrice] = useState('');
   const [counterNote, setCounterNote] = useState('');
+
+  // Deletion modal state
+  const [motoToDelete, setMotoToDelete] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Chat message thread state
   const [activeChatUser, setActiveChatUser] = useState('especialista');
@@ -192,7 +199,10 @@ const SellerDashboard = () => {
     setShowBoostModal(true);
   };
 
-  const handleDeleteMoto = async (motoId, status, offersCount = 0) => {
+  const initiateDeleteMoto = (moto) => {
+    const status = moto.status;
+    const offersCount = moto.offersCount || 0;
+
     if (status === 'Apartada' || status === 'reserved' || status === 'Proceso de entrega') {
       toast({
         title: 'Acción no permitida',
@@ -209,10 +219,21 @@ const SellerDashboard = () => {
       });
       return;
     }
-    if (!window.confirm('¿Estás seguro de eliminar esta publicación de tu inventario?')) return;
+
+    setMotoToDelete(moto);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async (motoId) => {
+    setDeleteLoading(true);
     try {
       await motoApi.remove(motoId);
-      toast({ title: 'Publicación eliminada', description: 'La motocicleta ha sido removida de tu inventario.' });
+      toast({
+        title: 'Publicación eliminada',
+        description: 'La motocicleta ha sido removida de tu inventario correctamente.',
+      });
+      setShowDeleteModal(false);
+      setMotoToDelete(null);
       setMotos(prev => prev.filter(m => m.id !== motoId));
       loadData();
     } catch (err) {
@@ -221,6 +242,8 @@ const SellerDashboard = () => {
         description: err?.message || 'Ocurrió un error al eliminar la publicación.',
         variant: 'destructive',
       });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -456,7 +479,8 @@ const SellerDashboard = () => {
                                 Ver ficha
                               </Link>
                               <button
-                                onClick={() => handleDeleteMoto(pub.id, pub.status, pub.offersCount || 0)}
+                                type="button"
+                                onClick={() => initiateDeleteMoto(pub)}
                                 className={`p-1.5 rounded-lg border transition-colors flex items-center justify-center ${
                                   pub.status === 'Apartada' || pub.status === 'reserved' || (pub.offersCount || 0) > 0
                                     ? 'border-white/5 text-zinc-600 hover:text-amber-400 hover:border-amber-500/40'
@@ -470,7 +494,7 @@ const SellerDashboard = () => {
                                     : 'Eliminar publicación'
                                 }
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           </div>
@@ -769,7 +793,8 @@ const SellerDashboard = () => {
                             Ver ficha
                           </Link>
                           <button
-                            onClick={() => handleDeleteMoto(m.id, m.status, m.offersCount || 0)}
+                            type="button"
+                            onClick={() => initiateDeleteMoto(m)}
                             className={`w-9 h-8 rounded-lg border transition-colors flex items-center justify-center ${
                               m.status === 'Apartada' || m.status === 'reserved' || (m.offersCount || 0) > 0
                                 ? 'border-white/5 text-zinc-600 hover:text-amber-400 hover:border-amber-500/40'
@@ -1425,6 +1450,20 @@ const SellerDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          if (!deleteLoading) {
+            setShowDeleteModal(false);
+            setMotoToDelete(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        moto={motoToDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 };

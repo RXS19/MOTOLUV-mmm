@@ -26,6 +26,7 @@ import {
   Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 import { offerApi } from '../services/api';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
@@ -34,6 +35,7 @@ import { toast } from '../hooks/use-toast';
 
 const BuyerDashboard = () => {
   const { user } = useAuth();
+  const { favorites, isFavorite, toggleFavorite, removeFavorite } = useFavorites();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab') || 'resumen';
 
@@ -71,50 +73,6 @@ const BuyerDashboard = () => {
       time: '11:05 AM',
       isMe: false
     }
-  ]);
-
-  // Saved Motos state
-  const [savedMotos, setSavedMotos] = useState([
-    {
-      id: 'saved-1',
-      brand: 'BMW',
-      model: 'F 850 GS',
-      year: 2021,
-      price: 189900,
-      image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=600&q=80',
-      isFavorite: true,
-      city: 'CDMX'
-    },
-    {
-      id: 'saved-2',
-      brand: 'Triumph',
-      model: 'Street Twin',
-      year: 2019,
-      price: 117900,
-      image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80',
-      isFavorite: true,
-      city: 'Guadalajara'
-    },
-    {
-      id: 'saved-3',
-      brand: 'Honda',
-      model: 'CB650R',
-      year: 2020,
-      price: 139900,
-      image: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80',
-      isFavorite: true,
-      city: 'Monterrey'
-    },
-    {
-      id: 'saved-4',
-      brand: 'Benelli',
-      model: 'TNT 300',
-      year: 2022,
-      price: 64900,
-      image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80',
-      isFavorite: true,
-      city: 'Puebla'
-    },
   ]);
 
   // Requests / Sent Offers state
@@ -190,14 +148,6 @@ const BuyerDashboard = () => {
   }, []);
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'Pedro';
-
-  // Toggle favorite
-  const toggleFavorite = (id) => {
-    setSavedMotos((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isFavorite: !m.isFavorite } : m))
-    );
-    toast({ title: 'Favoritos actualizados' });
-  };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -364,55 +314,84 @@ const BuyerDashboard = () => {
                 {/* Section: Motos guardadas */}
                 <div className="bg-[#101013] border border-white/5 rounded-2xl p-5 sm:p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm sm:text-base font-bold text-white tracking-wide">
-                      Motos guardadas
-                    </h2>
-                    <button
-                      onClick={() => handleTabChange('guardadas')}
-                      className="text-xs text-red-brand hover:text-red-400 font-semibold transition-colors"
-                    >
-                      Ver todas ({savedMotos.filter(m => m.isFavorite).length}) →
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
-                    {savedMotos.slice(0, 4).map((moto) => (
-                      <div
-                        key={moto.id}
-                        className="group bg-[#141418] border border-white/5 hover:border-white/15 rounded-xl p-2.5 sm:p-3 transition-all relative flex flex-col justify-between"
+                    <div className="flex items-center gap-2">
+                      <Heart size={16} className="text-red-brand fill-red-brand" />
+                      <h2 className="text-sm sm:text-base font-bold text-white tracking-wide">
+                        Motos guardadas
+                      </h2>
+                    </div>
+                    {favorites.length > 0 && (
+                      <button
+                        onClick={() => handleTabChange('guardadas')}
+                        className="text-xs text-red-brand hover:text-red-400 font-semibold transition-colors"
                       >
-                        <div>
-                          <div className="aspect-[4/3] rounded-lg overflow-hidden bg-black/40 mb-2.5 relative">
-                            <img
-                              src={resolveSafeImageUrl(moto.image, 'moto')}
-                              alt={`${moto.brand} ${moto.model}`}
-                              onError={(e) => handleImageError(e, 'moto')}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          </div>
-                          <h4 className="text-white text-xs font-bold truncate">
-                            {moto.brand} {moto.model} {moto.year}
-                          </h4>
-                        </div>
-
-                        <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
-                          <span className="text-zinc-200 font-bold text-xs">
-                            ${moto.price.toLocaleString()} MXN
-                          </span>
-                          <button
-                            onClick={() => toggleFavorite(moto.id)}
-                            className="text-red-brand hover:scale-110 transition-transform p-1"
-                            title="Favorita"
-                          >
-                            <Heart
-                              size={15}
-                              className={moto.isFavorite ? 'fill-red-brand text-red-brand' : 'text-zinc-500'}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                        Ver todas ({favorites.length}) →
+                      </button>
+                    )}
                   </div>
+
+                  {favorites.length === 0 ? (
+                    <div className="p-6 bg-[#141418] border border-dashed border-white/10 rounded-xl text-center space-y-3">
+                      <div className="w-10 h-10 rounded-full bg-red-brand/10 text-red-brand flex items-center justify-center mx-auto">
+                        <Heart size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white">No tienes motos guardadas aún</p>
+                        <p className="text-[11px] text-zinc-400 mt-1 max-w-sm mx-auto">
+                          Guarda las motocicletas que te interesen con el ícono de corazón en el catálogo para darles seguimiento.
+                        </p>
+                      </div>
+                      <Link
+                        to="/motos"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors shadow"
+                      >
+                        Explorar catálogo
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-3.5">
+                      {favorites.slice(0, 4).map((moto) => (
+                        <div
+                          key={moto.id}
+                          className="group bg-[#141418] border border-white/5 hover:border-white/15 rounded-xl p-2.5 sm:p-3 transition-all relative flex flex-col justify-between"
+                        >
+                          <Link to={`/motos/${moto.id}`} className="block">
+                            <div className="aspect-[4/3] rounded-lg overflow-hidden bg-black/40 mb-2.5 relative">
+                              <img
+                                src={resolveSafeImageUrl(moto.image || moto.images?.[0], 'moto')}
+                                alt={`${moto.brand} ${moto.model}`}
+                                onError={(e) => handleImageError(e, 'moto')}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </div>
+                            <h4 className="text-white text-xs font-bold truncate group-hover:text-red-brand transition-colors">
+                              {moto.brand} {moto.model} {moto.year}
+                            </h4>
+                          </Link>
+
+                          <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
+                            <span className="text-zinc-200 font-bold text-xs">
+                              ${Number(moto.price || 0).toLocaleString()} MXN
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                toggleFavorite(moto);
+                              }}
+                              className="text-red-brand hover:scale-110 transition-transform p-1"
+                              title="Quitar de favoritas"
+                            >
+                              <Heart
+                                size={15}
+                                className="fill-red-brand text-red-brand"
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -510,52 +489,99 @@ const BuyerDashboard = () => {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h1 className="text-2xl font-bold text-white">Motos Guardadas</h1>
+                <div className="flex items-center gap-2">
+                  <Heart size={20} className="text-red-brand fill-red-brand" />
+                  <h1 className="text-2xl font-bold text-white">Motos Guardadas</h1>
+                </div>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Tus motocicletas favoritas para darles seguimiento y recibir alertas de precio.
+                  Tus motocicletas favoritas para darles seguimiento, hacer ofertas y recibir alertas de precio.
                 </p>
               </div>
-              <Link to="/motos" className="text-xs text-red-brand font-semibold hover:underline">
-                + Ver más motos en catálogo
+              <Link to="/motos" className="text-xs text-red-brand font-semibold hover:underline flex items-center gap-1">
+                + Explorar más motos en catálogo
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {savedMotos.filter(m => m.isFavorite).map((m) => (
-                <div key={m.id} className="bg-[#111114] border border-white/5 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-white/15 transition-all">
-                  <div>
-                    <div className="aspect-[4/3] bg-black/40 relative">
-                      <img src={m.image} alt={m.model} className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => toggleFavorite(m.id)}
-                        className="absolute top-2.5 right-2.5 p-1.5 bg-black/60 rounded-full text-red-brand hover:scale-110 transition-transform"
-                      >
-                        <Heart size={16} className="fill-red-brand" />
-                      </button>
-                      <span className="absolute bottom-2.5 left-2.5 text-[10px] bg-black/70 px-2 py-0.5 rounded text-zinc-300">
-                        📍 {m.city}
-                      </span>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-sm text-white">{m.brand} {m.model}</h3>
-                      <p className="text-xs text-zinc-400">Año {m.year}</p>
-                      <div className="mt-2 text-base font-black text-red-brand">
-                        ${m.price.toLocaleString()} MXN
+            {favorites.length === 0 ? (
+              <div className="p-12 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-4 max-w-lg mx-auto">
+                <div className="w-16 h-16 rounded-full bg-red-brand/10 text-red-brand flex items-center justify-center mx-auto shadow-inner">
+                  <Heart size={32} />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-white">No tienes motos guardadas todavía</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Cuando veas una moto que te interese en el catálogo o en su ficha técnica, haz clic en el ícono de corazón para guardarla en esta sección.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link
+                    to="/motos"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-brand/20"
+                  >
+                    <Bike size={16} />
+                    <span>Ver motocicletas disponibles</span>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {favorites.map((m) => (
+                  <div
+                    key={m.id}
+                    className="bg-[#111114] border border-white/5 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-white/20 transition-all shadow-lg group"
+                  >
+                    <div>
+                      <div className="aspect-[4/3] bg-black/40 relative overflow-hidden">
+                        <img
+                          src={resolveSafeImageUrl(m.image || m.images?.[0], 'moto')}
+                          alt={`${m.brand} ${m.model}`}
+                          onError={(e) => handleImageError(e, 'moto')}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleFavorite(m);
+                          }}
+                          className="absolute top-2.5 right-2.5 p-2 bg-red-brand/90 hover:bg-red-brand rounded-full text-white hover:scale-110 transition-all shadow-md"
+                          title="Quitar de favoritas"
+                          aria-label="Quitar de favoritas"
+                        >
+                          <Heart size={16} className="fill-white stroke-white" />
+                        </button>
+                        {m.city && (
+                          <span className="absolute bottom-2.5 left-2.5 text-[10px] bg-black/80 backdrop-blur px-2.5 py-1 rounded text-zinc-200 border border-white/10 font-medium">
+                            📍 {m.city}
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <Link to={`/motos/${m.id}`} className="block group-hover:text-red-brand transition-colors">
+                          <h3 className="font-bold text-sm text-white truncate">
+                            {m.brand} {m.model}
+                          </h3>
+                          <p className="text-xs text-zinc-400 mt-0.5">Año {m.year || 'N/A'}</p>
+                        </Link>
+                        <div className="mt-3 text-lg font-black text-red-brand">
+                          ${Number(m.price || 0).toLocaleString()} MXN
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="p-4 pt-0">
-                    <Link
-                      to="/motos"
-                      className="w-full block text-center py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl transition-colors shadow"
-                    >
-                      Hacer Oferta Directa
-                    </Link>
+                    <div className="p-4 pt-0 space-y-2">
+                      <Link
+                        to={`/motos/${m.id}`}
+                        className="w-full block text-center py-2.5 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-red-brand/20"
+                      >
+                        Ver detalles y apartar
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
