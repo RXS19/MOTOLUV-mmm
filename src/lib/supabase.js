@@ -99,41 +99,6 @@ export function logAuthDiagnostic(action, details = {}) {
 }
 
 /**
- * Ejecutar la función RPC `public.sync_current_user()` en Supabase.
- * Asegura los registros en:
- *  - register_users (inmutable con ON CONFLICT DO NOTHING)
- *  - users (datos actuales)
- *  - profiles (perfil del dashboard)
- */
-export async function syncCurrentUser() {
-  if (!isSupabaseConfigured || !supabase) return null;
-
-  try {
-    const { data, error } = await supabase.rpc('sync_current_user');
-
-    if (error) {
-      logAuthDiagnostic('sync_current_user_error', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-      });
-      console.error('[Supabase RPC sync_current_user Error]', error.message, error.details || '');
-      return { success: false, error };
-    }
-
-    logAuthDiagnostic('sync_current_user_success', { result: data });
-    return { success: true, data };
-  } catch (err) {
-    logAuthDiagnostic('sync_current_user_exception', {
-      message: err?.message || String(err),
-    });
-    console.error('[Supabase RPC sync_current_user Exception]', err?.message || err);
-    return { success: false, error: err };
-  }
-}
-
-/**
  * Obtener perfil de usuario desde `public.profiles` con fallback a `auth.user.user_metadata`.
  *
  * PRIORIDAD DE DATOS:
@@ -270,10 +235,9 @@ export async function fetchUserProfile(userId, userMetadata = null) {
  * 1. public.profiles es la ÚNICA fuente de verdad del perfil.
  * 2. NO actualizar public.users (no contiene full_name, city, role, bank_clabe, etc.).
  * 3. NO llamar a supabase.auth.updateUser() para evitar onAuthStateChange y segundas sincronizaciones.
- * 4. NO llamar a sync_current_user().
- * 5. bank_clabe es NUMERIC: Si está vacío, enviar null (NUNCA "").
- * 6. NUNCA modificar public.register_users (inmutable).
- * 7. Devuelve el registro de perfil actualizado directamente desde public.profiles.
+ * 4. bank_clabe es NUMERIC: Si está vacío, enviar null (NUNCA "").
+ * 5. NUNCA modificar public.register_users (inmutable).
+ * 6. Devuelve el registro de perfil actualizado directamente desde public.profiles.
  */
 export async function updateUserProfile(userId, updates) {
   if (!isSupabaseConfigured || !supabase || !userId) {

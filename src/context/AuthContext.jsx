@@ -6,7 +6,6 @@ import {
   formatSupabaseAuthError,
   fetchUserProfile,
   updateUserProfile,
-  syncCurrentUser,
   logAuthDiagnostic,
 } from '../lib/supabase';
 
@@ -97,8 +96,6 @@ export const AuthProvider = ({ children }) => {
         if (mounted) {
           if (initialSession?.user) {
             setSession(initialSession);
-            // REQUISITO 3: Ejecutar sync_current_user() antes de construir el usuario
-            await syncCurrentUser();
             const userObj = await buildUserObject(initialSession.user, initialSession);
             setUser(userObj);
             if (userObj?.role === 'comprador') setActiveView('comprador');
@@ -131,8 +128,6 @@ export const AuthProvider = ({ children }) => {
 
         if (currentSession?.user) {
           setSession(currentSession);
-          // REQUISITO 2: Ejecutar sync_current_user() cuando Supabase entrega la sesión (OAuth / Login / Refresh)
-          await syncCurrentUser();
           const userObj = await buildUserObject(currentSession.user, currentSession);
           if (mounted) {
             setUser(userObj);
@@ -197,8 +192,6 @@ export const AuthProvider = ({ children }) => {
 
     if (data?.session) {
       setSession(data.session);
-      // REQUISITO 1: Ejecutar sync_current_user() al iniciar sesión
-      await syncCurrentUser();
     }
 
     const userObj = await buildUserObject(data.user, data.session);
@@ -256,12 +249,10 @@ export const AuthProvider = ({ children }) => {
       throw customErr;
     }
 
-    // REQUISITO 1:
-    // Si existe sesión, ejecutar inmediatamente sync_current_user().
+    // Si existe sesión, guardar en estado
     // Si Supabase requiere confirmación de email y todavía no existe sesión, NO mostrar error.
     if (data?.session) {
       setSession(data.session);
-      await syncCurrentUser();
     }
 
     const userObj = await buildUserObject(data.user, data.session);
