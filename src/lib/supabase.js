@@ -82,7 +82,25 @@ export async function signInWithProvider(provider) {
 }
 
 /**
- * Obtener o sincronizar el perfil de usuario de `public.profiles`
+ * Diagnostic logger for Supabase user and profile lifecycle
+ * Strict security: Never logs tokens, passwords or secrets
+ */
+export function logAuthDiagnostic(action, details = {}) {
+  if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
+    const safeDetails = { ...details };
+    // Explicitly delete any sensitive key if passed accidentally
+    delete safeDetails.access_token;
+    delete safeDetails.refresh_token;
+    delete safeDetails.password;
+    delete safeDetails.anon_key;
+    delete safeDetails.service_role;
+    console.log(`[MOTOLUV AUTH DIAGNOSTIC: ${action}]`, safeDetails);
+  }
+}
+
+/**
+ * Obtener o sincronizar el perfil de usuario de `public.profiles`.
+ * Si el usuario existe en auth pero no en public.profiles, se intenta upsert inmediato.
  */
 export async function fetchUserProfile(userId, userMetadata = null) {
   if (!isSupabaseConfigured || !supabase || !userId) return null;
@@ -94,56 +112,144 @@ export async function fetchUserProfile(userId, userMetadata = null) {
       .eq('id', userId)
       .maybeSingle();
 
-    if (!error && profile) {
+    if (error) {
+      logAuthDiagnostic('fetchUserProfile_error', {
+        userId,
+        errorCode: error.code,
+        errorMessage: error.message,
+        details: error.details,
+      });
+      console.error('[Supabase Profiles Error]', error.message, error.details || '');
+    }
+
+    if (profile) {
+      logAuthDiagnostic('profile_encontrado', {
+        userId: profile.id,
+        hasPhone: Boolean(profile.phone),
+        role: profile.role,
+      });
       return profile;
     }
 
-    // Si la tabla no existe o el perfil aún no se creó por trigger, usamos metadata
+    // Si profile no existe aún, crearlo mediante upsert seguro
     if (userMetadata) {
-      return {
+      const fallbackPayload = {
         id: userId,
         full_name: userMetadata.full_name || userMetadata.name || '',
-        phone: userMetadata.phone || '',
+        phone: userMetadata.phone || userMetadata.phone_number || '',
         city: userMetadata.city || 'Ciudad de México',
         role: userMetadata.role || 'both',
+        updated_at: new Date().toISOString(),
       };
+
+      logAuthDiagnostic('profile_creando_por_fallback', { userId });
+
+      const { data: createdProfile, error: insertError } = await supabase
+        .from('profiles')
+        .upsert(fallbackPayload, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
+
+      if (!insertError && createdProfile) {
+        logAuthDiagnostic('profile_creado', { userId: createdProfile.id });
+        return createdProfile;
+      }
+
+      if (insertError) {
+        logAuthDiagnostic('profile_creacion_error', {
+          userId,
+          errorCode: insertError.code,
+          errorMessage: insertError.message,
+        });
+      }
+
+      return fallbackPayload;
     }
   } catch (err) {
-    console.warn('Advertencia al consultar tabla profiles en Supabase:', err?.message || err);
+    console.error('Error al consultar tabla profiles en Supabase:', err?.message || err);
   }
 
   return null;
 }
 
 /**
- * Actualizar datos del perfil en `public.profiles` y metadata
+ * Actualizar datos del perfil en `public.profiles` y metadata de Supabase Auth
+ * Espera la respuesta de Supabase y no oculta errores silenciosamente.
  */
 export async function updateUserProfile(userId, updates) {
-  if (!isSupabaseConfigured || !supabase || !userId) return null;
+  if (!isSupabaseConfigured || !supabase || !userId) {
+    throw new Error('Supabase no está configurado para actualizar el perfil.');
+  }
 
+  const cleanUpdates = { ...updates };
+  // Sanitizar campos
+  if (cleanUpdates.phone !== undefined) {
+    cleanUpdates.phone = String(cleanUpdates.phone).trim();
+  }
+
+  let authMetaError = null;
+  let dbProfileError = null;
+
+  // 1. Actualizar metadata de auth en Supabase
   try {
-    // 1. Actualizar metadata de auth
-    await supabase.auth.updateUser({
-      data: updates,
+    const { error: metaErr } = await supabase.auth.updateUser({
+      data: cleanUpdates,
     });
+    if (metaErr) {
+      authMetaError = metaErr;
+      logAuthDiagnostic('update_auth_metadata_error', {
+        userId,
+        message: metaErr.message,
+        code: metaErr.code,
+      });
+    }
+  } catch (err) {
+    authMetaError = err;
+  }
 
-    // 2. Intentar actualizar tabla public.profiles
-    const { data, error } = await supabase
+  // 2. Actualizar tabla public.profiles mediante upsert seguro
+  try {
+    const { data, error: tableErr } = await supabase
       .from('profiles')
       .upsert({
         id: userId,
-        ...updates,
+        ...cleanUpdates,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' })
       .select()
       .maybeSingle();
 
-    if (!error && data) {
+    if (tableErr) {
+      dbProfileError = tableErr;
+      logAuthDiagnostic('update_profile_table_error', {
+        userId,
+        message: tableErr.message,
+        code: tableErr.code,
+        details: tableErr.details,
+      });
+      console.error('[Supabase Profile Update Error]', tableErr.message, tableErr.details || '');
+    }
+
+    if (data) {
+      logAuthDiagnostic('profile_actualizado', {
+        userId: data.id,
+        updatedPhone: data.phone,
+        role: data.role,
+      });
       return data;
     }
   } catch (err) {
-    console.warn('Advertencia al actualizar profiles en Supabase:', err?.message || err);
+    dbProfileError = err;
+    console.error('[Supabase Profile Update Exception]', err?.message || err);
   }
 
-  return null;
+  // Si ambos fallaron o hubo un error crítico de base de datos/RLS, lanzarlo
+  if (dbProfileError && authMetaError) {
+    const err = new Error(dbProfileError.message || authMetaError.message || 'Error al actualizar perfil en Supabase');
+    err.dbError = dbProfileError;
+    err.authError = authMetaError;
+    throw err;
+  }
+
+  return cleanUpdates;
 }

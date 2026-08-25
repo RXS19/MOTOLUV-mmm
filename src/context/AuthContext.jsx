@@ -6,6 +6,7 @@ import {
   formatSupabaseAuthError,
   fetchUserProfile,
   updateUserProfile,
+  logAuthDiagnostic,
 } from '../lib/supabase';
 
 const AuthContext = createContext(null);
@@ -23,11 +24,20 @@ export const AuthProvider = ({ children }) => {
     const metadata = authUser.user_metadata || {};
     let profile = null;
 
+    logAuthDiagnostic('buildUserObject_inicio', {
+      userId: authUser.id,
+      userEmail: authUser.email,
+      hasSession: Boolean(currentSession),
+    });
+
     if (isSupabaseConfigured && supabase) {
       try {
         profile = await fetchUserProfile(authUser.id, metadata);
       } catch (err) {
-        console.warn('No se pudo cargar profile desde Supabase:', err);
+        logAuthDiagnostic('fetchUserProfile_exception', {
+          userId: authUser.id,
+          message: err?.message || String(err),
+        });
       }
     }
 
@@ -41,17 +51,21 @@ export const AuthProvider = ({ children }) => {
     const bankName = profile?.bank_name || metadata.bank_name || '';
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
 
-    // Sincronizar automáticamente con profiles si se detecta teléfono nuevo (por ejemplo desde Google OAuth)
+    // Sincronizar automáticamente con profiles si se detecta teléfono nuevo o ausente en public.profiles
     if (isSupabaseConfigured && supabase && authUser.id && phone && (!profile || !profile.phone)) {
       try {
-        updateUserProfile(authUser.id, {
+        await updateUserProfile(authUser.id, {
           phone,
           full_name: fullName,
           role,
           city,
         });
+        logAuthDiagnostic('profile_phone_synced', { userId: authUser.id, phone });
       } catch (err) {
-        console.warn('Sync profile phone warning:', err);
+        logAuthDiagnostic('profile_phone_sync_warning', {
+          userId: authUser.id,
+          message: err?.message || String(err),
+        });
       }
     }
 
@@ -313,8 +327,14 @@ export const AuthProvider = ({ children }) => {
 
     try {
       await updateUserProfile(user.id, updates);
+      logAuthDiagnostic('updateProfile_completado', { userId: user.id });
     } catch (err) {
-      console.warn('Error al actualizar perfil, aplicando localmente:', err);
+      logAuthDiagnostic('updateProfile_error', {
+        userId: user.id,
+        message: err?.message || String(err),
+      });
+      console.error('[Error al actualizar perfil en Supabase]', err);
+      throw err;
     }
 
     const updated = {

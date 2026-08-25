@@ -21,14 +21,44 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. FUNCIÓN DE TRIGGER (CONSERVADA PARA RESTAURACIÓN POSTERIOR):
+-- 3. FUNCIÓN DE TRIGGER (ACTIVO PARA REGISTROS EMAIL Y GOOGLE OAUTH):
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER 
 LANGUAGE plpgsql 
 SECURITY DEFINER 
 SET search_path = public
 AS $$
+DECLARE
+  v_full_name TEXT;
+  v_phone TEXT;
+  v_city TEXT;
+  v_role TEXT;
 BEGIN
+  v_full_name := COALESCE(
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'name',
+    NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
+    'Usuario Motoluv'
+  );
+
+  v_phone := COALESCE(
+    NEW.raw_user_meta_data->>'phone',
+    NEW.raw_user_meta_data->>'phone_number',
+    NEW.raw_user_meta_data->>'phoneNumber',
+    NEW.phone,
+    ''
+  );
+
+  v_city := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'city', ''),
+    'Ciudad de México'
+  );
+
+  v_role := COALESCE(
+    NULLIF(NEW.raw_user_meta_data->>'role', ''),
+    'both'
+  );
+
   INSERT INTO public.profiles (
     id,
     full_name,
@@ -40,29 +70,39 @@ BEGIN
   )
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'phone', ''),
-    COALESCE(NEW.raw_user_meta_data->>'city', 'Ciudad de México'),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'both'),
+    v_full_name,
+    v_phone,
+    v_city,
+    v_role,
     NOW(),
     NOW()
   )
   ON CONFLICT (id) DO UPDATE SET
-    full_name = COALESCE(EXCLUDED.full_name, profiles.full_name),
-    phone = COALESCE(EXCLUDED.phone, profiles.phone),
-    city = COALESCE(EXCLUDED.city, profiles.city),
-    role = COALESCE(EXCLUDED.role, profiles.role),
+    full_name = CASE 
+      WHEN public.profiles.full_name IS NULL OR public.profiles.full_name = '' OR public.profiles.full_name = 'Usuario Motoluv' 
+      THEN EXCLUDED.full_name 
+      ELSE public.profiles.full_name 
+    END,
+    phone = CASE 
+      WHEN (public.profiles.phone IS NULL OR public.profiles.phone = '') AND EXCLUDED.phone <> '' 
+      THEN EXCLUDED.phone 
+      ELSE public.profiles.phone 
+    END,
+    city = COALESCE(NULLIF(public.profiles.city, ''), EXCLUDED.city),
+    role = COALESCE(NULLIF(public.profiles.role, ''), EXCLUDED.role),
     updated_at = NOW();
 
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'Error en handle_new_user para usuario %: %', NEW.id, SQLERRM;
   RETURN NEW;
 END;
 $$;
 
--- Desactivado temporalmente para prueba diagnóstica (DROP TRIGGER IF EXISTS)
--- DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
--- CREATE TRIGGER on_auth_user_created
---   AFTER INSERT ON auth.users
---   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- 4. TABLA DE MOTOCICLETAS
 CREATE TABLE IF NOT EXISTS public.motos (
