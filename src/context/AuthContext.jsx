@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    const fullName = profile?.full_name || metadata.full_name || metadata.name || (authUser.email ? authUser.email.split('@')[0] : 'Usuario');
+    const fullName = profile?.full_name || profile?.name || metadata.full_name || metadata.name || (authUser.email ? authUser.email.split('@')[0] : 'Usuario');
     const role = profile?.role || metadata.role || 'both';
     const city = profile?.city || metadata.city || 'Ciudad de México';
     const phone = profile?.phone || metadata.phone || metadata.phone_number || metadata.phoneNumber || authUser.phone || metadata.custom_claims?.phone || '';
@@ -52,23 +52,27 @@ export const AuthProvider = ({ children }) => {
     const bankName = profile?.bank_name || metadata.bank_name || '';
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
     const bankUpdatedAt = profile?.bank_updated_at || metadata.bank_updated_at || null;
+    const avatarUrl = profile?.avatar_url || metadata.avatar_url || metadata.picture || '';
 
     return {
       id: authUser.id,
       email: authUser.email,
       name: fullName,
+      full_name: fullName,
       phone,
       phone_updated_once: phoneUpdatedOnce,
       phone_change_count: phoneChangeCount,
       city,
       role,
+      avatar_url: avatarUrl,
       rating: profile?.rating ?? 5.0,
       operations: profile?.operations ?? 0,
       bank_clabe: bankClabe,
       bank_name: bankName,
       bank_holder: bankHolder,
       bank_updated_at: bankUpdatedAt,
-      created_at: authUser.created_at || new Date().toISOString(),
+      created_at: profile?.created_at || authUser.created_at || new Date().toISOString(),
+      updated_at: profile?.updated_at || new Date().toISOString(),
       raw: authUser,
     };
   }, []);

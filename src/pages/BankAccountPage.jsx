@@ -12,7 +12,7 @@ const BankAccountPage = () => {
   const [form, setForm] = useState({
     clabe: user?.bank_clabe || '',
     bank_name: user?.bank_name || '',
-    holder: user?.bank_holder || user?.name || '',
+    holder: user?.bank_holder || user?.full_name || user?.name || '',
   });
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));

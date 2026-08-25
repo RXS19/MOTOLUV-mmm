@@ -134,31 +134,50 @@ export async function syncCurrentUser() {
 }
 
 /**
- * Obtener perfil de usuario desde `public.profiles` y `public.users`.
+ * Obtener perfil de usuario combinando `public.profiles`, `public.users` y `auth.user.user_metadata`.
+ *
+ * PRIORIDAD DE DATOS:
+ * 1. public.profiles (id = user.id)
+ * 2. public.users (id = user.id)
+ * 3. user.user_metadata
+ * 4. Valores predeterminados / vacíos
+ *
+ * Si profiles o users no existe o devuelve error:
+ *  - NO dejar la página vacía.
+ *  - Usar los fallbacks en cascada.
+ *  - Registrar el diagnóstico en consola en modo desarrollo.
  */
 export async function fetchUserProfile(userId, userMetadata = null) {
-  if (!isSupabaseConfigured || !supabase || !userId) return null;
+  if (!userId) return null;
 
-  try {
+  let profile = null;
+  let userData = null;
+
+  if (isSupabaseConfigured && supabase) {
     // 1. Consultar tabla profiles
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+    try {
+      const { data: pData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (profileError) {
-      logAuthDiagnostic('fetch_profile_error', {
-        userId,
-        errorCode: profileError.code,
-        errorMessage: profileError.message,
-        details: profileError.details,
-      });
-      console.error('[Supabase Profiles Error]', profileError.message, profileError.details || '');
+      if (profileError) {
+        logAuthDiagnostic('fetch_profile_error', {
+          userId,
+          errorCode: profileError.code,
+          errorMessage: profileError.message,
+          details: profileError.details,
+        });
+        console.warn('[Supabase Profiles Warning]', profileError.message);
+      } else if (pData) {
+        profile = pData;
+      }
+    } catch (err) {
+      console.warn('[Supabase Profiles Exception]', err?.message || err);
     }
 
-    // 2. Consultar tabla users para datos complementarios
-    let userData = null;
+    // 2. Consultar tabla users para datos complementarios o fallback
     try {
       const { data: uData, error: uError } = await supabase
         .from('users')
@@ -166,71 +185,120 @@ export async function fetchUserProfile(userId, userMetadata = null) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (!uError && uData) {
+      if (uError) {
+        logAuthDiagnostic('fetch_users_table_error', {
+          userId,
+          errorCode: uError.code,
+          errorMessage: uError.message,
+          details: uError.details,
+        });
+        console.warn('[Supabase Users Warning]', uError.message);
+      } else if (uData) {
         userData = uData;
       }
-    } catch {
-      // Ignorar si tabla users aún está vacía
+    } catch (err) {
+      console.warn('[Supabase Users Exception]', err?.message || err);
     }
-
-    if (profile || userData) {
-      const fullName = profile?.full_name || userData?.full_name || userMetadata?.full_name || userMetadata?.name || '';
-      const phone = profile?.phone || userData?.phone || userMetadata?.phone || userMetadata?.phone_number || '';
-      const city = profile?.city || userData?.city || userMetadata?.city || 'Ciudad de México';
-      const role = profile?.role || userData?.role || userMetadata?.role || 'both';
-
-      const merged = {
-        id: userId,
-        full_name: fullName,
-        phone,
-        phone_updated_once: Boolean(profile?.phone_updated_once ?? userData?.phone_updated_once),
-        phone_change_count: profile?.phone_change_count ?? userData?.phone_change_count ?? 0,
-        city,
-        role,
-        bank_clabe: profile?.bank_clabe || userData?.bank_clabe || '',
-        bank_name: profile?.bank_name || userData?.bank_name || '',
-        bank_holder: profile?.bank_holder || userData?.bank_holder || fullName,
-        bank_updated_at: profile?.bank_updated_at || userData?.bank_updated_at || null,
-        rating: profile?.rating ?? 5.0,
-        operations: profile?.operations ?? 0,
-        created_at: profile?.created_at || userData?.created_at || new Date().toISOString(),
-        updated_at: profile?.updated_at || userData?.updated_at || new Date().toISOString(),
-      };
-
-      logAuthDiagnostic('profile_encontrado', {
-        userId: merged.id,
-        hasPhone: Boolean(merged.phone),
-        role: merged.role,
-      });
-      return merged;
-    }
-
-    // Si profile no existe aún en tablas, estructurar fallback desde metadata
-    if (userMetadata) {
-      const fallbackPayload = {
-        id: userId,
-        full_name: userMetadata.full_name || userMetadata.name || '',
-        phone: userMetadata.phone || userMetadata.phone_number || '',
-        phone_updated_once: Boolean(userMetadata.phone_updated_once),
-        phone_change_count: userMetadata.phone_change_count || 0,
-        city: userMetadata.city || 'Ciudad de México',
-        role: userMetadata.role || 'both',
-        bank_clabe: userMetadata.bank_clabe || '',
-        bank_name: userMetadata.bank_name || '',
-        bank_holder: userMetadata.bank_holder || userMetadata.full_name || userMetadata.name || '',
-        bank_updated_at: userMetadata.bank_updated_at || null,
-        rating: 5.0,
-        operations: 0,
-        updated_at: new Date().toISOString(),
-      };
-
-      return fallbackPayload;
-    }
-  } catch (err) {
-    console.error('Error al consultar tabla profiles en Supabase:', err?.message || err);
   }
 
-  return null;
+  // 3. Cascada de datos según prioridad
+  const meta = userMetadata || {};
+
+  const fullName = profile?.full_name 
+    || userData?.full_name 
+    || meta.full_name 
+    || meta.name 
+    || '';
+
+  const phone = profile?.phone 
+    || userData?.phone 
+    || meta.phone 
+    || meta.phone_number 
+    || meta.phoneNumber 
+    || '';
+
+  const phoneUpdatedOnce = Boolean(
+    profile?.phone_updated_once 
+    ?? userData?.phone_updated_once 
+    ?? meta.phone_updated_once 
+    ?? ((profile?.phone_change_count && profile.phone_change_count >= 1) || false)
+  );
+
+  const phoneChangeCount = profile?.phone_change_count 
+    ?? userData?.phone_change_count 
+    ?? meta.phone_change_count 
+    ?? (phoneUpdatedOnce ? 1 : 0);
+
+  const city = profile?.city 
+    || userData?.city 
+    || meta.city 
+    || 'Ciudad de México';
+
+  const role = profile?.role 
+    || userData?.role 
+    || meta.role 
+    || 'both';
+
+  const avatarUrl = profile?.avatar_url 
+    || userData?.avatar_url 
+    || meta.avatar_url 
+    || meta.picture 
+    || '';
+
+  const bankClabe = profile?.bank_clabe 
+    || userData?.bank_clabe 
+    || meta.bank_clabe 
+    || '';
+
+  const bankName = profile?.bank_name 
+    || userData?.bank_name 
+    || meta.bank_name 
+    || '';
+
+  const bankHolder = profile?.bank_holder 
+    || userData?.bank_holder 
+    || meta.bank_holder 
+    || fullName;
+
+  const bankUpdatedAt = profile?.bank_updated_at 
+    || userData?.bank_updated_at 
+    || meta.bank_updated_at 
+    || null;
+
+  const rating = profile?.rating ?? userData?.rating ?? 5.0;
+  const operations = profile?.operations ?? userData?.operations ?? 0;
+  const createdAt = profile?.created_at || userData?.created_at || new Date().toISOString();
+  const updatedAt = profile?.updated_at || userData?.updated_at || new Date().toISOString();
+
+  const merged = {
+    id: userId,
+    full_name: fullName,
+    name: fullName, // Compatibilidad con vistas que usen user.name
+    phone,
+    phone_updated_once: phoneUpdatedOnce,
+    phone_change_count: phoneChangeCount,
+    city,
+    role,
+    avatar_url: avatarUrl,
+    bank_clabe: bankClabe,
+    bank_name: bankName,
+    bank_holder: bankHolder,
+    bank_updated_at: bankUpdatedAt,
+    rating,
+    operations,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  };
+
+  logAuthDiagnostic('profile_cargado_exitoso', {
+    userId: merged.id,
+    hasFullName: Boolean(merged.full_name),
+    hasPhone: Boolean(merged.phone),
+    role: merged.role,
+    source: profile ? 'profiles' : userData ? 'users' : 'metadata/default',
+  });
+
+  return merged;
 }
 
 /**

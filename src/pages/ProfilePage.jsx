@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   User, 
@@ -13,49 +13,286 @@ import {
   Lock, 
   AlertCircle, 
   Bike, 
-  Tag, 
-  Store, 
   Sparkles,
-  Repeat
+  MapPin,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase, isSupabaseConfigured, logAuthDiagnostic } from '../lib/supabase';
 import { toast } from '../hooks/use-toast';
 import { MEXICAN_BANKS } from '../data/banks';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, updateProfile, activeView, setActiveView } = useAuth();
+  const { user: authContextUser, updateProfile, activeView } = useAuth();
 
-  const isSeller = user?.role === 'vendedor' || user?.role === 'both';
-  const [showSellerClabe, setShowSellerClabe] = useState(isSeller);
+  // Estados de ciclo de vida: 'loading' | 'loaded' | 'error'
+  const [pageStatus, setPageStatus] = useState('loading');
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    bank_name: user?.bank_name || '',
-    bank_clabe: user?.bank_clabe || '',
-    bank_holder: user?.bank_holder || user?.name || '',
-    role: user?.role || 'both',
+  // Perfil unificado en memoria
+  const [profileData, setProfileData] = useState({
+    id: authContextUser?.id || '',
+    email: authContextUser?.email || '',
+    full_name: authContextUser?.full_name || authContextUser?.name || '',
+    phone: authContextUser?.phone || '',
+    city: authContextUser?.city || 'Ciudad de México',
+    role: authContextUser?.role || 'both',
+    avatar_url: authContextUser?.avatar_url || '',
+    phone_updated_once: Boolean(authContextUser?.phone_updated_once),
+    phone_change_count: authContextUser?.phone_change_count || 0,
+    bank_clabe: authContextUser?.bank_clabe || '',
+    bank_name: authContextUser?.bank_name || '',
+    bank_holder: authContextUser?.bank_holder || authContextUser?.full_name || authContextUser?.name || '',
+    bank_updated_at: authContextUser?.bank_updated_at || null,
+    rating: authContextUser?.rating ?? 5.0,
+    operations: authContextUser?.operations ?? 0,
+    created_at: authContextUser?.created_at || new Date().toISOString(),
+    updated_at: authContextUser?.updated_at || new Date().toISOString(),
   });
 
-  useEffect(() => {
-    if (user) {
-      setForm({
-        name: user.name || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        bank_name: user.bank_name || '',
-        bank_clabe: user.bank_clabe || '',
-        bank_holder: user.bank_holder || user.name || '',
-        role: user.role || 'both',
-      });
-      setShowSellerClabe(user.role === 'vendedor' || user.role === 'both');
-    }
-  }, [user]);
+  const [showSellerClabe, setShowSellerClabe] = useState(
+    authContextUser?.role === 'vendedor' || authContextUser?.role === 'both'
+  );
 
-  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  const [form, setForm] = useState({
+    name: authContextUser?.full_name || authContextUser?.name || '',
+    email: authContextUser?.email || '',
+    phone: authContextUser?.phone || '',
+    city: authContextUser?.city || 'Ciudad de México',
+    bank_name: authContextUser?.bank_name || '',
+    bank_clabe: authContextUser?.bank_clabe || '',
+    bank_holder: authContextUser?.bank_holder || authContextUser?.full_name || authContextUser?.name || '',
+    role: authContextUser?.role || 'both',
+  });
+
+  /**
+   * Carga del Perfil según los requisitos críticos:
+   * 1. Obtener UUID real desde supabase.auth.getUser()
+   * 2. Utilizar user.id
+   * 3. Buscar public.profiles.id = user.id
+   * 4. Buscar public.users.id = user.id
+   * 5. Construir perfil con prioridad: profiles -> users -> user_metadata -> defaults
+   * Si hay errores de red o tablas vacías: NO dejar la pantalla vacía.
+   */
+  const loadProfile = useCallback(async () => {
+    setPageStatus('loading');
+    setErrorMessage(null);
+
+    let authUser = null;
+    let userId = authContextUser?.id || null;
+    let userEmail = authContextUser?.email || '';
+    let userMetadata = authContextUser?.raw?.user_metadata || {};
+
+    // 1. Obtener usuario autenticado directamente desde Supabase Auth
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { user: sbUser }, error: sbUserErr } = await supabase.auth.getUser();
+        if (sbUser) {
+          authUser = sbUser;
+          userId = sbUser.id;
+          userEmail = sbUser.email || userEmail;
+          userMetadata = sbUser.user_metadata || userMetadata;
+        } else if (sbUserErr) {
+          console.warn('[ProfilePage] Aviso al consultar auth.getUser():', sbUserErr.message);
+        }
+      } catch (err) {
+        console.warn('[ProfilePage] Excepción en auth.getUser():', err?.message || err);
+      }
+    }
+
+    if (!userId && authContextUser?.id) {
+      userId = authContextUser.id;
+    }
+
+    // Si no hay usuario autenticado después de todas las comprobaciones
+    if (!userId) {
+      setPageStatus('loaded');
+      return;
+    }
+
+    let profilesRow = null;
+    let usersRow = null;
+    let queryErrorDetected = false;
+
+    if (isSupabaseConfigured && supabase) {
+      // 3. Buscar en public.profiles
+      try {
+        const { data: pData, error: pError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (pError) {
+          queryErrorDetected = true;
+          logAuthDiagnostic('profile_page_profiles_error', {
+            userId,
+            message: pError.message,
+            code: pError.code,
+          });
+          console.warn('[ProfilePage Profiles Query Error]', pError.message);
+        } else if (pData) {
+          profilesRow = pData;
+        }
+      } catch (err) {
+        queryErrorDetected = true;
+        console.warn('[ProfilePage Profiles Query Exception]', err?.message || err);
+      }
+
+      // 4. Buscar también en public.users
+      try {
+        const { data: uData, error: uError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (uError) {
+          queryErrorDetected = true;
+          logAuthDiagnostic('profile_page_users_error', {
+            userId,
+            message: uError.message,
+            code: uError.code,
+          });
+          console.warn('[ProfilePage Users Query Error]', uError.message);
+        } else if (uData) {
+          usersRow = uData;
+        }
+      } catch (err) {
+        queryErrorDetected = true;
+        console.warn('[ProfilePage Users Query Exception]', err?.message || err);
+      }
+    }
+
+    // 5. Prioridad de datos: profiles -> users -> user.user_metadata -> valores vacíos/default
+    const resolvedFullName = profilesRow?.full_name 
+      || usersRow?.full_name 
+      || userMetadata?.full_name 
+      || userMetadata?.name 
+      || authContextUser?.full_name 
+      || authContextUser?.name 
+      || (userEmail ? userEmail.split('@')[0] : 'Usuario');
+
+    const resolvedPhone = profilesRow?.phone 
+      || usersRow?.phone 
+      || userMetadata?.phone 
+      || userMetadata?.phone_number 
+      || authContextUser?.phone 
+      || '';
+
+    const resolvedPhoneUpdatedOnce = Boolean(
+      profilesRow?.phone_updated_once 
+      ?? usersRow?.phone_updated_once 
+      ?? userMetadata?.phone_updated_once 
+      ?? authContextUser?.phone_updated_once 
+      ?? ((profilesRow?.phone_change_count && profilesRow.phone_change_count >= 1) || false)
+    );
+
+    const resolvedPhoneChangeCount = profilesRow?.phone_change_count 
+      ?? usersRow?.phone_change_count 
+      ?? userMetadata?.phone_change_count 
+      ?? authContextUser?.phone_change_count 
+      ?? (resolvedPhoneUpdatedOnce ? 1 : 0);
+
+    const resolvedCity = profilesRow?.city 
+      || usersRow?.city 
+      || userMetadata?.city 
+      || authContextUser?.city 
+      || 'Ciudad de México';
+
+    const resolvedRole = profilesRow?.role 
+      || usersRow?.role 
+      || userMetadata?.role 
+      || authContextUser?.role 
+      || 'both';
+
+    const resolvedAvatarUrl = profilesRow?.avatar_url 
+      || usersRow?.avatar_url 
+      || userMetadata?.avatar_url 
+      || userMetadata?.picture 
+      || authContextUser?.avatar_url 
+      || '';
+
+    const resolvedBankClabe = profilesRow?.bank_clabe 
+      || usersRow?.bank_clabe 
+      || userMetadata?.bank_clabe 
+      || authContextUser?.bank_clabe 
+      || '';
+
+    const resolvedBankName = profilesRow?.bank_name 
+      || usersRow?.bank_name 
+      || userMetadata?.bank_name 
+      || authContextUser?.bank_name 
+      || '';
+
+    const resolvedBankHolder = profilesRow?.bank_holder 
+      || usersRow?.bank_holder 
+      || userMetadata?.bank_holder 
+      || authContextUser?.bank_holder 
+      || resolvedFullName;
+
+    const resolvedBankUpdatedAt = profilesRow?.bank_updated_at 
+      || usersRow?.bank_updated_at 
+      || userMetadata?.bank_updated_at 
+      || authContextUser?.bank_updated_at 
+      || null;
+
+    const resolvedRating = profilesRow?.rating ?? usersRow?.rating ?? authContextUser?.rating ?? 5.0;
+    const resolvedOperations = profilesRow?.operations ?? usersRow?.operations ?? authContextUser?.operations ?? 0;
+    const resolvedCreatedAt = profilesRow?.created_at || usersRow?.created_at || authContextUser?.created_at || new Date().toISOString();
+    const resolvedUpdatedAt = profilesRow?.updated_at || usersRow?.updated_at || authContextUser?.updated_at || new Date().toISOString();
+
+    const builtProfile = {
+      id: userId,
+      email: userEmail,
+      full_name: resolvedFullName,
+      name: resolvedFullName, // Alias de conveniencia
+      phone: resolvedPhone,
+      city: resolvedCity,
+      role: resolvedRole,
+      avatar_url: resolvedAvatarUrl,
+      phone_updated_once: resolvedPhoneUpdatedOnce,
+      phone_change_count: resolvedPhoneChangeCount,
+      bank_clabe: resolvedBankClabe,
+      bank_name: resolvedBankName,
+      bank_holder: resolvedBankHolder,
+      bank_updated_at: resolvedBankUpdatedAt,
+      rating: resolvedRating,
+      operations: resolvedOperations,
+      created_at: resolvedCreatedAt,
+      updated_at: resolvedUpdatedAt,
+    };
+
+    setProfileData(builtProfile);
+    setForm({
+      name: builtProfile.full_name,
+      email: builtProfile.email,
+      phone: builtProfile.phone,
+      city: builtProfile.city,
+      bank_name: builtProfile.bank_name,
+      bank_clabe: builtProfile.bank_clabe,
+      bank_holder: builtProfile.bank_holder,
+      role: builtProfile.role,
+    });
+    setShowSellerClabe(builtProfile.role === 'vendedor' || builtProfile.role === 'both');
+
+    if (queryErrorDetected) {
+      setErrorMessage('La información se cargó desde la sesión local de respaldo.');
+      setPageStatus('error');
+    } else {
+      setPageStatus('loaded');
+    }
+  }, [authContextUser]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  const updateField = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -69,7 +306,7 @@ const ProfilePage = () => {
       return;
     }
 
-    // Si el usuario es vendedor o tiene habilitada la sección de CLABE y llenó algún campo bancario
+    // Validación de CLABE si aplica
     const clabeClean = form.bank_clabe ? form.bank_clabe.replace(/\s/g, '') : '';
     if (showSellerClabe && clabeClean) {
       if (!/^\d{18}$/.test(clabeClean)) {
@@ -90,11 +327,13 @@ const ProfilePage = () => {
       }
     }
 
-    setLoading(true);
+    setIsSaving(true);
     try {
-      await updateProfile({
+      // Guardar cambios: actualiza public.users, public.profiles y metadata de auth (NUNCA register_users)
+      const updatedUser = await updateProfile({
         name: form.name.trim(),
         phone: form.phone.trim(),
+        city: form.city.trim(),
         role: form.role,
         ...(showSellerClabe
           ? {
@@ -105,24 +344,38 @@ const ProfilePage = () => {
           : {}),
       });
 
+      // Actualizar estado local inmediato
+      setProfileData((prev) => ({
+        ...prev,
+        ...updatedUser,
+        full_name: form.name.trim(),
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        city: form.city.trim(),
+        role: form.role,
+        bank_clabe: showSellerClabe ? clabeClean : prev.bank_clabe,
+        bank_name: showSellerClabe ? form.bank_name : prev.bank_name,
+        bank_holder: showSellerClabe ? (form.bank_holder.trim() || form.name.trim()) : prev.bank_holder,
+      }));
+
       toast({
         title: 'Perfil actualizado',
         description: 'Tus datos se han guardado exitosamente en tu cuenta Motoluv.',
       });
     } catch (err) {
-      console.error('Error al actualizar perfil:', err);
+      console.error('[ProfilePage] Error al actualizar perfil:', err);
       toast({
         title: 'Error al actualizar',
         description: err?.message || 'No se pudo guardar la información de tu perfil.',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   const handleActivateSeller = () => {
-    update('role', 'both');
+    updateField('role', 'both');
     setShowSellerClabe(true);
     toast({
       title: 'Modo Vendedor Activado',
@@ -130,35 +383,91 @@ const ProfilePage = () => {
     });
   };
 
-  const initials = (form.name || user?.name || 'U')
+  const displayName = form.name || profileData.full_name || profileData.name || 'Usuario Motoluv';
+  const initials = displayName
     .split(' ')
+    .filter(Boolean)
     .map((s) => s[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase();
+    .toUpperCase() || 'U';
+
+  // SKELETON / LOADING STATE: Muestra la estructura sin dejar pantalla vacía
+  if (pageStatus === 'loading') {
+    return (
+      <div className="min-h-screen py-10" id="profile-loading-view">
+        <div className="max-w-4xl mx-auto px-5 lg:px-8 space-y-8 animate-pulse">
+          
+          {/* Top Bar Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="h-4 w-32 bg-white/5 rounded"></div>
+            <div className="h-4 w-24 bg-white/5 rounded"></div>
+          </div>
+
+          {/* Banner Skeleton */}
+          <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 flex items-center gap-6">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/10 flex-shrink-0"></div>
+            <div className="space-y-3 flex-1">
+              <div className="h-7 w-48 bg-white/10 rounded"></div>
+              <div className="h-4 w-36 bg-white/5 rounded"></div>
+            </div>
+          </div>
+
+          {/* Form Skeleton */}
+          <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6">
+            <div className="h-6 w-56 bg-white/10 rounded"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="h-12 bg-white/5 rounded"></div>
+              <div className="h-12 bg-white/5 rounded"></div>
+              <div className="h-12 bg-white/5 rounded md:col-span-2"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen py-10">
+    <div className="min-h-screen py-10" id="profile-main-view">
       <div className="max-w-4xl mx-auto px-5 lg:px-8 space-y-8">
         
+        {/* Aviso controlado en caso de error o advertencia */}
+        {pageStatus === 'error' && errorMessage && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-md p-4 flex items-center justify-between gap-3 text-amber-300 text-xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-amber-400 flex-shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={loadProfile}
+              className="flex items-center gap-1 text-amber-200 hover:text-white font-bold underline cursor-pointer"
+            >
+              <RefreshCw size={12} /> Reintentar sincronización
+            </button>
+          </div>
+        )}
+
         {/* Navigation back */}
         <div className="flex items-center justify-between">
           <button 
+            id="profile-back-button"
             onClick={() => navigate(-1)} 
-            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-red-brand transition-colors"
+            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-red-brand transition-colors cursor-pointer"
           >
             <ArrowLeft size={14} /> Volver al panel
           </button>
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-zinc-500 font-mono">
-              ID: {user?.id ? user.id.slice(0, 8) : 'MLV-USER'}
+              ID: {profileData.id ? profileData.id.slice(0, 8) : 'MLV-USER'}
             </span>
           </div>
         </div>
 
         {/* Profile Card Banner */}
-        <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 relative overflow-hidden shadow-xl">
+        <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 relative overflow-hidden shadow-xl" id="profile-banner-card">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-red-brand/30 to-red-900/40 border-2 border-red-brand/50 flex items-center justify-center text-red-brand font-display font-extrabold text-2xl sm:text-3xl shadow-lg flex-shrink-0">
@@ -167,19 +476,19 @@ const ProfilePage = () => {
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-display font-black text-white text-2xl sm:text-3xl uppercase tracking-wide">
-                    {form.name || 'Mi Perfil'}
+                    {displayName}
                   </h1>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-brand/10 border border-red-brand/30 text-red-brand">
                     <Shield size={11} /> Cuenta Verificada
                   </span>
                 </div>
-                <p className="text-zinc-400 text-xs sm:text-sm">{user?.email}</p>
+                <p className="text-zinc-400 text-xs sm:text-sm">{profileData.email}</p>
                 <div className="flex items-center gap-2 pt-1 text-[11px] text-zinc-500">
                   <span>Rol de cuenta:</span>
                   <span className="text-zinc-300 font-medium">
-                    {user?.role === 'vendedor' 
+                    {profileData.role === 'vendedor' 
                       ? '🏍️ Vendedor Oficial' 
-                      : user?.role === 'comprador' 
+                      : profileData.role === 'comprador' 
                       ? '🛒 Comprador' 
                       : '⭐ Vendedor y Comprador'}
                   </span>
@@ -189,6 +498,7 @@ const ProfilePage = () => {
 
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               <Link
+                id="profile-goto-dashboard"
                 to={activeView === 'vendedor' ? '/panel' : '/panel/mis-ofertas'}
                 className="flex-1 sm:flex-none text-center px-4 py-2.5 bg-[#0a0a0a] hover:bg-white/5 border border-white/10 text-zinc-300 hover:text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-colors"
               >
@@ -199,7 +509,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Profile Main Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" id="profile-edit-form">
           <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6 shadow-xl">
             
             <div className="border-b border-white/5 pb-4 flex items-center justify-between">
@@ -215,15 +525,16 @@ const ProfilePage = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* NOMBRE */}
+              {/* NOMBRE COMPLETO (full_name) */}
               <div>
                 <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
                   <User size={13} className="text-red-brand" /> Nombre Completo <span className="text-red-brand">*</span>
                 </label>
                 <input
+                  id="profile-fullname-input"
                   type="text"
                   value={form.name}
-                  onChange={(e) => update('name', e.target.value)}
+                  onChange={(e) => updateField('name', e.target.value)}
                   placeholder="Ej. Carlos Mendoza García"
                   required
                   className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-medium"
@@ -240,6 +551,7 @@ const ProfilePage = () => {
                 </label>
                 <div className="relative">
                   <input
+                    id="profile-email-input"
                     type="email"
                     value={form.email}
                     disabled
@@ -260,7 +572,7 @@ const ProfilePage = () => {
                   <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
                     <Phone size={13} className="text-red-brand" /> Teléfono Móvil / WhatsApp <span className="text-red-brand">*</span>
                   </label>
-                  {user?.phone_updated_once ? (
+                  {profileData.phone_updated_once ? (
                     <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                       <Lock size={10} /> Modificación única utilizada
                     </span>
@@ -272,35 +584,51 @@ const ProfilePage = () => {
                 </div>
                 <div className="relative">
                   <input
+                    id="profile-phone-input"
                     type="tel"
                     value={form.phone}
-                    disabled={Boolean(user?.phone_updated_once)}
-                    onChange={(e) => update('phone', e.target.value.replace(/[^0-9+\s()-]/g, ''))}
+                    disabled={Boolean(profileData.phone_updated_once)}
+                    onChange={(e) => updateField('phone', e.target.value.replace(/[^0-9+\s()-]/g, ''))}
                     placeholder="Ej. +52 56 4304 8865"
                     className={`w-full px-4 py-3 bg-[#0a0a0a] border text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-mono tracking-wide ${
-                      user?.phone_updated_once
+                      profileData.phone_updated_once
                         ? 'border-white/5 text-zinc-400 cursor-not-allowed bg-[#08080a]'
                         : 'border-white/10 focus:border-red-brand text-white'
                     }`}
                   />
-                  {user?.phone_updated_once && (
+                  {profileData.phone_updated_once && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500" title="Número protegido">
                       <Lock size={15} className="text-zinc-500" />
                     </div>
                   )}
                 </div>
                 <p className="text-[11px] text-zinc-500 mt-1.5">
-                  {user?.phone_updated_once
+                  {profileData.phone_updated_once
                     ? 'Por seguridad antifraude en contratos e inspecciones, tu teléfono está verificado. Para una corrección adicional, solicita asistencia a soporte.'
                     : 'Indispensable para coordinar citas de inspección técnica, entrega de motocicletas y alertas. Podrás actualizarlo 1 sola vez por seguridad.'}
                 </p>
+              </div>
+
+              {/* CIUDAD */}
+              <div className="md:col-span-2">
+                <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                  <MapPin size={13} className="text-red-brand" /> Ciudad / Ubicación
+                </label>
+                <input
+                  id="profile-city-input"
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => updateField('city', e.target.value)}
+                  placeholder="Ej. Ciudad de México"
+                  className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-medium"
+                />
               </div>
 
             </div>
           </div>
 
           {/* SECCIÓN CLABE (SOLO PARA VENDEDORES) */}
-          <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6 shadow-xl">
+          <div className="bg-[#111112] border border-white/10 rounded-md p-6 sm:p-8 space-y-6 shadow-xl" id="profile-clabe-section">
             <div className="border-b border-white/5 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -327,16 +655,16 @@ const ProfilePage = () => {
               <div className="space-y-6">
                 
                 {/* Active CLABE highlight if present */}
-                {user?.bank_clabe && (
+                {profileData.bank_clabe && (
                   <div className="bg-[#0a0a0a] border border-emerald-500/20 rounded-sm p-4 flex items-start gap-3">
                     <Shield size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />
                     <div className="text-xs space-y-0.5">
                       <div className="text-emerald-300 font-bold">Cuenta de recepción configurada</div>
                       <div className="text-zinc-300 font-mono">
-                        {user.bank_name || 'Banco Registrado'} · CLABE ••••••••••••••{user.bank_clabe.slice(-4)}
+                        {profileData.bank_name || 'Banco Registrado'} · CLABE ••••••••••••••{profileData.bank_clabe.slice(-4)}
                       </div>
                       <div className="text-zinc-500 text-[11px]">
-                        Titular: {user.bank_holder || user.name}
+                        Titular: {profileData.bank_holder || profileData.full_name}
                       </div>
                     </div>
                   </div>
@@ -350,8 +678,9 @@ const ProfilePage = () => {
                       <Building2 size={13} className="text-red-brand" /> Banco Receptor <span className="text-red-brand">*</span>
                     </label>
                     <select
+                      id="profile-bank-select"
                       value={form.bank_name}
-                      onChange={(e) => update('bank_name', e.target.value)}
+                      onChange={(e) => updateField('bank_name', e.target.value)}
                       className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors"
                     >
                       <option value="">Selecciona una institución bancaria</option>
@@ -377,10 +706,11 @@ const ProfilePage = () => {
                       </span>
                     </div>
                     <input
+                      id="profile-clabe-input"
                       type="text"
                       maxLength={18}
                       value={form.bank_clabe}
-                      onChange={(e) => update('bank_clabe', e.target.value.replace(/[^0-9]/g, ''))}
+                      onChange={(e) => updateField('bank_clabe', e.target.value.replace(/[^0-9]/g, ''))}
                       placeholder="18 dígitos exactos"
                       className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors font-mono tracking-widest placeholder:text-zinc-600"
                     />
@@ -395,9 +725,10 @@ const ProfilePage = () => {
                       <User size={13} className="text-red-brand" /> Nombre Completo del Titular de la Cuenta
                     </label>
                     <input
+                      id="profile-bankholder-input"
                       type="text"
                       value={form.bank_holder}
-                      onChange={(e) => update('bank_holder', e.target.value)}
+                      onChange={(e) => updateField('bank_holder', e.target.value)}
                       placeholder={form.name || "Nombre del titular en el estado de cuenta"}
                       className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-medium"
                     />
@@ -435,9 +766,10 @@ const ProfilePage = () => {
 
                 <div className="pt-2 flex justify-center sm:justify-start">
                   <button
+                    id="profile-activate-seller-btn"
                     type="button"
                     onClick={handleActivateSeller}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-brand hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-colors shadow-md"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-brand hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-sm transition-colors shadow-md cursor-pointer"
                   >
                     <Sparkles size={14} /> Habilitar Modo Vendedor y Registrar CLABE
                   </button>
@@ -454,20 +786,22 @@ const ProfilePage = () => {
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
+                id="profile-cancel-btn"
                 type="button"
                 onClick={() => navigate(-1)}
-                className="flex-1 sm:flex-none px-6 py-3.5 border border-white/10 hover:border-white/30 text-zinc-300 hover:text-white text-xs font-bold uppercase tracking-widest rounded-sm transition-colors text-center"
+                className="flex-1 sm:flex-none px-6 py-3.5 border border-white/10 hover:border-white/30 text-zinc-300 hover:text-white text-xs font-bold uppercase tracking-widest rounded-sm transition-colors text-center cursor-pointer"
               >
                 Cancelar
               </button>
 
               <button
+                id="profile-submit-btn"
                 type="submit"
-                disabled={loading}
+                disabled={isSaving}
                 className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-red-brand hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold uppercase tracking-widest rounded-sm transition-all shadow-lg cursor-pointer"
               >
                 <Save size={15} />
-                {loading ? 'Guardando...' : 'Guardar Perfil'}
+                {isSaving ? 'Guardando...' : 'Guardar Perfil'}
               </button>
             </div>
           </div>
