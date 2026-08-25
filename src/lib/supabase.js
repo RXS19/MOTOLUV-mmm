@@ -99,69 +99,130 @@ export function logAuthDiagnostic(action, details = {}) {
 }
 
 /**
- * Obtener o sincronizar el perfil de usuario de `public.profiles`.
- * Si el usuario existe en auth pero no en public.profiles, se intenta upsert inmediato.
+ * Ejecutar la función RPC `public.sync_current_user()` en Supabase.
+ * Asegura los registros en:
+ *  - register_users (inmutable con ON CONFLICT DO NOTHING)
+ *  - users (datos actuales)
+ *  - profiles (perfil del dashboard)
+ */
+export async function syncCurrentUser() {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  try {
+    const { data, error } = await supabase.rpc('sync_current_user');
+
+    if (error) {
+      logAuthDiagnostic('sync_current_user_error', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      console.error('[Supabase RPC sync_current_user Error]', error.message, error.details || '');
+      return { success: false, error };
+    }
+
+    logAuthDiagnostic('sync_current_user_success', { result: data });
+    return { success: true, data };
+  } catch (err) {
+    logAuthDiagnostic('sync_current_user_exception', {
+      message: err?.message || String(err),
+    });
+    console.error('[Supabase RPC sync_current_user Exception]', err?.message || err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Obtener perfil de usuario desde `public.profiles` y `public.users`.
  */
 export async function fetchUserProfile(userId, userMetadata = null) {
   if (!isSupabaseConfigured || !supabase || !userId) return null;
 
   try {
-    const { data: profile, error } = await supabase
+    // 1. Consultar tabla profiles
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
 
-    if (error) {
-      logAuthDiagnostic('fetchUserProfile_error', {
+    if (profileError) {
+      logAuthDiagnostic('fetch_profile_error', {
         userId,
-        errorCode: error.code,
-        errorMessage: error.message,
-        details: error.details,
+        errorCode: profileError.code,
+        errorMessage: profileError.message,
+        details: profileError.details,
       });
-      console.error('[Supabase Profiles Error]', error.message, error.details || '');
+      console.error('[Supabase Profiles Error]', profileError.message, profileError.details || '');
     }
 
-    if (profile) {
+    // 2. Consultar tabla users para datos complementarios
+    let userData = null;
+    try {
+      const { data: uData, error: uError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!uError && uData) {
+        userData = uData;
+      }
+    } catch {
+      // Ignorar si tabla users aún está vacía
+    }
+
+    if (profile || userData) {
+      const fullName = profile?.full_name || userData?.full_name || userMetadata?.full_name || userMetadata?.name || '';
+      const phone = profile?.phone || userData?.phone || userMetadata?.phone || userMetadata?.phone_number || '';
+      const city = profile?.city || userData?.city || userMetadata?.city || 'Ciudad de México';
+      const role = profile?.role || userData?.role || userMetadata?.role || 'both';
+
+      const merged = {
+        id: userId,
+        full_name: fullName,
+        phone,
+        phone_updated_once: Boolean(profile?.phone_updated_once ?? userData?.phone_updated_once),
+        phone_change_count: profile?.phone_change_count ?? userData?.phone_change_count ?? 0,
+        city,
+        role,
+        bank_clabe: profile?.bank_clabe || userData?.bank_clabe || '',
+        bank_name: profile?.bank_name || userData?.bank_name || '',
+        bank_holder: profile?.bank_holder || userData?.bank_holder || fullName,
+        bank_updated_at: profile?.bank_updated_at || userData?.bank_updated_at || null,
+        rating: profile?.rating ?? 5.0,
+        operations: profile?.operations ?? 0,
+        created_at: profile?.created_at || userData?.created_at || new Date().toISOString(),
+        updated_at: profile?.updated_at || userData?.updated_at || new Date().toISOString(),
+      };
+
       logAuthDiagnostic('profile_encontrado', {
-        userId: profile.id,
-        hasPhone: Boolean(profile.phone),
-        role: profile.role,
+        userId: merged.id,
+        hasPhone: Boolean(merged.phone),
+        role: merged.role,
       });
-      return profile;
+      return merged;
     }
 
-    // Si profile no existe aún, crearlo mediante upsert seguro
+    // Si profile no existe aún en tablas, estructurar fallback desde metadata
     if (userMetadata) {
       const fallbackPayload = {
         id: userId,
         full_name: userMetadata.full_name || userMetadata.name || '',
         phone: userMetadata.phone || userMetadata.phone_number || '',
+        phone_updated_once: Boolean(userMetadata.phone_updated_once),
+        phone_change_count: userMetadata.phone_change_count || 0,
         city: userMetadata.city || 'Ciudad de México',
         role: userMetadata.role || 'both',
+        bank_clabe: userMetadata.bank_clabe || '',
+        bank_name: userMetadata.bank_name || '',
+        bank_holder: userMetadata.bank_holder || userMetadata.full_name || userMetadata.name || '',
+        bank_updated_at: userMetadata.bank_updated_at || null,
+        rating: 5.0,
+        operations: 0,
         updated_at: new Date().toISOString(),
       };
-
-      logAuthDiagnostic('profile_creando_por_fallback', { userId });
-
-      const { data: createdProfile, error: insertError } = await supabase
-        .from('profiles')
-        .upsert(fallbackPayload, { onConflict: 'id' })
-        .select()
-        .maybeSingle();
-
-      if (!insertError && createdProfile) {
-        logAuthDiagnostic('profile_creado', { userId: createdProfile.id });
-        return createdProfile;
-      }
-
-      if (insertError) {
-        logAuthDiagnostic('profile_creacion_error', {
-          userId,
-          errorCode: insertError.code,
-          errorMessage: insertError.message,
-        });
-      }
 
       return fallbackPayload;
     }
@@ -173,27 +234,53 @@ export async function fetchUserProfile(userId, userMetadata = null) {
 }
 
 /**
- * Actualizar datos del perfil en `public.profiles` y metadata de Supabase Auth
- * Espera la respuesta de Supabase y no oculta errores silenciosamente.
+ * Actualizar datos del usuario:
+ * - NO enviar "name" a public.profiles ni public.users (la columna es "full_name").
+ * - Mapear name -> full_name.
+ * - Mantener: phone, phone_updated_once, phone_change_count, city, role, bank_clabe, bank_name, bank_holder, bank_updated_at.
+ * - Actualizar public.users.
+ * - Actualizar public.profiles.
+ * - Actualizar metadata de Supabase Auth.
+ * - NUNCA modificar public.register_users (inmutable).
  */
 export async function updateUserProfile(userId, updates) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     throw new Error('Supabase no está configurado para actualizar el perfil.');
   }
 
-  const cleanUpdates = { ...updates };
-  // Sanitizar campos
-  if (cleanUpdates.phone !== undefined) {
-    cleanUpdates.phone = String(cleanUpdates.phone).trim();
-  }
+  // 1. Extraer y mapear valores estrictos para evitar enviar columnas inexistentes (como "name")
+  const resolvedFullName = updates.full_name !== undefined
+    ? String(updates.full_name).trim()
+    : updates.name !== undefined
+    ? String(updates.name).trim()
+    : undefined;
+
+  const cleanData = {};
+
+  if (resolvedFullName !== undefined) cleanData.full_name = resolvedFullName;
+  if (updates.phone !== undefined) cleanData.phone = String(updates.phone).trim();
+  if (updates.phone_updated_once !== undefined) cleanData.phone_updated_once = Boolean(updates.phone_updated_once);
+  if (updates.phone_change_count !== undefined) cleanData.phone_change_count = Number(updates.phone_change_count);
+  if (updates.city !== undefined) cleanData.city = String(updates.city).trim();
+  if (updates.role !== undefined) cleanData.role = updates.role;
+  if (updates.bank_clabe !== undefined) cleanData.bank_clabe = String(updates.bank_clabe).trim();
+  if (updates.bank_name !== undefined) cleanData.bank_name = String(updates.bank_name).trim();
+  if (updates.bank_holder !== undefined) cleanData.bank_holder = String(updates.bank_holder).trim();
+  if (updates.bank_updated_at !== undefined) cleanData.bank_updated_at = updates.bank_updated_at;
+  cleanData.updated_at = new Date().toISOString();
 
   let authMetaError = null;
-  let dbProfileError = null;
+  let usersTableError = null;
+  let profilesTableError = null;
 
-  // 1. Actualizar metadata de auth en Supabase
+  // A. Actualizar metadata de auth en Supabase
   try {
+    const authMetaPayload = { ...cleanData };
+    if (resolvedFullName !== undefined) {
+      authMetaPayload.name = resolvedFullName;
+    }
     const { error: metaErr } = await supabase.auth.updateUser({
-      data: cleanUpdates,
+      data: authMetaPayload,
     });
     if (metaErr) {
       authMetaError = metaErr;
@@ -202,54 +289,79 @@ export async function updateUserProfile(userId, updates) {
         message: metaErr.message,
         code: metaErr.code,
       });
+      console.error('[Supabase Auth Metadata Error]', metaErr.message);
     }
   } catch (err) {
     authMetaError = err;
+    console.error('[Supabase Auth Metadata Exception]', err);
   }
 
-  // 2. Actualizar tabla public.profiles mediante upsert seguro
+  // B. Actualizar public.users (NO register_users)
   try {
-    const { data, error: tableErr } = await supabase
+    const { error: uErr } = await supabase
+      .from('users')
+      .upsert({
+        id: userId,
+        ...cleanData,
+      }, { onConflict: 'id' });
+
+    if (uErr) {
+      usersTableError = uErr;
+      logAuthDiagnostic('update_users_table_error', {
+        userId,
+        message: uErr.message,
+        code: uErr.code,
+        details: uErr.details,
+      });
+      console.error('[Supabase Users Table Error]', uErr.message, uErr.details || '');
+    }
+  } catch (err) {
+    usersTableError = err;
+    console.error('[Supabase Users Table Exception]', err);
+  }
+
+  // C. Actualizar public.profiles (NO register_users)
+  try {
+    const { data: profileResult, error: pErr } = await supabase
       .from('profiles')
       .upsert({
         id: userId,
-        ...cleanUpdates,
-        updated_at: new Date().toISOString(),
+        ...cleanData,
       }, { onConflict: 'id' })
       .select()
       .maybeSingle();
 
-    if (tableErr) {
-      dbProfileError = tableErr;
-      logAuthDiagnostic('update_profile_table_error', {
+    if (pErr) {
+      profilesTableError = pErr;
+      logAuthDiagnostic('update_profiles_table_error', {
         userId,
-        message: tableErr.message,
-        code: tableErr.code,
-        details: tableErr.details,
+        message: pErr.message,
+        code: pErr.code,
+        details: pErr.details,
       });
-      console.error('[Supabase Profile Update Error]', tableErr.message, tableErr.details || '');
+      console.error('[Supabase Profiles Table Error]', pErr.message, pErr.details || '');
     }
 
-    if (data) {
+    if (profileResult) {
       logAuthDiagnostic('profile_actualizado', {
-        userId: data.id,
-        updatedPhone: data.phone,
-        role: data.role,
+        userId: profileResult.id,
+        updatedPhone: profileResult.phone,
+        role: profileResult.role,
       });
-      return data;
     }
   } catch (err) {
-    dbProfileError = err;
-    console.error('[Supabase Profile Update Exception]', err?.message || err);
+    profilesTableError = err;
+    console.error('[Supabase Profiles Table Exception]', err);
   }
 
-  // Si ambos fallaron o hubo un error crítico de base de datos/RLS, lanzarlo
-  if (dbProfileError && authMetaError) {
-    const err = new Error(dbProfileError.message || authMetaError.message || 'Error al actualizar perfil en Supabase');
-    err.dbError = dbProfileError;
+  // Si fallaron tanto users como profiles, lanzar error real
+  if (usersTableError && profilesTableError) {
+    const err = new Error(profilesTableError.message || usersTableError.message || 'Error al actualizar perfil en Supabase');
+    err.profilesError = profilesTableError;
+    err.usersError = usersTableError;
     err.authError = authMetaError;
     throw err;
   }
 
-  return cleanUpdates;
+  return cleanData;
 }

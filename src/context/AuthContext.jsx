@@ -6,6 +6,7 @@ import {
   formatSupabaseAuthError,
   fetchUserProfile,
   updateUserProfile,
+  syncCurrentUser,
   logAuthDiagnostic,
 } from '../lib/supabase';
 
@@ -50,24 +51,7 @@ export const AuthProvider = ({ children }) => {
     const bankClabe = profile?.bank_clabe || metadata.bank_clabe || '';
     const bankName = profile?.bank_name || metadata.bank_name || '';
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
-
-    // Sincronizar automáticamente con profiles si se detecta teléfono nuevo o ausente en public.profiles
-    if (isSupabaseConfigured && supabase && authUser.id && phone && (!profile || !profile.phone)) {
-      try {
-        await updateUserProfile(authUser.id, {
-          phone,
-          full_name: fullName,
-          role,
-          city,
-        });
-        logAuthDiagnostic('profile_phone_synced', { userId: authUser.id, phone });
-      } catch (err) {
-        logAuthDiagnostic('profile_phone_sync_warning', {
-          userId: authUser.id,
-          message: err?.message || String(err),
-        });
-      }
-    }
+    const bankUpdatedAt = profile?.bank_updated_at || metadata.bank_updated_at || null;
 
     return {
       id: authUser.id,
@@ -78,11 +62,12 @@ export const AuthProvider = ({ children }) => {
       phone_change_count: phoneChangeCount,
       city,
       role,
-      rating: 5.0,
-      operations: 1,
+      rating: profile?.rating ?? 5.0,
+      operations: profile?.operations ?? 0,
       bank_clabe: bankClabe,
       bank_name: bankName,
       bank_holder: bankHolder,
+      bank_updated_at: bankUpdatedAt,
       created_at: authUser.created_at || new Date().toISOString(),
       raw: authUser,
     };
@@ -108,6 +93,8 @@ export const AuthProvider = ({ children }) => {
         if (mounted) {
           if (initialSession?.user) {
             setSession(initialSession);
+            // REQUISITO 3: Ejecutar sync_current_user() antes de construir el usuario
+            await syncCurrentUser();
             const userObj = await buildUserObject(initialSession.user, initialSession);
             setUser(userObj);
             if (userObj?.role === 'comprador') setActiveView('comprador');
@@ -126,7 +113,7 @@ export const AuthProvider = ({ children }) => {
 
     initAuth();
 
-    // Suscripción reactiva a cambios de autenticación (Login, Logout, Token Refresh)
+    // Suscripción reactiva a cambios de autenticación (Login, Google OAuth, Logout, Token Refresh)
     let subscription = null;
     if (isSupabaseConfigured && supabase) {
       const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
@@ -140,6 +127,8 @@ export const AuthProvider = ({ children }) => {
 
         if (currentSession?.user) {
           setSession(currentSession);
+          // REQUISITO 2: Ejecutar sync_current_user() cuando Supabase entrega la sesión (OAuth / Login / Refresh)
+          await syncCurrentUser();
           const userObj = await buildUserObject(currentSession.user, currentSession);
           if (mounted) {
             setUser(userObj);
@@ -200,11 +189,12 @@ export const AuthProvider = ({ children }) => {
     console.log('data.user.id (UUID):', data?.user?.id);
     console.log('data.user.email:', data?.user?.email);
     console.log('data.session exists:', Boolean(data?.session));
-    console.log('data.session.expires_at:', data?.session?.expires_at);
     console.log('=====================================');
 
     if (data?.session) {
       setSession(data.session);
+      // REQUISITO 1: Ejecutar sync_current_user() al iniciar sesión
+      await syncCurrentUser();
     }
 
     const userObj = await buildUserObject(data.user, data.session);
@@ -262,11 +252,14 @@ export const AuthProvider = ({ children }) => {
       throw customErr;
     }
 
+    // REQUISITO 1:
+    // Si existe sesión, ejecutar inmediatamente sync_current_user().
+    // Si Supabase requiere confirmación de email y todavía no existe sesión, NO mostrar error.
     if (data?.session) {
       setSession(data.session);
+      await syncCurrentUser();
     }
 
-    // Flujo puro de registro con Supabase Auth (sin upsert a profiles)
     const userObj = await buildUserObject(data.user, data.session);
     setUser(userObj);
     if (role === 'comprador') setActiveView('comprador');
@@ -298,16 +291,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Actualizar datos completos del perfil (nombre, teléfono, ciudad, CLABE, rol)
+  // REQUISITO 9 & 10: Actualizar datos de perfil (users y profiles, NUNCA register_users)
   const updateProfile = async ({ name, phone, city, bank_clabe, bank_name, bank_holder, role }) => {
     if (!user) throw new Error('Debes estar autenticado para actualizar tu perfil.');
     const updates = {};
     if (name !== undefined) {
       updates.full_name = name.trim();
-      updates.name = name.trim();
     }
     const isPhoneChanging = phone !== undefined && user?.phone && phone.trim() !== user.phone.trim();
-    const willBeUpdatedOnce = user?.phone_updated_once || (user?.phone_change_count && user.phone_change_count >= 1) || isPhoneChanging;
 
     if (phone !== undefined) {
       updates.phone = phone.trim();
@@ -344,7 +335,7 @@ export const AuthProvider = ({ children }) => {
       ...(isPhoneChanging ? { phone_updated_once: true, phone_change_count: (user?.phone_change_count || 0) + 1 } : {}),
       ...(city !== undefined ? { city: city.trim() } : {}),
       ...(role !== undefined ? { role } : {}),
-      ...(bank_clabe !== undefined ? { bank_clabe: bank_clabe.trim() } : {}),
+      ...(bank_clabe !== undefined ? { bank_clabe: bank_clabe.trim(), bank_updated_at: updates.bank_updated_at } : {}),
       ...(bank_name !== undefined ? { bank_name: bank_name.trim() } : {}),
       ...(bank_holder !== undefined ? { bank_holder: bank_holder.trim() } : {}),
     };
@@ -369,9 +360,10 @@ export const AuthProvider = ({ children }) => {
   const updateBank = async ({ clabe, bank_name, holder }) => {
     if (!user) throw new Error('Debes estar autenticado para actualizar tus datos bancarios.');
     const updates = {
-      bank_clabe: clabe,
-      bank_name,
-      bank_holder: holder || user.name,
+      bank_clabe: clabe ? clabe.trim() : '',
+      bank_name: bank_name ? bank_name.trim() : '',
+      bank_holder: holder ? holder.trim() : user.name,
+      bank_updated_at: new Date().toISOString(),
     };
     await updateUserProfile(user.id, updates);
     const updated = { ...user, ...updates };
@@ -407,3 +399,4 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 };
+
