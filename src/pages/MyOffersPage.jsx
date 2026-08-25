@@ -103,74 +103,23 @@ const MyOffersPage = () => {
   const [offers, setOffers] = useState([]);
   const [received, setReceived] = useState([]);
   const [tab, setTab] = useState('sent');
-
-  // Fallback sample offers
-  const sampleSentOffers = [
-    {
-      id: 'sent-1',
-      moto_brand: 'Yamaha',
-      moto_model: 'MT-07',
-      moto_year: 2021,
-      amount: 125000,
-      original_price: 128900,
-      seller_name: 'Luis Ramírez',
-      status: 'pending',
-      created_at: 'Hoy, 10:30 AM',
-      message: 'Ofrezco $125,000 con apartado de $2,000 en custodia.'
-    },
-    {
-      id: 'sent-2',
-      moto_brand: 'KTM',
-      moto_model: 'Duke 390',
-      moto_year: 2022,
-      amount: 92500,
-      original_price: 96900,
-      seller_name: 'Mario Vargas',
-      status: 'accepted',
-      created_at: '15 May 2025',
-      message: 'Oferta de compra sujeta a dictamen mecánico.'
-    }
-  ];
-
-  const sampleReceivedOffers = [
-    {
-      id: 'rec-1',
-      moto_brand: 'Yamaha',
-      moto_model: 'MT-07',
-      moto_year: 2021,
-      amount: 123000,
-      original_price: 128900,
-      buyer_name: 'Pedro Contreras',
-      status: 'pending',
-      created_at: 'Hoy, 11:15 AM',
-      message: 'Hola Luis, ofrezco $123,000 de contado inmediato.'
-    },
-    {
-      id: 'rec-2',
-      moto_brand: 'Honda',
-      moto_model: 'CB650R',
-      moto_year: 2020,
-      amount: 135000,
-      original_price: 139900,
-      buyer_name: 'Andrés Molina',
-      status: 'pending',
-      created_at: 'Ayer, 4:20 PM',
-      message: '¿Aceptas $135,000? Ya tengo apartado listo.'
-    }
-  ];
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
-    offerApi.mine().then(res => {
-      if (Array.isArray(res) && res.length > 0) setOffers(res);
-      else setOffers(sampleSentOffers);
-    }).catch(() => setOffers(sampleSentOffers));
+    setLoading(true);
+    const p1 = offerApi.mine().then(res => {
+      if (Array.isArray(res)) setOffers(res);
+      else setOffers([]);
+    }).catch(() => setOffers([]));
 
-    if (user?.role === 'vendedor' || user?.role === 'both') {
-      offerApi.received().then(res => {
-        if (Array.isArray(res) && res.length > 0) setReceived(res);
-        else setReceived(sampleReceivedOffers);
-      }).catch(() => setReceived(sampleReceivedOffers));
-    }
+    const p2 = (user?.role === 'vendedor' || user?.role === 'both')
+      ? offerApi.received().then(res => {
+          if (Array.isArray(res)) setReceived(res);
+          else setReceived([]);
+        }).catch(() => setReceived([]))
+      : Promise.resolve();
+
+    Promise.all([p1, p2]).finally(() => setLoading(false));
   };
 
   useEffect(load, [user]);
@@ -190,7 +139,7 @@ const MyOffersPage = () => {
       <div className="grid grid-cols-2 gap-1 bg-[#0a0a0a] border border-white/5 rounded-xl p-1 mb-6 max-w-sm">
         {[
           { id: 'sent', label: `Enviadas (${offers.length})` },
-          { id: 'received', label: `Recibidas (${received.length || sampleReceivedOffers.length})` },
+          { id: 'received', label: `Recibidas (${received.length})` },
         ].map((t) => (
           <button
             key={t.id}
@@ -205,8 +154,12 @@ const MyOffersPage = () => {
       </div>
 
       <div className="bg-[#101013] border border-white/5 rounded-2xl p-6">
-        {list.length === 0 ? (
-          <div className="py-20 text-center text-zinc-500">No hay ofertas para mostrar</div>
+        {loading ? (
+          <div className="py-20 text-center text-zinc-500">Cargando ofertas...</div>
+        ) : list.length === 0 ? (
+          <div className="py-20 text-center text-zinc-500">
+            {tab === 'sent' ? 'No has enviado ninguna oferta de compra todavía' : 'No has recibido ofertas en tus publicaciones'}
+          </div>
         ) : (
           <div className="space-y-3">
             {list.map((o) => (

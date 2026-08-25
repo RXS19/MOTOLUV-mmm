@@ -859,21 +859,80 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     return res.json(offer);
   });
 
-  api.get('/my/offers', authenticateToken, (req, res) => {
+  api.get('/my/offers', authenticateToken, async (req, res) => {
     const user = (req as any).user as User;
+    if (supabaseServer) {
+      try {
+        const { data: supaOffers, error } = await supabaseServer
+          .from('offers')
+          .select('*')
+          .eq('buyer_id', user.id);
+        if (!error && Array.isArray(supaOffers)) {
+          for (const o of supaOffers) {
+            const existing = db.offers.get(o.id) || {};
+            const moto = db.motos.get(o.moto_id);
+            db.offers.set(o.id, {
+              ...existing,
+              ...o,
+              buyer_id: o.buyer_id,
+              seller_id: o.seller_id,
+              moto_id: o.moto_id,
+              moto_brand: o.moto_brand || moto?.brand || '',
+              moto_model: o.moto_model || moto?.model || '',
+              moto_image: o.moto_image || moto?.image || '',
+              amount: o.amount,
+              status: o.status,
+              created_at: o.created_at,
+            });
+          }
+        }
+      } catch (err: any) {
+        console.warn('Supabase /my/offers error:', err?.message || err);
+      }
+    }
     const list = Array.from(db.offers.values()).filter((o) => o.buyer_id === user.id);
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return res.json(list);
   });
 
-  api.get('/my/received-offers', authenticateToken, (req, res) => {
+  api.get('/my/received-offers', authenticateToken, async (req, res) => {
     const user = (req as any).user as User;
+    if (supabaseServer) {
+      try {
+        const { data: supaOffers, error } = await supabaseServer
+          .from('offers')
+          .select('*')
+          .eq('seller_id', user.id);
+        if (!error && Array.isArray(supaOffers)) {
+          for (const o of supaOffers) {
+            const existing = db.offers.get(o.id) || {};
+            const moto = db.motos.get(o.moto_id);
+            db.offers.set(o.id, {
+              ...existing,
+              ...o,
+              buyer_id: o.buyer_id,
+              buyer_name: o.buyer_name || 'Comprador interesado',
+              seller_id: o.seller_id,
+              moto_id: o.moto_id,
+              moto_brand: o.moto_brand || moto?.brand || '',
+              moto_model: o.moto_model || moto?.model || '',
+              moto_image: o.moto_image || moto?.image || '',
+              amount: o.amount,
+              status: o.status,
+              created_at: o.created_at,
+            });
+          }
+        }
+      } catch (err: any) {
+        console.warn('Supabase /my/received-offers error:', err?.message || err);
+      }
+    }
     const list = Array.from(db.offers.values()).filter((o) => o.seller_id === user.id);
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return res.json(list);
   });
 
-  api.patch('/offers/:id', authenticateToken, (req, res) => {
+  api.patch('/offers/:id', authenticateToken, async (req, res) => {
     const user = (req as any).user as User;
     const offer = db.offers.get(req.params.id);
     if (!offer) return res.status(404).json({ detail: 'Oferta no encontrada' });
@@ -884,6 +943,15 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     }
 
     offer.status = status;
+
+    if (supabaseServer) {
+      try {
+        await supabaseServer.from('offers').update({ status }).eq('id', offer.id);
+      } catch (err: any) {
+        console.warn('Supabase update offer status error:', err?.message || err);
+      }
+    }
+
     return res.json(offer);
   });
 

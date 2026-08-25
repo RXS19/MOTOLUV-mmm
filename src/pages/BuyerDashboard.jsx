@@ -44,83 +44,12 @@ const BuyerDashboard = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showProtectionModal, setShowProtectionModal] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Chat message thread state
+  // Chat message thread state with Concierge
   const [activeChatUser, setActiveChatUser] = useState('asesor');
   const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: 'asesor',
-      senderName: 'Asesor Especialista Motoluv',
-      text: '¡Hola Pedro! La inspección técnica certificada para la Yamaha MT-07 2021 ya está en curso con el perito.',
-      time: '09:40 AM',
-      isMe: false
-    },
-    {
-      id: 2,
-      sender: 'me',
-      senderName: 'Tú',
-      text: 'Perfecto, me interesa mucho revisar la compresión del motor y el estado de la cadena.',
-      time: '09:45 AM',
-      isMe: true
-    },
-    {
-      id: 3,
-      sender: 'luis',
-      senderName: 'Luis Ramírez (Vendedor)',
-      text: '¡Hola Pedro! Confirmado, el perito ya se encuentra en el Centro de Inspección Autorizado para certificar la moto.',
-      time: '11:05 AM',
-      isMe: false
-    }
-  ]);
-
-  // Requests / Sent Offers state
-  const [myRequests, setMyRequests] = useState([
-    {
-      id: 'req-1',
-      moto_brand: 'Yamaha',
-      moto_model: 'MT-07',
-      year: 2021,
-      date: '18 May 2025',
-      status: 'inspeccion',
-      statusLabel: 'Inspección en curso',
-      statusType: 'emerald',
-      nextStep: 'Resultado de inspección técnica',
-      image: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80',
-      amount: 125000,
-      depositPaid: 2000,
-      sellerName: 'Luis Ramírez'
-    },
-    {
-      id: 'req-2',
-      moto_brand: 'KTM',
-      moto_model: 'Duke 390',
-      year: 2022,
-      date: '15 May 2025',
-      status: 'oferta_enviada',
-      statusLabel: 'Oferta enviada',
-      statusType: 'blue',
-      nextStep: 'Esperando respuesta del vendedor',
-      image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80',
-      amount: 92500,
-      depositPaid: 0,
-      sellerName: 'Mario Vargas'
-    },
-  ]);
-
-  // Purchases list
-  const purchases = [
-    {
-      id: 'compra-104',
-      moto: 'Kawasaki Ninja 400 2023',
-      date: '10 Feb 2025',
-      total: 112000,
-      status: 'Entregada y Verificada',
-      protectionUntil: '10 Feb 2026',
-      image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80'
-    }
-  ];
+  const [messages, setMessages] = useState([]);
 
   // Sync tab with URL search params
   useEffect(() => {
@@ -136,18 +65,93 @@ const BuyerDashboard = () => {
   };
 
   const refreshOffers = () => {
+    setLoading(true);
     offerApi.mine().then((data) => {
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setOffers(data);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      setOffers([]);
+    }).finally(() => {
+      setLoading(false);
+    });
   };
 
   useEffect(() => {
     refreshOffers();
   }, []);
 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Pedro';
+  const firstName = user?.name
+    ? user.name.split(' ')[0]
+    : (user?.email ? user.email.split('@')[0] : 'Comprador');
+
+  // Dynamic derivation of Requests from real user offers
+  const myRequests = offers.map((o) => {
+    let statusLabel = 'Oferta enviada';
+    let statusType = 'blue';
+    let nextStep = 'Esperando respuesta del vendedor';
+
+    if (o.status === 'accepted' || o.status === 'Aceptada') {
+      statusLabel = o.is_apartado ? 'Apartada en Custodia' : 'Oferta Aceptada';
+      statusType = 'emerald';
+      nextStep = o.is_apartado ? 'Inspección técnica programada' : 'Proceder al apartado en custodia';
+    } else if (o.status === 'rejected' || o.status === 'Rechazada') {
+      statusLabel = 'Oferta declinada';
+      statusType = 'red';
+      nextStep = 'Explora otras motocicletas en el catálogo';
+    } else if (o.status === 'inspeccion') {
+      statusLabel = 'Inspección en curso';
+      statusType = 'emerald';
+      nextStep = 'Resultado de dictamen mecánico';
+    } else if (o.status === 'completed' || o.status === 'Entregada') {
+      statusLabel = 'Completada y Entregada';
+      statusType = 'emerald';
+      nextStep = 'Compra finalizada con éxito';
+    }
+
+    return {
+      id: o.id,
+      moto_brand: o.moto_brand || 'Motocicleta',
+      moto_model: o.moto_model || '',
+      year: o.moto_year || o.year || 2024,
+      date: o.created_at ? new Date(o.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Reciente',
+      status: o.status,
+      statusLabel,
+      statusType,
+      nextStep,
+      image: o.moto_image || 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80',
+      amount: Number(o.amount || 0),
+      depositPaid: o.is_apartado ? Number(o.amount || 2000) : 0,
+      sellerName: o.seller_name || 'Vendedor Verificado',
+      moto_id: o.moto_id,
+    };
+  });
+
+  // Dynamic Purchases list from completed or apartadas offers
+  const purchases = offers.filter(o => o.status === 'completed' || o.status === 'Entregada' || (o.status === 'accepted' && o.is_apartado)).map((o) => ({
+    id: o.id,
+    moto: `${o.moto_brand || ''} ${o.moto_model || ''}`.trim() || 'Motocicleta Certificada',
+    date: o.created_at ? new Date(o.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Reciente',
+    total: Number(o.amount || 0),
+    status: o.status === 'completed' || o.status === 'Entregada' ? 'Entregada y Verificada' : 'Apartada con Protección Activa',
+    protectionUntil: '1 Año Garantía Motoluv',
+    image: o.moto_image || 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80',
+  }));
+
+  // Dynamic Inspections list
+  const inspections = offers.filter(o => o.status === 'inspeccion' || (o.status === 'accepted' && o.is_apartado)).map((o) => ({
+    id: o.id,
+    moto_brand: o.moto_brand || 'Motocicleta',
+    moto_model: o.moto_model || '',
+    year: o.moto_year || o.year || 2024,
+    image: o.moto_image || 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80',
+    status: 'En Proceso Técnico',
+  }));
+
+  const activeRequestsCount = myRequests.filter(r => r.status !== 'rejected' && r.status !== 'completed').length;
+  const inProgressInspectionsCount = inspections.length;
+  const inProgressPurchasesCount = offers.filter(o => (o.status === 'accepted' || o.is_apartado) && o.status !== 'completed').length;
+  const completedPurchasesCount = offers.filter(o => o.status === 'completed' || o.status === 'Entregada').length;
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -166,16 +170,14 @@ const BuyerDashboard = () => {
     setTimeout(() => {
       const reply = {
         id: Date.now() + 1,
-        sender: activeChatUser,
-        senderName: activeChatUser === 'asesor' ? 'Asesor Motoluv' : 'Luis Ramírez',
-        text: activeChatUser === 'asesor'
-          ? 'Enterado Pedro. Los resultados de compresión y revisión mecánica estarán listos hoy mismo en tu panel.'
-          : '¡Saludos Pedro! Cualquier duda sobre los accesorios que incluye la moto me avisas.',
+        sender: 'asesor',
+        senderName: 'Asesor Concierge Motoluv',
+        text: `Hola ${firstName}, hemos recibido tu mensaje. Un perito especialista te contactará a la brevedad.`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isMe: false
       };
       setMessages(prev => [...prev, reply]);
-    }, 1200);
+    }, 1000);
   };
 
   return (
@@ -220,28 +222,28 @@ const BuyerDashboard = () => {
               <KpiCard
                 icon={FileText}
                 label="Solicitudes activas"
-                value={myRequests.length.toString()}
+                value={activeRequestsCount.toString()}
                 linkText="Ver detalles →"
                 onClick={() => handleTabChange('solicitudes')}
               />
               <KpiCard
                 icon={ShieldCheck}
                 label="Inspecciones en curso"
-                value="1"
+                value={inProgressInspectionsCount.toString()}
                 linkText="Ver detalles →"
                 onClick={() => handleTabChange('inspecciones')}
               />
               <KpiCard
                 icon={ShoppingBag}
                 label="Compras en proceso"
-                value="1"
+                value={inProgressPurchasesCount.toString()}
                 linkText="Ver detalles →"
                 onClick={() => handleTabChange('compras')}
               />
               <KpiCard
                 icon={CheckCircle2}
                 label="Compras completadas"
-                value="1"
+                value={completedPurchasesCount.toString()}
                 linkText="Ver detalles →"
                 onClick={() => handleTabChange('compras')}
               />
@@ -257,58 +259,79 @@ const BuyerDashboard = () => {
                     <h2 className="text-sm sm:text-base font-bold text-white tracking-wide">
                       Seguimiento de mis solicitudes
                     </h2>
-                    <button
-                      onClick={() => handleTabChange('solicitudes')}
-                      className="text-xs text-red-brand hover:text-red-400 font-semibold transition-colors"
-                    >
-                      Ver todas →
-                    </button>
+                    {myRequests.length > 0 && (
+                      <button
+                        onClick={() => handleTabChange('solicitudes')}
+                        className="text-xs text-red-brand hover:text-red-400 font-semibold transition-colors"
+                      >
+                        Ver todas →
+                      </button>
+                    )}
                   </div>
 
-                  <div className="space-y-3">
-                    {myRequests.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-3.5 sm:p-4 bg-[#141418] border border-white/5 hover:border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                  {loading ? (
+                    <div className="p-8 text-center text-zinc-500 text-xs">Cargando solicitudes...</div>
+                  ) : myRequests.length === 0 ? (
+                    <div className="p-6 bg-[#141418] border border-dashed border-white/10 rounded-xl text-center space-y-3">
+                      <p className="text-xs font-bold text-white">No tienes solicitudes ni ofertas activas</p>
+                      <p className="text-[11px] text-zinc-400 max-w-sm mx-auto">
+                        Explora las motocicletas certificadas y realiza tu oferta o apartado en garantía de forma 100% segura.
+                      </p>
+                      <Link
+                        to="/motos"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors shadow"
                       >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <img
-                            src={resolveSafeImageUrl(req.image, 'moto')}
-                            alt={`${req.moto_brand} ${req.moto_model}`}
-                            onError={(e) => handleImageError(e, 'moto')}
-                            className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg bg-black/40 flex-shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <h3 className="text-white text-sm font-bold truncate">
-                              {req.moto_brand} {req.moto_model} {req.year}
-                            </h3>
-                            <p className="text-zinc-400 text-xs mt-0.5">
-                              Oferta realizada el {req.date} • ${req.amount.toLocaleString()} MXN
-                            </p>
+                        <Bike size={14} /> Explorar catálogo
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {myRequests.map((req) => (
+                        <div
+                          key={req.id}
+                          className="p-3.5 sm:p-4 bg-[#141418] border border-white/5 hover:border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <img
+                              src={resolveSafeImageUrl(req.image, 'moto')}
+                              alt={`${req.moto_brand} ${req.moto_model}`}
+                              onError={(e) => handleImageError(e, 'moto')}
+                              className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg bg-black/40 flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <h3 className="text-white text-sm font-bold truncate">
+                                {req.moto_brand} {req.moto_model} {req.year}
+                              </h3>
+                              <p className="text-zinc-400 text-xs mt-0.5">
+                                Oferta realizada el {req.date} • ${req.amount.toLocaleString()} MXN
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-wrap">
+                            <span
+                              className={`px-3 py-1 text-xs font-semibold rounded-full border ${
+                                req.statusType === 'emerald'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : req.statusType === 'red'
+                                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                  : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                              }`}
+                            >
+                              {req.statusLabel}
+                            </span>
+
+                            <button
+                              onClick={() => setSelectedRequest(req)}
+                              className="px-3.5 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors"
+                            >
+                              Ver detalles
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-wrap">
-                          <span
-                            className={`px-3 py-1 text-xs font-semibold rounded-full border ${
-                              req.statusType === 'emerald'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            }`}
-                          >
-                            {req.statusLabel}
-                          </span>
-
-                          <button
-                            onClick={() => setSelectedRequest(req)}
-                            className="px-3.5 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors"
-                          >
-                            Ver detalles
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Section: Motos guardadas */}
@@ -595,57 +618,97 @@ const BuyerDashboard = () => {
               </p>
             </div>
 
-            <div className="space-y-4">
-              {myRequests.map((req) => (
-                <div key={req.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/5">
-                    <div className="flex items-center gap-3.5">
-                      <img src={req.image} alt={req.moto_model} className="w-14 h-14 rounded-xl object-cover" />
-                      <div>
-                        <h3 className="font-bold text-base text-white">{req.moto_brand} {req.moto_model} {req.year}</h3>
-                        <p className="text-xs text-zinc-400">Vendedor: {req.sellerName} • Solicitud #{req.id}</p>
+            {loading ? (
+              <div className="p-12 text-center text-zinc-500 text-sm">Cargando solicitudes...</div>
+            ) : myRequests.length === 0 ? (
+              <div className="p-12 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-4 max-w-lg mx-auto">
+                <div className="w-16 h-16 rounded-full bg-white/5 text-zinc-400 flex items-center justify-center mx-auto shadow-inner">
+                  <FileText size={32} />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-white">No tienes solicitudes ni ofertas activas</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Cuando encuentres una moto que te interese, puedes hacer una oferta formal o apartarla en custodia con total garantía.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link
+                    to="/motos"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-brand/20"
+                  >
+                    <Bike size={16} />
+                    <span>Ver motocicletas disponibles</span>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {myRequests.map((req) => (
+                  <div key={req.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/5">
+                      <div className="flex items-center gap-3.5">
+                        <img
+                          src={resolveSafeImageUrl(req.image, 'moto')}
+                          alt={req.moto_model}
+                          onError={(e) => handleImageError(e, 'moto')}
+                          className="w-14 h-14 rounded-xl object-cover"
+                        />
+                        <div>
+                          <h3 className="font-bold text-base text-white">{req.moto_brand} {req.moto_model} {req.year}</h3>
+                          <p className="text-xs text-zinc-400">Vendedor: {req.sellerName} • Solicitud #{req.id}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                          req.statusType === 'emerald'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : req.statusType === 'red'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                            : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                        }`}>
+                          {req.statusLabel}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
-                        req.statusType === 'emerald'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                      }`}>
-                        {req.statusLabel}
-                      </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
+                      <div>
+                        <span className="text-zinc-500 block">Monto Ofertado</span>
+                        <span className="text-white font-bold text-sm">${req.amount.toLocaleString()} MXN</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Apartado en Garantía</span>
+                        <span className="text-emerald-400 font-bold text-sm">
+                          {req.depositPaid > 0 ? `$${req.depositPaid.toLocaleString()} MXN (Custodia Activa)` : 'Pendiente'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block">Próximo Hito</span>
+                        <span className="text-zinc-200 font-semibold">{req.nextStep}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
-                    <div>
-                      <span className="text-zinc-500 block">Monto Ofertado</span>
-                      <span className="text-white font-bold text-sm">${req.amount.toLocaleString()} MXN</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Apartado en Garantía</span>
-                      <span className="text-emerald-400 font-bold text-sm">
-                        {req.depositPaid > 0 ? `$${req.depositPaid.toLocaleString()} MXN (Custodia Activa)` : 'Pendiente'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Próximo Hito</span>
-                      <span className="text-zinc-200 font-semibold">{req.nextStep}</span>
+                    <div className="flex items-center justify-end gap-2.5">
+                      {req.moto_id && (
+                        <Link
+                          to={`/motos/${req.moto_id}`}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition-colors"
+                        >
+                          Ver Publicación
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => setSelectedRequest(req)}
+                        className="px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl transition-colors"
+                      >
+                        Ver Detalle de Oferta
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-end gap-2.5">
-                    <button
-                      onClick={() => setSelectedRequest(req)}
-                      className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition-colors"
-                    >
-                      Ver Detalle Completo
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -664,45 +727,72 @@ const BuyerDashboard = () => {
               </span>
             </div>
 
-            <div className="p-6 bg-[#101013] border border-white/5 rounded-2xl space-y-5">
-              <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                    <ShieldCheck size={24} />
-                  </div>
-                  <div>
-                    <span className="text-xs text-zinc-400">Inspección Solicitada</span>
-                    <h3 className="font-bold text-base text-white">Yamaha MT-07 2021</h3>
-                  </div>
+            {inspections.length === 0 ? (
+              <div className="p-12 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-4 max-w-lg mx-auto">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
+                  <ShieldCheck size={32} />
                 </div>
-                <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  En Proceso Técnico
-                </span>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-white">No tienes inspecciones mecánicas en curso</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Al apartar una motocicleta o enviar una oferta formal aceptada, se coordinará aquí el peritaje técnico de 150 puntos de certificación.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link
+                    to="/motos"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-brand/20"
+                  >
+                    <Bike size={16} />
+                    <span>Explorar Motocicletas</span>
+                  </Link>
+                </div>
               </div>
+            ) : (
+              <div className="space-y-4">
+                {inspections.map((ins) => (
+                  <div key={ins.id} className="p-6 bg-[#101013] border border-white/5 rounded-2xl space-y-5">
+                    <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                          <ShieldCheck size={24} />
+                        </div>
+                        <div>
+                          <span className="text-xs text-zinc-400">Inspección Solicitada</span>
+                          <h3 className="font-bold text-base text-white">{ins.moto_brand} {ins.moto_model} {ins.year}</h3>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {ins.status}
+                      </span>
+                    </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
-                  <span className="text-zinc-500 block">Motor & Compresión</span>
-                  <span className="text-emerald-400 font-bold">175 PSI • Óptimo</span>
-                </div>
-                <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
-                  <span className="text-zinc-500 block">Frenos y Suspensión</span>
-                  <span className="text-emerald-400 font-bold">85% Vida útil</span>
-                </div>
-                <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
-                  <span className="text-zinc-500 block">Escaneo OBD2</span>
-                  <span className="text-emerald-400 font-bold">0 Códigos de falla</span>
-                </div>
-                <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
-                  <span className="text-zinc-500 block">Validación Legal</span>
-                  <span className="text-emerald-400 font-bold">REPUVE Limpio</span>
-                </div>
-              </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                      <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
+                        <span className="text-zinc-500 block">Motor & Compresión</span>
+                        <span className="text-emerald-400 font-bold">175 PSI • Óptimo</span>
+                      </div>
+                      <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
+                        <span className="text-zinc-500 block">Frenos y Suspensión</span>
+                        <span className="text-emerald-400 font-bold">85% Vida útil</span>
+                      </div>
+                      <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
+                        <span className="text-zinc-500 block">Escaneo OBD2</span>
+                        <span className="text-emerald-400 font-bold">0 Códigos de falla</span>
+                      </div>
+                      <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
+                        <span className="text-zinc-500 block">Validación Legal</span>
+                        <span className="text-emerald-400 font-bold">REPUVE Limpio</span>
+                      </div>
+                    </div>
 
-              <div className="p-3.5 bg-white/[0.02] border border-white/5 rounded-xl text-xs text-zinc-300">
-                El peritaje incluye validación de número de serie en cuadro y motor, factura original de agencia y ausencia de adeudos de tenencia.
+                    <div className="p-3.5 bg-white/[0.02] border border-white/5 rounded-xl text-xs text-zinc-300">
+                      El peritaje incluye validación de número de serie en cuadro y motor, factura original de agencia y ausencia de adeudos de tenencia.
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -716,35 +806,63 @@ const BuyerDashboard = () => {
               </p>
             </div>
 
-            <div className="space-y-4">
-              {purchases.map((p) => (
-                <div key={p.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <img src={p.image} alt={p.moto} className="w-16 h-16 rounded-xl object-cover" />
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        {p.id}
-                      </span>
-                      <h3 className="font-bold text-base text-white mt-1">{p.moto}</h3>
-                      <p className="text-xs text-zinc-400">Comprada el {p.date} • Garantía hasta {p.protectionUntil}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-5">
-                    <div className="text-left sm:text-right">
-                      <span className="text-[10px] text-zinc-500 block">Total Pagado</span>
-                      <span className="text-base font-black text-white">${p.total.toLocaleString()} MXN</span>
-                    </div>
-                    <button
-                      onClick={() => setShowProtectionModal(true)}
-                      className="px-4 py-2 bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold rounded-xl transition-colors"
-                    >
-                      Póliza de Garantía
-                    </button>
-                  </div>
+            {purchases.length === 0 ? (
+              <div className="p-12 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-4 max-w-lg mx-auto">
+                <div className="w-16 h-16 rounded-full bg-red-brand/10 text-red-brand flex items-center justify-center mx-auto shadow-inner">
+                  <ShoppingBag size={32} />
                 </div>
-              ))}
-            </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-white">Aún no tienes compras realizadas</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Todas las motocicletas adquiridas en Motoluv cuentan con fideicomiso en custodia, dictamen pericial y garantía mecánica de 30 días.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Link
+                    to="/motos"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-red-brand/20"
+                  >
+                    <Bike size={16} />
+                    <span>Ver catálogo disponible</span>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {purchases.map((p) => (
+                  <div key={p.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                      <img
+                        src={resolveSafeImageUrl(p.image, 'moto')}
+                        alt={p.moto}
+                        onError={(e) => handleImageError(e, 'moto')}
+                        className="w-16 h-16 rounded-xl object-cover"
+                      />
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                          {p.id}
+                        </span>
+                        <h3 className="font-bold text-base text-white mt-1">{p.moto}</h3>
+                        <p className="text-xs text-zinc-400">Comprada el {p.date} • {p.status}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-5">
+                      <div className="text-left sm:text-right">
+                        <span className="text-[10px] text-zinc-500 block">Total Pagado</span>
+                        <span className="text-base font-black text-white">${p.total.toLocaleString()} MXN</span>
+                      </div>
+                      <button
+                        onClick={() => setShowProtectionModal(true)}
+                        className="px-4 py-2 bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold rounded-xl transition-colors"
+                      >
+                        Póliza de Garantía
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -767,16 +885,26 @@ const BuyerDashboard = () => {
                 <p className="text-xs text-zinc-400 leading-relaxed">
                   Tus transacciones cuentan con encriptación bancaria de alta seguridad y protocolo 3D Secure. Tus fondos permanecen en custodia hasta que recibes y verificas tu motocicleta.
                 </p>
-                <div className="p-3 bg-[#141418] rounded-xl border border-white/5 text-xs text-zinc-300 space-y-2">
-                  <div className="flex justify-between">
-                    <span>Apartado de prueba (#AP-8834):</span>
-                    <span className="text-emerald-400 font-bold">$2,000 MXN (Pagado)</span>
+                {offers.filter(o => o.is_apartado || o.status === 'accepted').length === 0 ? (
+                  <div className="p-4 bg-[#141418] rounded-xl border border-white/5 text-xs text-zinc-400 text-center">
+                    No tienes transacciones de pago activas en este momento.
                   </div>
-                  <div className="flex justify-between">
-                    <span>Método utilizado:</span>
-                    <span className="text-zinc-300 font-semibold">Pago Seguro Encriptado</span>
+                ) : (
+                  <div className="space-y-2">
+                    {offers.filter(o => o.is_apartado || o.status === 'accepted').map((o) => (
+                      <div key={o.id} className="p-3 bg-[#141418] rounded-xl border border-white/5 text-xs text-zinc-300 space-y-1">
+                        <div className="flex justify-between">
+                          <span className="font-medium text-white">{o.moto_brand} {o.moto_model}</span>
+                          <span className="text-emerald-400 font-bold">${Number(o.amount || 0).toLocaleString()} MXN</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-zinc-400">
+                          <span>Estado: {o.status === 'accepted' ? 'Custodia Activa' : 'Apartada'}</span>
+                          <span>Pago Seguro Encriptado</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="p-6 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
@@ -814,11 +942,11 @@ const BuyerDashboard = () => {
                 <div className="space-y-3 text-xs">
                   <div>
                     <span className="text-zinc-500 block">Nombre:</span>
-                    <span className="text-white font-semibold">{user?.name || 'Pedro Contreras'}</span>
+                    <span className="text-white font-semibold">{user?.name || user?.email?.split('@')[0] || 'Comprador Motoluv'}</span>
                   </div>
                   <div>
                     <span className="text-zinc-500 block">Correo Electrónico:</span>
-                    <span className="text-white font-semibold">{user?.email || 'comprador@motoluv.mx'}</span>
+                    <span className="text-white font-semibold">{user?.email || 'No registrado'}</span>
                   </div>
                   <div className="pt-2 border-t border-white/5">
                     <span className="text-zinc-400 text-[11px] block">
