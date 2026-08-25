@@ -151,21 +151,78 @@ export const motoApi = {
       return fallbackRecord;
     }
   },
-  update: (id, data) => api.patch(`/motos/${id}`, data).then((r) => r.data),
-  remove: (id) => api.delete(`/motos/${id}`).then((r) => r.data),
+  update: async (id, data) => {
+    try {
+      const res = await api.patch(`/motos/${id}`, data);
+      if (data.status === 'Rechazada' || data.status === 'rejected') {
+        const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+        localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
+        if (isSupabaseConfigured && supabase) {
+          try {
+            await supabase.from('motos').delete().eq('id', id);
+          } catch {}
+        }
+      }
+      return res.data;
+    } catch (err) {
+      if (data.status === 'Rechazada' || data.status === 'rejected') {
+        const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+        localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
+        if (isSupabaseConfigured && supabase) {
+          try {
+            await supabase.from('motos').delete().eq('id', id);
+          } catch {}
+        }
+        return { deleted: true, status: 'Rechazada' };
+      }
+      throw err;
+    }
+  },
+  remove: async (id) => {
+    try {
+      const res = await api.delete(`/motos/${id}`);
+      const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('motos').delete().eq('id', id);
+        } catch {}
+      }
+      return res.data;
+    } catch (err) {
+      if (err?.response?.status === 400 || err?.response?.data?.detail) {
+        throw new Error(err.response.data.detail || 'No se puede eliminar la publicación');
+      }
+      const existing = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      localStorage.setItem('motoluv_custom_motos', JSON.stringify(existing.filter((m) => m.id !== id)));
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('motos').delete().eq('id', id);
+        } catch {}
+      }
+      return { ok: true };
+    }
+  },
   mine: async () => {
     try {
       const res = await api.get('/my/motos');
-      const custom = JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
-      const combined = [...(Array.isArray(res.data) ? res.data : [])];
-      for (const c of custom) {
-        if (!combined.some((m) => m.id === c.id)) {
-          combined.unshift(c);
-        }
-      }
-      return combined;
+      return Array.isArray(res.data) ? res.data : [];
     } catch {
-      return JSON.parse(localStorage.getItem('motoluv_custom_motos') || '[]');
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) {
+            const { data, error } = await supabase
+              .from('motos')
+              .select('*')
+              .eq('owner_id', session.user.id);
+            if (!error && Array.isArray(data)) {
+              return data;
+            }
+          }
+        } catch {}
+      }
+      return [];
     }
   },
 };

@@ -640,6 +640,39 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     if (moto.owner_id !== user.id) return res.status(403).json({ detail: 'No autorizado' });
 
     const previousStatus = moto.status;
+    const newStatus = req.body.status;
+
+    // Regla de negocio: Toda publicación rechazada en cualquier inspección se elimina automáticamente
+    if (newStatus === 'Rechazada' || newStatus === 'rejected') {
+      db.motos.delete(moto.id);
+
+      triggerN8nHubspotWebhook('card.status_updated', {
+        cardId: `card_${moto.id}`,
+        title: `${moto.brand} ${moto.model}`,
+        status: 'Rechazada_Eliminada',
+        userId: user.id,
+        userEmail: user.email,
+        motoId: moto.id,
+      });
+
+      if (supabaseServer) {
+        (async () => {
+          try {
+            await supabaseServer.from('motos').delete().eq('id', moto.id);
+          } catch (err: any) {
+            console.warn('Supabase moto delete on rejection exception:', err?.message || err);
+          }
+        })();
+      }
+
+      return res.json({
+        ok: true,
+        deleted: true,
+        status: 'Rechazada',
+        detail: 'La publicación no aprobó la inspección técnica y ha sido eliminada automáticamente del catálogo.',
+      });
+    }
+
     Object.assign(moto, req.body);
     if (req.body.images && req.body.images.length > 0) {
       moto.image = req.body.images[0];
@@ -679,19 +712,31 @@ api.get('/auth/me', authenticateToken, (req, res) => {
   api.delete('/motos/:id', authenticateToken, (req, res) => {
     const user = (req as any).user as User;
     const moto = db.motos.get(req.params.id);
-    if (!moto) return res.status(404).json({ detail: 'No encontrada' });
-    if (moto.owner_id !== user.id) return res.status(403).json({ detail: 'No autorizado' });
 
-    const activeOffers = Array.from(db.offers.values()).filter(
-      (o) => o.moto_id === req.params.id && ['pending', 'accepted'].includes(o.status)
-    );
-    if (activeOffers.length > 0) {
-      return res.status(400).json({
-        detail: `No puedes eliminar esta publicación: tiene ${activeOffers.length} oferta(s) activa(s). Debes rechazar o completar las ofertas primero.`,
-      });
+    if (moto) {
+      if (moto.owner_id && moto.owner_id !== user.id) {
+        return res.status(403).json({ detail: 'No autorizado' });
+      }
+
+      // Si la publicación fue autorizada y apartada, no se puede eliminar
+      if (moto.status === 'Apartada' || moto.status === 'reserved' || moto.status === 'Proceso de entrega') {
+        return res.status(400).json({
+          detail: 'No puedes eliminar una publicación autorizada y apartada. Se encuentra en proceso activo de compraventa.',
+        });
+      }
+
+      // Si tiene ofertas activas en proceso, no se puede eliminar
+      const activeOffers = Array.from(db.offers.values()).filter(
+        (o) => o.moto_id === req.params.id && ['pending', 'accepted'].includes(o.status)
+      );
+      if (activeOffers.length > 0) {
+        return res.status(400).json({
+          detail: `No puedes eliminar esta publicación: tiene ${activeOffers.length} oferta(s) activa(s) en proceso. Debes responder o declinar las ofertas antes de eliminarla.`,
+        });
+      }
+
+      db.motos.delete(req.params.id);
     }
-
-    db.motos.delete(req.params.id);
 
     if (supabaseServer) {
       (async () => {
@@ -703,11 +748,52 @@ api.get('/auth/me', authenticateToken, (req, res) => {
       })();
     }
 
-    return res.json({ ok: true });
+    return res.json({ ok: true, detail: 'Publicación eliminada correctamente' });
   });
 
-  api.get('/my/motos', authenticateToken, (req, res) => {
+  api.get('/my/motos', authenticateToken, async (req, res) => {
     const user = (req as any).user as User;
+    if (supabaseServer) {
+      try {
+        const { data: supaMotos, error } = await supabaseServer
+          .from('motos')
+          .select('*')
+          .eq('owner_id', user.id);
+
+        if (!error && Array.isArray(supaMotos)) {
+          for (const m of supaMotos) {
+            const imgs = Array.isArray(m.images) && m.images.length > 0 ? m.images : (m.image ? [m.image] : []);
+            const motoRecord: any = {
+              id: m.id,
+              title: m.title || `${m.brand} ${m.model} ${m.year}`,
+              brand: m.brand,
+              model: m.model,
+              year: m.year,
+              price: m.price,
+              km: m.km || 0,
+              engine: m.engine || '',
+              category: m.category || 'naked',
+              city: m.location || m.city || 'Ciudad de México',
+              images: imgs,
+              image: imgs[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80',
+              description: m.description || '',
+              status: m.status || 'En revisión',
+              owner_id: m.owner_id,
+              owner_name: m.owner_name || user.name,
+              owner_phone: m.owner_phone || user.phone,
+              views: m.views || 0,
+              featured: Boolean(m.featured),
+              is_boosted: Boolean(m.is_boosted),
+              created_at: m.created_at || new Date().toISOString(),
+            };
+            db.motos.set(m.id, motoRecord);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Supabase /my/motos sync error:', err?.message || err);
+      }
+    }
+
     const list = Array.from(db.motos.values()).filter((m) => m.owner_id === user.id);
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return res.json(list);
@@ -1139,24 +1225,26 @@ api.get('/auth/me', authenticateToken, (req, res) => {
 
       // Prepare context of Motoluv
       const activeMotos = Array.from(db.motos.values())
-        .filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada')
-        .map((m) => `• ${m.brand} ${m.model} (${m.year}) - $${m.price.toLocaleString()} MXN | ${m.km.toLocaleString()} km | Score: ${m.score}/10 | Ubicación: ${m.city}`);
+        .filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada' && m.status !== 'En revisión')
+        .map((m) => `• ${m.brand} ${m.model} (${m.year}) | ${m.km.toLocaleString()} km | Score: ${m.score}/10 | Ubicación: ${m.city}`);
 
       const systemPrompt = `Eres "Lu", el asistente virtual oficial de Motoluv.
 Tu tono es amable, apasionado por las motos, servicial y profesional. NUNCA te autodefinas ni menciones la palabra "mascota" ni "IA". Preséntate siempre simplemente como Lu, el asistente oficial de Motoluv.
 
-REGLA DE SEGURIDAD ABSOLUTA:
-Jamás reveles o solicites información confidencial de usuarios (cuentas bancarias, contraseñas, datos personales privados, etc.).
-NUNCA incluyas rutas técnicas, URLs o slashes como /motos, /tienda, /sumate en tus respuestas. Refiérete siempre a las secciones por su nombre natural (Catálogo de motocicletas, Tienda oficial de accesorios, Red de Socios).
+REGLAS ESTRICTAS DE RESPUESTA:
+1. EVITA TOTALMENTE HABLAR DE COSTOS, PRECIOS, COMISIONES O CIFRAS MONETARIAS EN EL CHAT.
+   - Si el usuario te pregunta por precios, costos de paquetes, comisiones o tarifas, explica los beneficios y el alcance de las inspecciones o servicios de Motoluv sin mencionar montos ni números en pesos/dólares, e invítalo a revisar los detalles directamente en la plataforma o catálogo.
+2. Jamás reveles o solicites información confidencial de usuarios (cuentas bancarias, contraseñas, datos personales privados, etc.).
+3. NUNCA incluyas rutas técnicas, URLs o slashes como /motos, /tienda, /sumate en tus respuestas. Refiérete siempre a las secciones por su nombre natural (Catálogo de motocicletas, Tienda oficial de accesorios, Red de Socios).
 
 INFORMACIÓN DEL SITIO MOTOLUV:
 - Qué es Motoluv: El marketplace más seguro de compra y venta de motocicletas seminuevas en México.
 - Eslogan: SUBE · CONECTA · RUEDA.
 - Protección y Transparencia: Motoluv resguarda la operación con transacciones y pagos verificados hasta que se complete la inspección y entrega.
-- Paquetes de Servicio:
-  1. Básico ($1,900 MXN): Inspección técnica con Score de 100 puntos y contrato digital.
-  2. Plus ($3,900 MXN): Básico + protección de pago verificada y validación de documentos.
-  3. Total ($5,900 MXN): Plus + gestión integral de trámites y traslado logístico entre centros autorizados.
+- Paquetes de Servicio (describe solo beneficios, sin montos ni costos):
+  1. Básico: Inspección técnica mecánica con Score de 100 puntos y contrato digital.
+  2. Plus: Básico + custodia segura de pago y validación de documentos.
+  3. Total: Plus + gestión integral de trámites y traslado logístico entre centros autorizados.
 - Red de Socios ("Súmate a nuestra red"): Talleres mecánicos, tiendas de accesorios, agencias de motocicletas, financieras y organizadores de eventos pueden registrarse en la sección de aliados y socios.
 - Inventario actual de motocicletas disponibles:
 ${activeMotos.slice(0, 10).join('\n')}
@@ -1211,8 +1299,8 @@ Responde siempre en español, de forma concisa, clara y amigable con emojis acor
         fallback = 'En nuestra Tienda Oficial de equipamiento encontrarás cascos certificados, chaquetas con protección, guantes y accesorios de alta calidad 🛡️.';
       } else if (lower.includes('red') || lower.includes('sumate') || lower.includes('socio') || lower.includes('taller') || lower.includes('agencia') || lower.includes('financiera') || lower.includes('evento')) {
         fallback = '¡Súmate a nuestra red! 🤝 Si tienes un taller, tienda de accesorios, agencia de motocicletas, financiera u organizas eventos, ingresa a la sección de aliados para registrar tus datos y conectarte con miles de motociclistas.';
-      } else if (lower.includes('paquete') || lower.includes('inspeccion') || lower.includes('inspección') || lower.includes('seguro')) {
-        fallback = 'En Motoluv tu compra está 100% protegida con transacciones verificadas 🔒. Contamos con paquetes Básico ($1,900), Plus ($3,900) y Total ($5,900 con gestión y traslado logístico).';
+      } else if (lower.includes('paquete') || lower.includes('inspeccion') || lower.includes('inspección') || lower.includes('seguro') || lower.includes('precio') || lower.includes('costo') || lower.includes('tarifa') || lower.includes('comision') || lower.includes('comisión')) {
+        fallback = 'En Motoluv tu compra está 100% protegida con transacciones verificadas 🔒. Contamos con paquetes diseñados a tu medida:\n\n• Básico: Inspección mecánica de 100 puntos y contrato digital.\n• Plus: Inspección + custodia segura de pago y validación documental.\n• Total: Cobertura Plus + gestión integral de trámites y traslado logístico entre centros autorizados.\n\nPuedes consultar todos los detalles al gestionar tu compra o publicación.';
       } else {
         fallback = '¡Con gusto te oriento! 🐾 En Motoluv puedes comprar o vender motos seminuevas certificadas, adquirir accesorios o sumar tu taller o negocio a nuestra red de aliados. ¿Qué te gustaría consultar?';
       }

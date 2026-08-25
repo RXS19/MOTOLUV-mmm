@@ -111,59 +111,11 @@ const SellerDashboard = () => {
     setSearchParams({ tab: tabId });
   };
 
-  // Sample default publications
-  const defaultPublications = [
-    {
-      id: 'pub-1',
-      brand: 'Yamaha',
-      model: 'MT-07',
-      year: 2021,
-      price: 128900,
-      publishDate: '10 May 2025',
-      views: 412,
-      savedCount: 25,
-      offersCount: 2,
-      status: 'Activa',
-      is_boosted: true,
-      boost_tier: 'plan_15',
-      image: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80',
-    },
-    {
-      id: 'pub-2',
-      brand: 'KTM',
-      model: 'Duke 390',
-      year: 2022,
-      price: 96900,
-      publishDate: '05 May 2025',
-      views: 289,
-      savedCount: 18,
-      offersCount: 1,
-      status: 'Activa',
-      is_boosted: false,
-      image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80',
-    },
-    {
-      id: 'pub-3',
-      brand: 'Honda',
-      model: 'CB650R',
-      year: 2020,
-      price: 139900,
-      publishDate: '28 Abr 2025',
-      views: 367,
-      savedCount: 22,
-      offersCount: 0,
-      status: 'Activa',
-      is_boosted: false,
-      image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80',
-    },
-  ];
-
   // Sample default received offers
   const [allOffers, setAllOffers] = useState([
     {
       id: 'off-1',
       buyerName: 'Pedro Contreras',
-      buyerEmail: 'pedro.c@gmail.com',
       motoBrand: 'Yamaha',
       motoModel: 'MT-07 2021',
       originalPrice: 128900,
@@ -176,7 +128,6 @@ const SellerDashboard = () => {
     {
       id: 'off-2',
       buyerName: 'Andrés Molina',
-      buyerEmail: 'andres.m@hotmail.com',
       motoBrand: 'KTM',
       motoModel: 'Duke 390 2022',
       originalPrice: 96900,
@@ -189,7 +140,6 @@ const SellerDashboard = () => {
     {
       id: 'off-3',
       buyerName: 'Roberto Garza',
-      buyerEmail: 'rgarza@outlook.com',
       motoBrand: 'Yamaha',
       motoModel: 'MT-07 2021',
       originalPrice: 128900,
@@ -201,10 +151,18 @@ const SellerDashboard = () => {
     }
   ]);
 
+  const [loadingMotos, setLoadingMotos] = useState(true);
+
   const loadData = () => {
+    setLoadingMotos(true);
     motoApi.mine().then((data) => {
-      if (Array.isArray(data) && data.length > 0) setMotos(data);
-    }).catch(() => {});
+      if (Array.isArray(data)) setMotos(data);
+      else setMotos([]);
+    }).catch(() => {
+      setMotos([]);
+    }).finally(() => {
+      setLoadingMotos(false);
+    });
     offerApi.received().then((data) => {
       if (Array.isArray(data) && data.length > 0) setOffers(data);
     }).catch(() => {});
@@ -214,8 +172,7 @@ const SellerDashboard = () => {
     loadData();
   }, []);
 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Luis';
-  const displayMotos = motos.length > 0 ? motos : defaultPublications;
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Vendedor';
 
   const currentCalc = calculateCommission(calcPrice || 0);
 
@@ -231,8 +188,40 @@ const SellerDashboard = () => {
   };
 
   const handleOpenBoostModal = (moto = null) => {
-    setSelectedMotoForBoost(moto || displayMotos[0]);
+    setSelectedMotoForBoost(moto || (motos.length > 0 ? motos[0] : null));
     setShowBoostModal(true);
+  };
+
+  const handleDeleteMoto = async (motoId, status, offersCount = 0) => {
+    if (status === 'Apartada' || status === 'reserved' || status === 'Proceso de entrega') {
+      toast({
+        title: 'Acción no permitida',
+        description: 'No puedes eliminar una publicación autorizada y apartada. Se encuentra en proceso activo de compraventa.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (offersCount > 0) {
+      toast({
+        title: 'Ofertas activas en proceso',
+        description: 'No puedes eliminar una motocicleta que tiene ofertas activas en proceso. Debes responder o declinar las ofertas antes de eliminarla.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!window.confirm('¿Estás seguro de eliminar esta publicación de tu inventario?')) return;
+    try {
+      await motoApi.remove(motoId);
+      toast({ title: 'Publicación eliminada', description: 'La motocicleta ha sido removida de tu inventario.' });
+      setMotos(prev => prev.filter(m => m.id !== motoId));
+      loadData();
+    } catch (err) {
+      toast({
+        title: 'No se pudo eliminar',
+        description: err?.message || 'Ocurrió un error al eliminar la publicación.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleAcceptOffer = (offerId) => {
@@ -340,7 +329,7 @@ const SellerDashboard = () => {
               <KpiCard
                 icon={Bike}
                 label="Publicaciones activas"
-                value={displayMotos.length.toString()}
+                value={motos.length.toString()}
                 linkText="Ver todas →"
                 onClick={() => handleTabChange('publicaciones')}
               />
@@ -377,85 +366,118 @@ const SellerDashboard = () => {
                     <h2 className="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-2">
                       <span>Mis publicaciones</span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-zinc-300 font-normal">
-                        {displayMotos.length}
+                        {motos.length}
                       </span>
                     </h2>
-                    <button
-                      onClick={() => handleTabChange('publicaciones')}
-                      className="text-xs text-red-brand hover:text-red-400 font-semibold transition-colors"
-                    >
-                      Ver todas →
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {displayMotos.map((pub, idx) => (
-                      <div
-                        key={pub.id || idx}
-                        className="p-3.5 sm:p-4 bg-[#141418] border border-white/5 hover:border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                    {motos.length > 0 && (
+                      <button
+                        onClick={() => handleTabChange('publicaciones')}
+                        className="text-xs text-red-brand hover:text-red-400 font-semibold transition-colors"
                       >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="relative flex-shrink-0">
-                            <img
-                              src={resolveSafeImageUrl(pub.image || pub.images?.[0], 'moto')}
-                              alt={`${pub.brand} ${pub.model}`}
-                              onError={(e) => handleImageError(e, 'moto')}
-                              className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg bg-black/40"
-                            />
-                            {pub.is_boosted && (
-                              <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-brand to-orange-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow flex items-center gap-0.5">
-                                <Sparkles size={8} /> TOP
-                              </span>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="text-white text-sm font-bold truncate flex items-center gap-1.5">
-                              <span>{pub.brand} {pub.model} {pub.year}</span>
-                            </h3>
-                            <p className="text-zinc-400 text-xs mt-0.5">
-                              Publicado el {pub.publishDate || 'Recientemente'}
-                            </p>
-                            <p className="text-zinc-200 text-xs font-bold mt-0.5">
-                              ${Number(pub.price).toLocaleString()} MXN
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-wrap">
-                          <div className="flex items-center gap-3 text-xs text-zinc-400">
-                            <div className="text-center">
-                              <span className="text-[10px] text-zinc-500 block">Vistas</span>
-                              <span className="font-semibold text-white">{pub.views || 412}</span>
-                            </div>
-                            <div className="text-center">
-                              <span className="text-[10px] text-zinc-500 block">Guardados</span>
-                              <span className="font-semibold text-white">{pub.savedCount || 25}</span>
-                            </div>
-                            <div className="text-center">
-                              <span className="text-[10px] text-zinc-500 block">Ofertas</span>
-                              <span className="font-semibold text-white">{pub.offersCount || 2}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenBoostModal(pub)}
-                              className="px-3 py-1.5 bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold rounded-lg transition-colors flex items-center justify-center"
-                              title="Destacar publicación"
-                            >
-                              <span>Destacar</span>
-                            </button>
-                            <Link
-                              to={pub.id ? `/motos/${pub.id}` : '/motos'}
-                              className="px-3 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
-                            >
-                              Ver ficha
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        Ver todas →
+                      </button>
+                    )}
                   </div>
+
+                  {loadingMotos ? (
+                    <div className="p-8 text-center text-zinc-500 text-xs">Cargando tus publicaciones...</div>
+                  ) : motos.length === 0 ? (
+                    <div className="p-8 text-center bg-[#141418] border border-white/5 rounded-xl">
+                      <p className="text-zinc-400 text-sm mb-4">Aún no tienes motocicletas publicadas</p>
+                      <Link
+                        to="/panel/publicar"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-lg transition-colors"
+                      >
+                        <Plus size={14} /> Publicar Motocicleta
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {motos.map((pub, idx) => (
+                        <div
+                          key={pub.id || idx}
+                          className="p-3.5 sm:p-4 bg-[#141418] border border-white/5 hover:border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="relative flex-shrink-0">
+                              <img
+                                src={resolveSafeImageUrl(pub.image || pub.images?.[0], 'moto')}
+                                alt={`${pub.brand} ${pub.model}`}
+                                onError={(e) => handleImageError(e, 'moto')}
+                                className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg bg-black/40"
+                              />
+                              {pub.is_boosted && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-brand to-orange-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow flex items-center gap-0.5">
+                                  <Sparkles size={8} /> TOP
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="text-white text-sm font-bold truncate flex items-center gap-1.5">
+                                <span>{pub.brand} {pub.model} {pub.year}</span>
+                              </h3>
+                              <p className="text-zinc-400 text-xs mt-0.5">
+                                Publicado el {pub.publishDate || 'Recientemente'}
+                              </p>
+                              <p className="text-zinc-200 text-xs font-bold mt-0.5">
+                                ${Number(pub.price).toLocaleString()} MXN
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-wrap">
+                            <div className="flex items-center gap-3 text-xs text-zinc-400">
+                              <div className="text-center">
+                                <span className="text-[10px] text-zinc-500 block">Vistas</span>
+                                <span className="font-semibold text-white">{pub.views || 412}</span>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-[10px] text-zinc-500 block">Guardados</span>
+                                <span className="font-semibold text-white">{pub.savedCount || 25}</span>
+                              </div>
+                              <div className="text-center">
+                                <span className="text-[10px] text-zinc-500 block">Ofertas</span>
+                                <span className="font-semibold text-white">{pub.offersCount || 2}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenBoostModal(pub)}
+                                className="px-3 py-1.5 bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold rounded-lg transition-colors flex items-center justify-center"
+                                title="Destacar publicación"
+                              >
+                                <span>Destacar</span>
+                              </button>
+                              <Link
+                                to={pub.id ? `/motos/${pub.id}` : '/motos'}
+                                className="px-3 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                Ver ficha
+                              </Link>
+                              <button
+                                onClick={() => handleDeleteMoto(pub.id, pub.status, pub.offersCount || 0)}
+                                className={`p-1.5 rounded-lg border transition-colors flex items-center justify-center ${
+                                  pub.status === 'Apartada' || pub.status === 'reserved' || (pub.offersCount || 0) > 0
+                                    ? 'border-white/5 text-zinc-600 hover:text-amber-400 hover:border-amber-500/40'
+                                    : 'border-white/10 text-zinc-400 hover:border-red-brand hover:text-red-brand'
+                                }`}
+                                title={
+                                  pub.status === 'Apartada'
+                                    ? 'Publicación autorizada y apartada (no eliminable)'
+                                    : (pub.offersCount || 0) > 0
+                                    ? 'Publicación con ofertas activas en proceso (no eliminable)'
+                                    : 'Eliminar publicación'
+                                }
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Simulator: Calculadora y Ganancia Neta */}
@@ -658,87 +680,118 @@ const SellerDashboard = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {displayMotos.map((m) => {
-                const style = getStatusStyle(m.status);
-                return (
-                  <div key={m.id} className="bg-[#111114] border border-white/5 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-white/15 transition-all">
-                    <div>
-                      <div className="aspect-[4/3] bg-zinc-900 relative">
-                        <img 
-                          src={resolveSafeImageUrl(m.image || m.images?.[0], 'moto')} 
-                          alt={m.model} 
-                          onError={(e) => handleImageError(e, 'moto')}
-                          className="w-full h-full object-cover" 
-                        />
-                        <div className="absolute top-3 left-3 flex gap-1.5">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-black/80 backdrop-blur ${style.badgeClass}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
-                            {style.label}
-                          </span>
-                          {m.is_boosted && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-red-brand to-orange-500 text-white shadow">
-                              <Sparkles size={10} /> Destacada
-                            </span>
-                          )}
-                        </div>
-                        <div className="absolute top-3 right-3 bg-black/70 backdrop-blur text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1">
-                          <Eye size={12} /> {m.views || 412}
-                        </div>
-                      </div>
-
-                      <div className="p-4 space-y-3">
-                        <div>
-                          <h3 className="font-bold text-base text-white">{m.brand} {m.model}</h3>
-                          <div className="text-xs text-zinc-400">Año {m.year} · ${(m.km || 14500).toLocaleString()} km</div>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div className="text-red-brand font-black text-base">${Number(m.price).toLocaleString()} MXN</div>
-                          <span className="text-xs text-zinc-400 bg-white/5 px-2 py-0.5 rounded">
-                            {m.savedCount || 25} interesados
-                          </span>
-                        </div>
-
-                        {/* Status indicator (Read-only, synchronized with Supabase & CRM) */}
-                        <div className="pt-2 border-t border-white/5">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1">
-                              <Activity size={11} className="text-red-brand" /> Estatus de Operación
-                            </span>
-                            <span className="text-[9px] text-zinc-500 font-medium">CRM Motoluv</span>
-                          </div>
-                          <div className="flex items-center justify-between p-2 bg-[#16161c] rounded-lg border border-white/5">
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${style.badgeClass.replace('bg-black/80', '').replace('backdrop-blur', '').replace('border', '')}`}>
+            {loadingMotos ? (
+              <div className="p-16 text-center text-zinc-500 text-sm">Cargando tus publicaciones...</div>
+            ) : motos.length === 0 ? (
+              <div className="bg-[#111114] border border-white/5 rounded-2xl p-16 text-center">
+                <p className="text-zinc-400 text-sm mb-6">Aún no tienes motocicletas publicadas</p>
+                <Link
+                  to="/panel/publicar"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-red-brand hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
+                >
+                  <Plus size={14} /> Publicar Motocicleta
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {motos.map((m) => {
+                  const style = getStatusStyle(m.status);
+                  return (
+                    <div key={m.id} className="bg-[#111114] border border-white/5 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-white/15 transition-all">
+                      <div>
+                        <div className="aspect-[4/3] bg-zinc-900 relative">
+                          <img 
+                            src={resolveSafeImageUrl(m.image || m.images?.[0], 'moto')} 
+                            alt={m.model} 
+                            onError={(e) => handleImageError(e, 'moto')}
+                            className="w-full h-full object-cover" 
+                          />
+                          <div className="absolute top-3 left-3 flex gap-1.5">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-black/80 backdrop-blur ${style.badgeClass}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
                               {style.label}
                             </span>
-                            <span className="text-[10px] text-zinc-500">Sincronizado</span>
+                            {m.is_boosted && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-red-brand to-orange-500 text-white shadow">
+                                <Sparkles size={10} /> Destacada
+                              </span>
+                            )}
+                          </div>
+                          <div className="absolute top-3 right-3 bg-black/70 backdrop-blur text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1">
+                            <Eye size={12} /> {m.views || 412}
+                          </div>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                          <div>
+                            <h3 className="font-bold text-base text-white">{m.brand} {m.model}</h3>
+                            <div className="text-xs text-zinc-400">Año {m.year} · ${(m.km || 14500).toLocaleString()} km</div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="text-red-brand font-black text-base">${Number(m.price).toLocaleString()} MXN</div>
+                            <span className="text-xs text-zinc-400 bg-white/5 px-2 py-0.5 rounded">
+                              {m.savedCount || 25} interesados
+                            </span>
+                          </div>
+
+                          {/* Status indicator (Read-only, synchronized with Supabase & CRM) */}
+                          <div className="pt-2 border-t border-white/5">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[10px] uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                                <Activity size={11} className="text-red-brand" /> Estatus de Operación
+                              </span>
+                              <span className="text-[9px] text-zinc-500 font-medium">CRM Motoluv</span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 bg-[#16161c] rounded-lg border border-white/5">
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${style.badgeClass.replace('bg-black/80', '').replace('backdrop-blur', '').replace('border', '')}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
+                                {style.label}
+                              </span>
+                              <span className="text-[10px] text-zinc-500">Sincronizado</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="p-4 pt-0 space-y-2">
-                      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
-                        <button
-                          onClick={() => handleOpenBoostModal(m)}
-                          className="w-full py-2 rounded-lg bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold transition-colors flex items-center justify-center"
-                        >
-                          <span>Destacar</span>
-                        </button>
-                        <Link
-                          to={m.id ? `/motos/${m.id}` : '/motos'}
-                          className="w-full text-center text-xs font-bold py-2 rounded-lg bg-[#16161c] text-white hover:bg-white/10 transition-colors border border-white/10"
-                        >
-                          Ver ficha
-                        </Link>
+                      <div className="p-4 pt-0 space-y-2">
+                        <div className="flex gap-2 pt-3 border-t border-white/5">
+                          <button
+                            onClick={() => handleOpenBoostModal(m)}
+                            className="flex-1 py-2 rounded-lg bg-red-brand/10 hover:bg-red-brand/20 text-red-brand border border-red-brand/30 text-xs font-bold transition-colors flex items-center justify-center"
+                          >
+                            <span>Destacar</span>
+                          </button>
+                          <Link
+                            to={m.id ? `/motos/${m.id}` : '/motos'}
+                            className="flex-1 text-center text-xs font-bold py-2 rounded-lg bg-[#16161c] text-white hover:bg-white/10 transition-colors border border-white/10"
+                          >
+                            Ver ficha
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteMoto(m.id, m.status, m.offersCount || 0)}
+                            className={`w-9 h-8 rounded-lg border transition-colors flex items-center justify-center ${
+                              m.status === 'Apartada' || m.status === 'reserved' || (m.offersCount || 0) > 0
+                                ? 'border-white/5 text-zinc-600 hover:text-amber-400 hover:border-amber-500/40'
+                                : 'border-white/10 text-zinc-400 hover:border-red-brand hover:text-red-brand'
+                            }`}
+                            title={
+                              m.status === 'Apartada'
+                                ? 'Publicación autorizada y apartada (no eliminable)'
+                                : (m.offersCount || 0) > 0
+                                ? 'Publicación con ofertas activas en proceso (no eliminable)'
+                                : 'Eliminar publicación'
+                            }
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -768,7 +821,9 @@ const SellerDashboard = () => {
                       <div>
                         <h3 className="font-bold text-sm text-white flex items-center gap-2">
                           <span>{off.buyerName}</span>
-                          <span className="text-xs text-zinc-400 font-normal">({off.buyerEmail})</span>
+                          <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                            <CheckCircle2 size={11} /> Comprador Verificado
+                          </span>
                         </h3>
                         <p className="text-xs text-zinc-400 mt-0.5">Para: <strong className="text-zinc-200">{off.motoBrand} {off.motoModel}</strong></p>
                       </div>
@@ -883,7 +938,7 @@ const SellerDashboard = () => {
                 <div className="space-y-2 text-xs text-zinc-300 p-3 bg-[#141418] rounded-xl border border-white/5">
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Lugar:</span>
-                    <span className="font-medium text-white">Domicilio del vendedor (CDMX)</span>
+                    <span className="font-medium text-white">Centro Autorizado Motoluv (CDMX)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Perito Asignado:</span>
@@ -1271,7 +1326,7 @@ const SellerDashboard = () => {
         isOpen={showBoostModal}
         onClose={() => setShowBoostModal(false)}
         moto={selectedMotoForBoost}
-        allMotos={displayMotos}
+        allMotos={motos}
         onBoostSuccess={(motoId, plan) => {
           setMotos(prev => prev.map(m => (m.id === motoId || m === motoId) ? { ...m, is_boosted: true, boost_tier: plan.id } : m));
           setShowBoostModal(false);

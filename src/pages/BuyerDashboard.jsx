@@ -67,7 +67,7 @@ const BuyerDashboard = () => {
       id: 3,
       sender: 'luis',
       senderName: 'Luis Ramírez (Vendedor)',
-      text: '¡Hola Pedro! Confirmado, el perito ya llegó a mi domicilio para revisar la moto.',
+      text: '¡Hola Pedro! Confirmado, el perito ya se encuentra en el Centro de Inspección Autorizado para certificar la moto.',
       time: '11:05 AM',
       isMe: false
     }

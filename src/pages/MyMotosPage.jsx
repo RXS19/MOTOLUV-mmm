@@ -13,83 +13,67 @@ const MyMotosPage = () => {
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [selectedMotoForBoost, setSelectedMotoForBoost] = useState(null);
 
-  const sampleFallbackMotos = [
-    {
-      id: 'pub-1',
-      brand: 'Yamaha',
-      model: 'MT-07',
-      year: 2021,
-      km: 14500,
-      price: 128900,
-      score: 9.4,
-      views: 412,
-      status: 'Activa',
-      is_boosted: true,
-      image: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80',
-    },
-    {
-      id: 'pub-2',
-      brand: 'KTM',
-      model: 'Duke 390',
-      year: 2022,
-      km: 8200,
-      price: 96900,
-      score: 9.1,
-      views: 289,
-      status: 'Activa',
-      is_boosted: false,
-      image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80',
-    },
-    {
-      id: 'pub-3',
-      brand: 'Honda',
-      model: 'CB650R',
-      year: 2020,
-      km: 19800,
-      price: 139900,
-      score: 9.6,
-      views: 367,
-      status: 'Activa',
-      is_boosted: false,
-      image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80',
-    },
-  ];
-
   const load = () => {
     setLoading(true);
     motoApi.mine().then((res) => {
-      if (Array.isArray(res) && res.length > 0) {
+      if (Array.isArray(res)) {
         setMotos(res);
       } else {
-        setMotos(sampleFallbackMotos);
+        setMotos([]);
       }
     }).catch(() => {
-      setMotos(sampleFallbackMotos);
+      setMotos([]);
     }).finally(() => setLoading(false));
   };
 
   useEffect(load, []);
 
-  const del = async (id) => {
-    if (!window.confirm('¿Eliminar esta publicación?')) return;
+  const del = async (id, status, offersCount = 0) => {
+    if (status === 'Apartada' || status === 'reserved' || status === 'Proceso de entrega') {
+      toast({
+        title: 'Acción no permitida',
+        description: 'No puedes eliminar una publicación autorizada y apartada. Se encuentra en proceso activo de compraventa.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (offersCount > 0) {
+      toast({
+        title: 'Ofertas activas en proceso',
+        description: 'No puedes eliminar una motocicleta que tiene ofertas activas en proceso. Debes responder o declinar las ofertas primero.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!window.confirm('¿Estás seguro de eliminar esta publicación de tu inventario?')) return;
     try {
       await motoApi.remove(id);
-      toast({ title: 'Publicación eliminada' });
+      toast({ title: 'Publicación eliminada', description: 'La motocicleta ha sido removida de tu inventario correctamente.' });
       load();
-    } catch {
-      toast({ title: 'Eliminado localmente' });
-      setMotos(prev => prev.filter(m => m.id !== id));
+    } catch (err) {
+      toast({
+        title: 'No se pudo eliminar',
+        description: err?.message || 'Ocurrió un error al eliminar la publicación.',
+        variant: 'destructive',
+      });
     }
   };
 
   const updateStatus = async (id, newStatus) => {
     try {
-      await motoApi.update(id, { status: newStatus });
-      toast({ title: 'Estatus de operación actualizado', description: `Cambió a "${newStatus}".` });
+      const res = await motoApi.update(id, { status: newStatus });
+      if (newStatus === 'Rechazada' || newStatus === 'rejected' || res?.deleted) {
+        toast({
+          title: 'Publicación rechazada',
+          description: 'La motocicleta no aprobó la inspección técnica y ha sido eliminada automáticamente del catálogo y del sistema.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Estatus de operación actualizado', description: `Cambió a "${newStatus}".` });
+      }
       load();
-    } catch {
-      toast({ title: 'Estatus actualizado' });
-      setMotos(prev => prev.map(m => m.id === id ? { ...m, status: newStatus } : m));
+    } catch (err) {
+      toast({ title: 'Error al actualizar estatus', description: err?.message, variant: 'destructive' });
     }
   };
 
@@ -108,12 +92,14 @@ const MyMotosPage = () => {
           <p className="text-zinc-400 mt-1 text-sm">{motos.length} publicación(es) registradas</p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleBoost(motos[0])}
-            className="px-5 py-3 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-sm shadow-md flex items-center justify-center uppercase tracking-wider transition-all"
-          >
-            Destacar Publicación
-          </button>
+          {motos.length > 0 && (
+            <button
+              onClick={() => handleBoost(motos[0])}
+              className="px-5 py-3 bg-gradient-to-r from-red-brand to-orange-600 hover:from-red-600 hover:to-orange-500 text-white font-bold text-xs rounded-sm shadow-md flex items-center justify-center uppercase tracking-wider transition-all"
+            >
+              Destacar Publicación
+            </button>
+          )}
           <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
             <Plus size={14} /> Nueva Publicación
           </Link>
@@ -132,9 +118,9 @@ const MyMotosPage = () => {
         <div className="text-center py-20 text-zinc-500">Cargando...</div>
       ) : motos.length === 0 ? (
         <div className="bg-[#111112] border border-white/5 rounded-md p-20 text-center">
-          <p className="text-zinc-500 mb-6">No tienes publicaciones aún</p>
+          <p className="text-zinc-400 text-sm mb-6">Aún no tienes motocicletas publicadas</p>
           <Link to="/panel/publicar" className="btn-red inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase px-6 py-3 rounded-sm">
-            <Plus size={14} /> Crear Publicación
+            <Plus size={14} /> Publicar Motocicleta
           </Link>
         </div>
       ) : (
@@ -203,7 +189,21 @@ const MyMotosPage = () => {
                     <Link to={m.id ? `/motos/${m.id}` : '/motos'} className="flex-1 text-center text-xs font-bold tracking-widest uppercase py-2 rounded-sm border border-white/10 text-white hover:border-red-brand hover:text-red-brand transition-colors">
                       Ver Ficha
                     </Link>
-                    <button onClick={() => del(m.id)} className="w-10 h-8 rounded-sm border border-white/10 text-zinc-400 hover:border-red-brand hover:text-red-brand transition-colors flex items-center justify-center">
+                    <button
+                      onClick={() => del(m.id, m.status, m.offersCount || 0)}
+                      className={`w-10 h-8 rounded-sm border transition-colors flex items-center justify-center ${
+                        m.status === 'Apartada' || m.status === 'reserved' || (m.offersCount || 0) > 0
+                          ? 'border-white/5 text-zinc-600 hover:text-amber-400 hover:border-amber-500/40'
+                          : 'border-white/10 text-zinc-400 hover:border-red-brand hover:text-red-brand'
+                      }`}
+                      title={
+                        m.status === 'Apartada'
+                          ? 'Publicación autorizada y apartada (no eliminable)'
+                          : (m.offersCount || 0) > 0
+                          ? 'Publicación con ofertas activas en proceso (no eliminable)'
+                          : 'Eliminar publicación'
+                      }
+                    >
                       <Trash2 size={13} />
                     </button>
                   </div>
