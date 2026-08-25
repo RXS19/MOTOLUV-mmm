@@ -70,7 +70,7 @@ const BankAccountPage = () => {
           <div>
             <div className="text-emerald-300 text-sm font-medium">Cuenta bancaria activa</div>
             <div className="text-zinc-400 text-xs mt-0.5">
-              {user.bank_name} · CLABE terminada en ••••{user.bank_clabe.slice(-4)}
+              {user.bank_name} · CLABE terminada en ••••{String(user.bank_clabe || '').slice(-4)}
             </div>
           </div>
         </div>

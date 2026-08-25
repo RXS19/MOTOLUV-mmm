@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   User, 
@@ -18,13 +18,14 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase, isSupabaseConfigured, logAuthDiagnostic } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, logAuthDiagnostic, fetchUserProfile } from '../lib/supabase';
 import { toast } from '../hooks/use-toast';
 import { MEXICAN_BANKS } from '../data/banks';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user: authContextUser, updateProfile, activeView } = useAuth();
+  const loadedUserIdRef = useRef(null);
 
   // Estados de ciclo de vida: 'loading' | 'loaded' | 'error'
   const [pageStatus, setPageStatus] = useState('loading');
@@ -32,17 +33,18 @@ const ProfilePage = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   // Perfil unificado en memoria
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState(() => ({
     id: authContextUser?.id || '',
     email: authContextUser?.email || '',
     full_name: authContextUser?.full_name || authContextUser?.name || '',
+    name: authContextUser?.full_name || authContextUser?.name || '',
     phone: authContextUser?.phone || '',
     city: authContextUser?.city || 'Ciudad de México',
     role: authContextUser?.role || 'both',
     avatar_url: authContextUser?.avatar_url || '',
     phone_updated_once: Boolean(authContextUser?.phone_updated_once),
     phone_change_count: authContextUser?.phone_change_count || 0,
-    bank_clabe: authContextUser?.bank_clabe || '',
+    bank_clabe: authContextUser?.bank_clabe ? String(authContextUser.bank_clabe) : '',
     bank_name: authContextUser?.bank_name || '',
     bank_holder: authContextUser?.bank_holder || authContextUser?.full_name || authContextUser?.name || '',
     bank_updated_at: authContextUser?.bank_updated_at || null,
@@ -50,47 +52,42 @@ const ProfilePage = () => {
     operations: authContextUser?.operations ?? 0,
     created_at: authContextUser?.created_at || new Date().toISOString(),
     updated_at: authContextUser?.updated_at || new Date().toISOString(),
-  });
+  }));
 
   const [showSellerClabe, setShowSellerClabe] = useState(
     authContextUser?.role === 'vendedor' || authContextUser?.role === 'both'
   );
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     name: authContextUser?.full_name || authContextUser?.name || '',
     email: authContextUser?.email || '',
     phone: authContextUser?.phone || '',
     city: authContextUser?.city || 'Ciudad de México',
     bank_name: authContextUser?.bank_name || '',
-    bank_clabe: authContextUser?.bank_clabe || '',
+    bank_clabe: authContextUser?.bank_clabe ? String(authContextUser.bank_clabe) : '',
     bank_holder: authContextUser?.bank_holder || authContextUser?.full_name || authContextUser?.name || '',
     role: authContextUser?.role || 'both',
-  });
+  }));
 
   /**
-   * Carga del Perfil según los requisitos críticos:
+   * Carga del Perfil según la arquitectura oficial:
    * 1. Obtener UUID real desde supabase.auth.getUser()
-   * 2. Utilizar user.id
-   * 3. Buscar public.profiles.id = user.id
-   * 4. Buscar public.users.id = user.id
-   * 5. Construir perfil con prioridad: profiles -> users -> user_metadata -> defaults
-   * Si hay errores de red o tablas vacías: NO dejar la pantalla vacía.
+   * 2. Consultar public.profiles (única fuente de verdad)
+   * 3. Fallback a auth metadata si no existe registro
+   * 4. Si hay errores: NO dejar la pantalla vacía, usar datos de sesión.
    */
   const loadProfile = useCallback(async () => {
     setPageStatus('loading');
     setErrorMessage(null);
 
-    let authUser = null;
     let userId = authContextUser?.id || null;
     let userEmail = authContextUser?.email || '';
     let userMetadata = authContextUser?.raw?.user_metadata || {};
 
-    // 1. Obtener usuario autenticado directamente desde Supabase Auth
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: { user: sbUser }, error: sbUserErr } = await supabase.auth.getUser();
         if (sbUser) {
-          authUser = sbUser;
           userId = sbUser.id;
           userEmail = sbUser.email || userEmail;
           userMetadata = sbUser.user_metadata || userMetadata;
@@ -106,149 +103,92 @@ const ProfilePage = () => {
       userId = authContextUser.id;
     }
 
-    // Si no hay usuario autenticado después de todas las comprobaciones
     if (!userId) {
       setPageStatus('loaded');
       return;
     }
 
-    let profilesRow = null;
-    let usersRow = null;
+    loadedUserIdRef.current = userId;
+
+    let profile = null;
     let queryErrorDetected = false;
 
-    if (isSupabaseConfigured && supabase) {
-      // 3. Buscar en public.profiles
-      try {
-        const { data: pData, error: pError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (pError) {
-          queryErrorDetected = true;
-          logAuthDiagnostic('profile_page_profiles_error', {
-            userId,
-            message: pError.message,
-            code: pError.code,
-          });
-          console.warn('[ProfilePage Profiles Query Error]', pError.message);
-        } else if (pData) {
-          profilesRow = pData;
-        }
-      } catch (err) {
-        queryErrorDetected = true;
-        console.warn('[ProfilePage Profiles Query Exception]', err?.message || err);
-      }
-
-      // 4. Buscar también en public.users
-      try {
-        const { data: uData, error: uError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (uError) {
-          queryErrorDetected = true;
-          logAuthDiagnostic('profile_page_users_error', {
-            userId,
-            message: uError.message,
-            code: uError.code,
-          });
-          console.warn('[ProfilePage Users Query Error]', uError.message);
-        } else if (uData) {
-          usersRow = uData;
-        }
-      } catch (err) {
-        queryErrorDetected = true;
-        console.warn('[ProfilePage Users Query Exception]', err?.message || err);
-      }
+    try {
+      profile = await fetchUserProfile(userId, userMetadata);
+    } catch (err) {
+      queryErrorDetected = true;
+      console.warn('[ProfilePage] Error al obtener perfil desde Supabase:', err);
     }
 
-    // 5. Prioridad de datos: profiles -> users -> user.user_metadata -> valores vacíos/default
-    const resolvedFullName = profilesRow?.full_name 
-      || usersRow?.full_name 
+    const resolvedFullName = profile?.full_name 
+      || profile?.name 
       || userMetadata?.full_name 
       || userMetadata?.name 
       || authContextUser?.full_name 
       || authContextUser?.name 
       || (userEmail ? userEmail.split('@')[0] : 'Usuario');
 
-    const resolvedPhone = profilesRow?.phone 
-      || usersRow?.phone 
+    const resolvedPhone = profile?.phone 
       || userMetadata?.phone 
-      || userMetadata?.phone_number 
       || authContextUser?.phone 
       || '';
 
     const resolvedPhoneUpdatedOnce = Boolean(
-      profilesRow?.phone_updated_once 
-      ?? usersRow?.phone_updated_once 
+      profile?.phone_updated_once 
       ?? userMetadata?.phone_updated_once 
       ?? authContextUser?.phone_updated_once 
-      ?? ((profilesRow?.phone_change_count && profilesRow.phone_change_count >= 1) || false)
+      ?? ((profile?.phone_change_count && profile.phone_change_count >= 1) || false)
     );
 
-    const resolvedPhoneChangeCount = profilesRow?.phone_change_count 
-      ?? usersRow?.phone_change_count 
+    const resolvedPhoneChangeCount = profile?.phone_change_count 
       ?? userMetadata?.phone_change_count 
       ?? authContextUser?.phone_change_count 
       ?? (resolvedPhoneUpdatedOnce ? 1 : 0);
 
-    const resolvedCity = profilesRow?.city 
-      || usersRow?.city 
+    const resolvedCity = profile?.city 
       || userMetadata?.city 
       || authContextUser?.city 
       || 'Ciudad de México';
 
-    const resolvedRole = profilesRow?.role 
-      || usersRow?.role 
+    const resolvedRole = profile?.role 
       || userMetadata?.role 
       || authContextUser?.role 
       || 'both';
 
-    const resolvedAvatarUrl = profilesRow?.avatar_url 
-      || usersRow?.avatar_url 
+    const resolvedAvatarUrl = profile?.avatar_url 
       || userMetadata?.avatar_url 
-      || userMetadata?.picture 
       || authContextUser?.avatar_url 
       || '';
 
-    const resolvedBankClabe = profilesRow?.bank_clabe 
-      || usersRow?.bank_clabe 
-      || userMetadata?.bank_clabe 
-      || authContextUser?.bank_clabe 
-      || '';
+    const resolvedBankClabe = profile?.bank_clabe !== undefined && profile?.bank_clabe !== null
+      ? String(profile.bank_clabe)
+      : (authContextUser?.bank_clabe ? String(authContextUser.bank_clabe) : '');
 
-    const resolvedBankName = profilesRow?.bank_name 
-      || usersRow?.bank_name 
+    const resolvedBankName = profile?.bank_name 
       || userMetadata?.bank_name 
       || authContextUser?.bank_name 
       || '';
 
-    const resolvedBankHolder = profilesRow?.bank_holder 
-      || usersRow?.bank_holder 
+    const resolvedBankHolder = profile?.bank_holder 
       || userMetadata?.bank_holder 
       || authContextUser?.bank_holder 
       || resolvedFullName;
 
-    const resolvedBankUpdatedAt = profilesRow?.bank_updated_at 
-      || usersRow?.bank_updated_at 
+    const resolvedBankUpdatedAt = profile?.bank_updated_at 
       || userMetadata?.bank_updated_at 
       || authContextUser?.bank_updated_at 
       || null;
 
-    const resolvedRating = profilesRow?.rating ?? usersRow?.rating ?? authContextUser?.rating ?? 5.0;
-    const resolvedOperations = profilesRow?.operations ?? usersRow?.operations ?? authContextUser?.operations ?? 0;
-    const resolvedCreatedAt = profilesRow?.created_at || usersRow?.created_at || authContextUser?.created_at || new Date().toISOString();
-    const resolvedUpdatedAt = profilesRow?.updated_at || usersRow?.updated_at || authContextUser?.updated_at || new Date().toISOString();
+    const resolvedRating = profile?.rating ?? authContextUser?.rating ?? 5.0;
+    const resolvedOperations = profile?.operations ?? authContextUser?.operations ?? 0;
+    const resolvedCreatedAt = profile?.created_at || authContextUser?.created_at || new Date().toISOString();
+    const resolvedUpdatedAt = profile?.updated_at || authContextUser?.updated_at || new Date().toISOString();
 
     const builtProfile = {
       id: userId,
       email: userEmail,
       full_name: resolvedFullName,
-      name: resolvedFullName, // Alias de conveniencia
+      name: resolvedFullName,
       phone: resolvedPhone,
       city: resolvedCity,
       role: resolvedRole,
@@ -284,7 +224,7 @@ const ProfilePage = () => {
     } else {
       setPageStatus('loaded');
     }
-  }, [authContextUser]);
+  }, [authContextUser?.id, authContextUser?.email]);
 
   useEffect(() => {
     loadProfile();
@@ -297,7 +237,8 @@ const ProfilePage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.name.trim()) {
+    const cleanName = (form.name || '').trim();
+    if (!cleanName) {
       toast({
         title: 'Nombre requerido',
         description: 'Por favor ingresa tu nombre completo.',
@@ -307,7 +248,7 @@ const ProfilePage = () => {
     }
 
     // Validación de CLABE si aplica
-    const clabeClean = form.bank_clabe ? form.bank_clabe.replace(/\s/g, '') : '';
+    const clabeClean = form.bank_clabe ? String(form.bank_clabe).replace(/\s/g, '').replace(/\D/g, '') : '';
     if (showSellerClabe && clabeClean) {
       if (!/^\d{18}$/.test(clabeClean)) {
         toast({
@@ -329,33 +270,44 @@ const ProfilePage = () => {
 
     setIsSaving(true);
     try {
-      // Guardar cambios: actualiza public.users, public.profiles y metadata de auth (NUNCA register_users)
+      // Guardar cambios: actualiza exclusivamente public.profiles
       const updatedUser = await updateProfile({
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        city: form.city.trim(),
+        name: cleanName,
+        phone: (form.phone || '').trim(),
+        city: (form.city || '').trim(),
         role: form.role,
         ...(showSellerClabe
           ? {
               bank_clabe: clabeClean,
               bank_name: form.bank_name,
-              bank_holder: form.bank_holder.trim() || form.name.trim(),
+              bank_holder: (form.bank_holder || '').trim() || cleanName,
             }
           : {}),
       });
 
-      // Actualizar estado local inmediato
+      // Actualizar estado local inmediato sin recargar la página ni poner pantalla de carga
       setProfileData((prev) => ({
         ...prev,
         ...updatedUser,
-        full_name: form.name.trim(),
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        city: form.city.trim(),
+        full_name: cleanName,
+        name: cleanName,
+        phone: (form.phone || '').trim(),
+        city: (form.city || '').trim(),
         role: form.role,
         bank_clabe: showSellerClabe ? clabeClean : prev.bank_clabe,
         bank_name: showSellerClabe ? form.bank_name : prev.bank_name,
-        bank_holder: showSellerClabe ? (form.bank_holder.trim() || form.name.trim()) : prev.bank_holder,
+        bank_holder: showSellerClabe ? ((form.bank_holder || '').trim() || cleanName) : prev.bank_holder,
+      }));
+
+      setForm((prev) => ({
+        ...prev,
+        name: cleanName,
+        phone: (form.phone || '').trim(),
+        city: (form.city || '').trim(),
+        role: form.role,
+        bank_clabe: showSellerClabe ? clabeClean : prev.bank_clabe,
+        bank_name: showSellerClabe ? form.bank_name : prev.bank_name,
+        bank_holder: showSellerClabe ? ((form.bank_holder || '').trim() || cleanName) : prev.bank_holder,
       }));
 
       toast({
@@ -384,7 +336,7 @@ const ProfilePage = () => {
   };
 
   const displayName = form.name || profileData.full_name || profileData.name || 'Usuario Motoluv';
-  const initials = displayName
+  const initials = String(displayName)
     .split(' ')
     .filter(Boolean)
     .map((s) => s[0])
@@ -461,7 +413,7 @@ const ProfilePage = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-zinc-500 font-mono">
-              ID: {profileData.id ? profileData.id.slice(0, 8) : 'MLV-USER'}
+              ID: {profileData.id ? String(profileData.id).slice(0, 8) : 'MLV-USER'}
             </span>
           </div>
         </div>
@@ -661,10 +613,10 @@ const ProfilePage = () => {
                     <div className="text-xs space-y-0.5">
                       <div className="text-emerald-300 font-bold">Cuenta de recepción configurada</div>
                       <div className="text-zinc-300 font-mono">
-                        {profileData.bank_name || 'Banco Registrado'} · CLABE ••••••••••••••{profileData.bank_clabe.slice(-4)}
+                        {profileData.bank_name || 'Banco Registrado'} · CLABE ••••••••••••••{String(profileData.bank_clabe).slice(-4)}
                       </div>
                       <div className="text-zinc-500 text-[11px]">
-                        Titular: {profileData.bank_holder || profileData.full_name}
+                        Titular: {profileData.bank_holder || profileData.full_name || profileData.name}
                       </div>
                     </div>
                   </div>
@@ -701,8 +653,8 @@ const ProfilePage = () => {
                       <label className="text-xs text-zinc-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
                         <CreditCard size={13} className="text-red-brand" /> CLABE Interbancaria (18 dígitos) <span className="text-red-brand">*</span>
                       </label>
-                      <span className={`text-[11px] font-mono ${form.bank_clabe.length === 18 ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                        {form.bank_clabe.length}/18
+                      <span className={`text-[11px] font-mono ${(form.bank_clabe || '').length === 18 ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                        {(form.bank_clabe || '').length}/18
                       </span>
                     </div>
                     <input

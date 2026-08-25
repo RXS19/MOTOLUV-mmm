@@ -295,7 +295,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // REQUISITO 9 & 10: Actualizar datos de perfil (users y profiles, NUNCA register_users)
+  // Actualizar datos de perfil exclusivamente en public.profiles
   const updateProfile = async ({ name, phone, city, bank_clabe, bank_name, bank_holder, role }) => {
     if (!user) throw new Error('Debes estar autenticado para actualizar tu perfil.');
     const updates = {};
@@ -320,8 +320,9 @@ export const AuthProvider = ({ children }) => {
     if (bank_name !== undefined) updates.bank_name = bank_name.trim();
     if (bank_holder !== undefined) updates.bank_holder = bank_holder.trim();
 
+    let updatedProfile = null;
     try {
-      await updateUserProfile(user.id, updates);
+      updatedProfile = await updateUserProfile(user.id, updates);
       logAuthDiagnostic('updateProfile_completado', { userId: user.id });
     } catch (err) {
       logAuthDiagnostic('updateProfile_error', {
@@ -332,17 +333,30 @@ export const AuthProvider = ({ children }) => {
       throw err;
     }
 
+    const resolvedName = updatedProfile?.full_name || (name !== undefined ? name.trim() : (user.full_name || user.name));
     const updated = {
       ...user,
-      ...(name !== undefined ? { name: name.trim() } : {}),
-      ...(phone !== undefined ? { phone: phone.trim() } : {}),
-      ...(isPhoneChanging ? { phone_updated_once: true, phone_change_count: (user?.phone_change_count || 0) + 1 } : {}),
-      ...(city !== undefined ? { city: city.trim() } : {}),
-      ...(role !== undefined ? { role } : {}),
-      ...(bank_clabe !== undefined ? { bank_clabe: bank_clabe.trim(), bank_updated_at: updates.bank_updated_at } : {}),
-      ...(bank_name !== undefined ? { bank_name: bank_name.trim() } : {}),
-      ...(bank_holder !== undefined ? { bank_holder: bank_holder.trim() } : {}),
+      name: resolvedName,
+      full_name: resolvedName,
+      phone: updatedProfile?.phone !== undefined ? updatedProfile.phone : (phone !== undefined ? phone.trim() : user.phone),
+      phone_updated_once: updatedProfile?.phone_updated_once !== undefined 
+        ? updatedProfile.phone_updated_once 
+        : (isPhoneChanging ? true : user.phone_updated_once),
+      phone_change_count: updatedProfile?.phone_change_count !== undefined 
+        ? updatedProfile.phone_change_count 
+        : (isPhoneChanging ? (user?.phone_change_count || 0) + 1 : user.phone_change_count),
+      city: updatedProfile?.city !== undefined ? updatedProfile.city : (city !== undefined ? city.trim() : user.city),
+      role: updatedProfile?.role !== undefined ? updatedProfile.role : (role !== undefined ? role : user.role),
+      avatar_url: updatedProfile?.avatar_url || user.avatar_url,
+      bank_clabe: updatedProfile?.bank_clabe !== undefined 
+        ? (updatedProfile.bank_clabe ? String(updatedProfile.bank_clabe) : '') 
+        : (bank_clabe !== undefined ? bank_clabe.trim() : user.bank_clabe),
+      bank_name: updatedProfile?.bank_name !== undefined ? updatedProfile.bank_name : (bank_name !== undefined ? bank_name.trim() : user.bank_name),
+      bank_holder: updatedProfile?.bank_holder !== undefined ? updatedProfile.bank_holder : (bank_holder !== undefined ? bank_holder.trim() : user.bank_holder),
+      bank_updated_at: updatedProfile?.bank_updated_at || updates.bank_updated_at || user.bank_updated_at,
+      updated_at: updatedProfile?.updated_at || new Date().toISOString(),
     };
+
     setUser(updated);
     if (role && role !== user.role) {
       setActiveView(role === 'both' ? 'vendedor' : role);
@@ -353,8 +367,12 @@ export const AuthProvider = ({ children }) => {
   // Cambiar rol (comprador/vendedor/both)
   const updateRole = async (newRole) => {
     if (!user) return null;
-    await updateUserProfile(user.id, { role: newRole });
-    const updated = { ...user, role: newRole };
+    const updatedProfile = await updateUserProfile(user.id, { role: newRole });
+    const updated = { 
+      ...user, 
+      role: updatedProfile?.role || newRole,
+      updated_at: updatedProfile?.updated_at || new Date().toISOString(),
+    };
     setUser(updated);
     setActiveView(newRole === 'both' ? 'vendedor' : newRole);
     return updated;
@@ -366,11 +384,18 @@ export const AuthProvider = ({ children }) => {
     const updates = {
       bank_clabe: clabe ? clabe.trim() : '',
       bank_name: bank_name ? bank_name.trim() : '',
-      bank_holder: holder ? holder.trim() : user.name,
+      bank_holder: holder ? holder.trim() : (user.full_name || user.name),
       bank_updated_at: new Date().toISOString(),
     };
-    await updateUserProfile(user.id, updates);
-    const updated = { ...user, ...updates };
+    const updatedProfile = await updateUserProfile(user.id, updates);
+    const updated = { 
+      ...user, 
+      bank_clabe: updatedProfile?.bank_clabe ? String(updatedProfile.bank_clabe) : (clabe ? clabe.trim() : ''),
+      bank_name: updatedProfile?.bank_name || updates.bank_name,
+      bank_holder: updatedProfile?.bank_holder || updates.bank_holder,
+      bank_updated_at: updatedProfile?.bank_updated_at || updates.bank_updated_at,
+      updated_at: updatedProfile?.updated_at || new Date().toISOString(),
+    };
     setUser(updated);
     return updated;
   };

@@ -134,27 +134,22 @@ export async function syncCurrentUser() {
 }
 
 /**
- * Obtener perfil de usuario combinando `public.profiles`, `public.users` y `auth.user.user_metadata`.
+ * Obtener perfil de usuario desde `public.profiles` con fallback a `auth.user.user_metadata`.
  *
  * PRIORIDAD DE DATOS:
- * 1. public.profiles (id = user.id)
- * 2. public.users (id = user.id)
- * 3. user.user_metadata
- * 4. Valores predeterminados / vacíos
+ * 1. public.profiles (id = user.id) - Fuente de verdad principal
+ * 2. auth.user.user_metadata - Fallback si profiles no existe aún
+ * 3. Valores predeterminados / seguros
  *
- * Si profiles o users no existe o devuelve error:
- *  - NO dejar la página vacía.
- *  - Usar los fallbacks en cascada.
- *  - Registrar el diagnóstico en consola en modo desarrollo.
+ * NOTA: No permite que datos incompletos de public.users sobrescriban public.profiles.
  */
 export async function fetchUserProfile(userId, userMetadata = null) {
   if (!userId) return null;
 
   let profile = null;
-  let userData = null;
 
   if (isSupabaseConfigured && supabase) {
-    // 1. Consultar tabla profiles
+    // 1. Consultar tabla profiles como única fuente de verdad del perfil
     try {
       const { data: pData, error: profileError } = await supabase
         .from('profiles')
@@ -176,42 +171,18 @@ export async function fetchUserProfile(userId, userMetadata = null) {
     } catch (err) {
       console.warn('[Supabase Profiles Exception]', err?.message || err);
     }
-
-    // 2. Consultar tabla users para datos complementarios o fallback
-    try {
-      const { data: uData, error: uError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (uError) {
-        logAuthDiagnostic('fetch_users_table_error', {
-          userId,
-          errorCode: uError.code,
-          errorMessage: uError.message,
-          details: uError.details,
-        });
-        console.warn('[Supabase Users Warning]', uError.message);
-      } else if (uData) {
-        userData = uData;
-      }
-    } catch (err) {
-      console.warn('[Supabase Users Exception]', err?.message || err);
-    }
   }
 
-  // 3. Cascada de datos según prioridad
+  // 2. Cascada de datos según prioridad: profiles -> userMetadata -> defaults
   const meta = userMetadata || {};
 
   const fullName = profile?.full_name 
-    || userData?.full_name 
+    || profile?.name 
     || meta.full_name 
     || meta.name 
     || '';
 
   const phone = profile?.phone 
-    || userData?.phone 
     || meta.phone 
     || meta.phone_number 
     || meta.phoneNumber 
@@ -219,61 +190,52 @@ export async function fetchUserProfile(userId, userMetadata = null) {
 
   const phoneUpdatedOnce = Boolean(
     profile?.phone_updated_once 
-    ?? userData?.phone_updated_once 
     ?? meta.phone_updated_once 
     ?? ((profile?.phone_change_count && profile.phone_change_count >= 1) || false)
   );
 
   const phoneChangeCount = profile?.phone_change_count 
-    ?? userData?.phone_change_count 
     ?? meta.phone_change_count 
     ?? (phoneUpdatedOnce ? 1 : 0);
 
   const city = profile?.city 
-    || userData?.city 
     || meta.city 
     || 'Ciudad de México';
 
   const role = profile?.role 
-    || userData?.role 
     || meta.role 
     || 'both';
 
   const avatarUrl = profile?.avatar_url 
-    || userData?.avatar_url 
     || meta.avatar_url 
     || meta.picture 
     || '';
 
-  const bankClabe = profile?.bank_clabe 
-    || userData?.bank_clabe 
-    || meta.bank_clabe 
-    || '';
+  const bankClabe = profile?.bank_clabe !== null && profile?.bank_clabe !== undefined
+    ? String(profile.bank_clabe)
+    : (meta.bank_clabe ? String(meta.bank_clabe) : '');
 
   const bankName = profile?.bank_name 
-    || userData?.bank_name 
     || meta.bank_name 
     || '';
 
   const bankHolder = profile?.bank_holder 
-    || userData?.bank_holder 
     || meta.bank_holder 
     || fullName;
 
   const bankUpdatedAt = profile?.bank_updated_at 
-    || userData?.bank_updated_at 
     || meta.bank_updated_at 
     || null;
 
-  const rating = profile?.rating ?? userData?.rating ?? 5.0;
-  const operations = profile?.operations ?? userData?.operations ?? 0;
-  const createdAt = profile?.created_at || userData?.created_at || new Date().toISOString();
-  const updatedAt = profile?.updated_at || userData?.updated_at || new Date().toISOString();
+  const rating = profile?.rating ?? 5.0;
+  const operations = profile?.operations ?? 0;
+  const createdAt = profile?.created_at || new Date().toISOString();
+  const updatedAt = profile?.updated_at || new Date().toISOString();
 
   const merged = {
     id: userId,
     full_name: fullName,
-    name: fullName, // Compatibilidad con vistas que usen user.name
+    name: fullName, // Compatibilidad total con vistas que usen user.name
     phone,
     phone_updated_once: phoneUpdatedOnce,
     phone_change_count: phoneChangeCount,
@@ -295,28 +257,30 @@ export async function fetchUserProfile(userId, userMetadata = null) {
     hasFullName: Boolean(merged.full_name),
     hasPhone: Boolean(merged.phone),
     role: merged.role,
-    source: profile ? 'profiles' : userData ? 'users' : 'metadata/default',
+    source: profile ? 'profiles' : 'metadata/default',
   });
 
   return merged;
 }
 
 /**
- * Actualizar datos del usuario:
- * - NO enviar "name" a public.profiles ni public.users (la columna es "full_name").
- * - Mapear name -> full_name.
- * - Mantener: phone, phone_updated_once, phone_change_count, city, role, bank_clabe, bank_name, bank_holder, bank_updated_at.
- * - Actualizar public.users.
- * - Actualizar public.profiles.
- * - Actualizar metadata de Supabase Auth.
- * - NUNCA modificar public.register_users (inmutable).
+ * Actualizar datos del usuario exclusivamente en `public.profiles`.
+ *
+ * REGLAS ARQUITECTÓNICAS CRÍTICAS:
+ * 1. public.profiles es la ÚNICA fuente de verdad del perfil.
+ * 2. NO actualizar public.users (no contiene full_name, city, role, bank_clabe, etc.).
+ * 3. NO llamar a supabase.auth.updateUser() para evitar onAuthStateChange y segundas sincronizaciones.
+ * 4. NO llamar a sync_current_user().
+ * 5. bank_clabe es NUMERIC: Si está vacío, enviar null (NUNCA "").
+ * 6. NUNCA modificar public.register_users (inmutable).
+ * 7. Devuelve el registro de perfil actualizado directamente desde public.profiles.
  */
 export async function updateUserProfile(userId, updates) {
   if (!isSupabaseConfigured || !supabase || !userId) {
     throw new Error('Supabase no está configurado para actualizar el perfil.');
   }
 
-  // 1. Extraer y mapear valores estrictos para evitar enviar columnas inexistentes (como "name")
+  // 1. Mapear y sanear campos para public.profiles
   const resolvedFullName = updates.full_name !== undefined
     ? String(updates.full_name).trim()
     : updates.name !== undefined
@@ -325,82 +289,65 @@ export async function updateUserProfile(userId, updates) {
 
   const cleanData = {};
 
-  if (resolvedFullName !== undefined) cleanData.full_name = resolvedFullName;
-  if (updates.phone !== undefined) cleanData.phone = String(updates.phone).trim();
-  if (updates.phone_updated_once !== undefined) cleanData.phone_updated_once = Boolean(updates.phone_updated_once);
-  if (updates.phone_change_count !== undefined) cleanData.phone_change_count = Number(updates.phone_change_count);
-  if (updates.city !== undefined) cleanData.city = String(updates.city).trim();
-  if (updates.role !== undefined) cleanData.role = updates.role;
-  if (updates.bank_clabe !== undefined) cleanData.bank_clabe = String(updates.bank_clabe).trim();
-  if (updates.bank_name !== undefined) cleanData.bank_name = String(updates.bank_name).trim();
-  if (updates.bank_holder !== undefined) cleanData.bank_holder = String(updates.bank_holder).trim();
-  if (updates.bank_updated_at !== undefined) cleanData.bank_updated_at = updates.bank_updated_at;
+  if (resolvedFullName !== undefined) {
+    cleanData.full_name = resolvedFullName;
+    const nameParts = resolvedFullName.split(' ').filter(Boolean);
+    cleanData.first_name = nameParts[0] || null;
+    cleanData.last_name = nameParts.slice(1).join(' ') || null;
+  }
+
+  if (updates.phone !== undefined) {
+    cleanData.phone = updates.phone ? String(updates.phone).trim() : null;
+  }
+  if (updates.phone_updated_once !== undefined) {
+    cleanData.phone_updated_once = Boolean(updates.phone_updated_once);
+  }
+  if (updates.phone_change_count !== undefined) {
+    cleanData.phone_change_count = Number(updates.phone_change_count);
+  }
+  if (updates.city !== undefined) {
+    cleanData.city = updates.city ? String(updates.city).trim() : null;
+  }
+  if (updates.role !== undefined) {
+    cleanData.role = updates.role;
+  }
+  if (updates.avatar_url !== undefined) {
+    cleanData.avatar_url = updates.avatar_url;
+  }
+  if (updates.bank_name !== undefined) {
+    cleanData.bank_name = updates.bank_name ? String(updates.bank_name).trim() : null;
+  }
+  if (updates.bank_holder !== undefined) {
+    cleanData.bank_holder = updates.bank_holder ? String(updates.bank_holder).trim() : null;
+  }
+  if (updates.bank_updated_at !== undefined) {
+    cleanData.bank_updated_at = updates.bank_updated_at;
+  }
+
+  // Manejo estricto de bank_clabe como NUMERIC
+  if (updates.bank_clabe !== undefined) {
+    const clabeStr = String(updates.bank_clabe).replace(/\D/g, '').trim();
+    if (clabeStr.length > 0) {
+      cleanData.bank_clabe = clabeStr;
+    } else {
+      cleanData.bank_clabe = null; // NUMERIC en Postgres debe recibir null, nunca ""
+    }
+  }
+
   cleanData.updated_at = new Date().toISOString();
 
-  let authMetaError = null;
-  let usersTableError = null;
-  let profilesTableError = null;
-
-  // A. Actualizar metadata de auth en Supabase
+  // 2. Actualizar EXCLUSIVAMENTE public.profiles
   try {
-    const authMetaPayload = { ...cleanData };
-    if (resolvedFullName !== undefined) {
-      authMetaPayload.name = resolvedFullName;
-    }
-    const { error: metaErr } = await supabase.auth.updateUser({
-      data: authMetaPayload,
-    });
-    if (metaErr) {
-      authMetaError = metaErr;
-      logAuthDiagnostic('update_auth_metadata_error', {
-        userId,
-        message: metaErr.message,
-        code: metaErr.code,
-      });
-      console.error('[Supabase Auth Metadata Error]', metaErr.message);
-    }
-  } catch (err) {
-    authMetaError = err;
-    console.error('[Supabase Auth Metadata Exception]', err);
-  }
-
-  // B. Actualizar public.users (NO register_users)
-  try {
-    const { error: uErr } = await supabase
-      .from('users')
-      .upsert({
-        id: userId,
-        ...cleanData,
-      }, { onConflict: 'id' });
-
-    if (uErr) {
-      usersTableError = uErr;
-      logAuthDiagnostic('update_users_table_error', {
-        userId,
-        message: uErr.message,
-        code: uErr.code,
-        details: uErr.details,
-      });
-      console.error('[Supabase Users Table Error]', uErr.message, uErr.details || '');
-    }
-  } catch (err) {
-    usersTableError = err;
-    console.error('[Supabase Users Table Exception]', err);
-  }
-
-  // C. Actualizar public.profiles (NO register_users)
-  try {
-    const { data: profileResult, error: pErr } = await supabase
+    const { data: updatedProfile, error: pErr } = await supabase
       .from('profiles')
       .upsert({
         id: userId,
         ...cleanData,
       }, { onConflict: 'id' })
-      .select()
-      .maybeSingle();
+      .select('*')
+      .single();
 
     if (pErr) {
-      profilesTableError = pErr;
       logAuthDiagnostic('update_profiles_table_error', {
         userId,
         message: pErr.message,
@@ -408,28 +355,23 @@ export async function updateUserProfile(userId, updates) {
         details: pErr.details,
       });
       console.error('[Supabase Profiles Table Error]', pErr.message, pErr.details || '');
+      throw new Error(pErr.message || 'Error al actualizar perfil en Supabase');
     }
 
-    if (profileResult) {
-      logAuthDiagnostic('profile_actualizado', {
-        userId: profileResult.id,
-        updatedPhone: profileResult.phone,
-        role: profileResult.role,
-      });
-    }
+    logAuthDiagnostic('profile_actualizado_exitoso', {
+      userId: updatedProfile?.id || userId,
+      full_name: updatedProfile?.full_name,
+      phone: updatedProfile?.phone,
+      role: updatedProfile?.role,
+    });
+
+    return updatedProfile;
   } catch (err) {
-    profilesTableError = err;
-    console.error('[Supabase Profiles Table Exception]', err);
-  }
-
-  // Si fallaron tanto users como profiles, lanzar error real
-  if (usersTableError && profilesTableError) {
-    const err = new Error(profilesTableError.message || usersTableError.message || 'Error al actualizar perfil en Supabase');
-    err.profilesError = profilesTableError;
-    err.usersError = usersTableError;
-    err.authError = authMetaError;
+    logAuthDiagnostic('update_profiles_exception', {
+      userId,
+      message: err?.message || String(err),
+    });
+    console.error('[Supabase Profiles Update Exception]', err);
     throw err;
   }
-
-  return cleanData;
 }
