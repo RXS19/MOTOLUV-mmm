@@ -195,25 +195,16 @@ const MotoDetailPage = () => {
   };
 
   const rawScoreDetails = (moto && (moto.score_details || moto.scoreDetails)) || null;
-  const scoreDetails = (rawScoreDetails && Object.keys(rawScoreDetails).length > 0)
+  const scoreDetails = (rawScoreDetails && typeof rawScoreDetails === 'object' && Object.keys(rawScoreDetails).length > 0)
     ? rawScoreDetails
-    : {
-        'Motor y Compresión': 92,
-        'Sistema de Frenos': 88,
-        'Suspensión y Horquillas': 85,
-        'Transmisión y Embrague': 90,
-        'Neumáticos y Rines': 82,
-        'Sistema Eléctrico': 94,
-        'Chasis y Geometría': 95,
-        'Documentación y Legal': 100,
-      };
+    : null;
 
-  const scoreValue = moto && moto.score !== undefined && moto.score !== null ? Number(moto.score) : 4.8;
-  const certFolio = moto?.certification_id || `CERT-MLV-${2024000 + (parseInt(String(moto?.id).replace(/\D/g, '')) || 101)}`;
-  const certDate = moto?.certified_date || '2024-05-15';
-  const certInspector = moto?.certifier || 'Taller Mecánico Especializado Motoluv MX • Inspector #MLV-408';
-  const certStatus = moto?.certified_status || 'Aprobada • Certificación Integral';
-  const certNotes = moto?.inspection_notes || 'Inspección técnica y peritaje integral completados satisfactoriamente. Compresión de motor verificada en estándar óptimo. Sistema de frenos y suspensión sin holguras ni desgastes anómalos. Sistema eléctrico y arnés íntegro. Libre de reporte de robo, siniestros y con número de serie/VIN cotejado en REPUVE.';
+  const scoreValue = moto && moto.score !== undefined && moto.score !== null ? Number(moto.score) : null;
+  const certFolio = moto?.certification_id || (moto?.id ? `CERT-MLV-${String(moto.id).replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}` : 'En trámite');
+  const certDate = moto?.certified_date || (moto?.created_at ? new Date(moto.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'En trámite');
+  const certInspector = moto?.certifier || 'Taller Mecánico Especializado Motoluv MX';
+  const certStatus = moto?.certified_status || (scoreValue !== null ? 'Certificación Técnica Aprobada' : 'En proceso de inspección');
+  const certNotes = moto?.inspection_notes || (scoreValue !== null ? 'Inspección técnica y peritaje integral completados satisfactoriamente bajo protocolo de verificación integral Motoluv.' : 'Esta motocicleta se encuentra en proceso de validación técnica y documental pericial.');
 
   return (
     <div className="max-w-7xl mx-auto px-5 lg:px-8 py-8">
@@ -355,8 +346,12 @@ const MotoDetailPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-[#0a0a0b] border border-white/5 rounded-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-md bg-gradient-to-br from-red-brand to-red-700 flex flex-col items-center justify-center text-white shadow-lg flex-shrink-0">
-                      <span className="font-display font-extrabold text-2xl leading-none">{scoreValue.toFixed(1)}</span>
-                      <span className="text-[9px] uppercase font-bold tracking-widest text-red-100 mt-0.5">de 5.0</span>
+                      <span className="font-display font-extrabold text-2xl leading-none">
+                        {scoreValue !== null ? scoreValue.toFixed(1) : '--'}
+                      </span>
+                      <span className="text-[9px] uppercase font-bold tracking-widest text-red-100 mt-0.5">
+                        {scoreValue !== null ? 'de 5.0' : 'Score'}
+                      </span>
                     </div>
                     <div>
                       <div className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Score Mecánico</div>
@@ -379,43 +374,51 @@ const MotoDetailPage = () => {
                 </div>
 
                 {/* Grid of Mechanical Systems */}
-                <div>
-                  <div className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-4 flex items-center justify-between">
-                    <span>Evaluación por Sistemas Mecánicos y Estructurales</span>
-                    <span className="text-[10px] text-zinc-500 font-normal">Tolerancia fabricante OK</span>
-                  </div>
+                {scoreDetails ? (
+                  <div>
+                    <div className="text-xs text-zinc-400 uppercase tracking-widest font-bold mb-4 flex items-center justify-between">
+                      <span>Evaluación por Sistemas Mecánicos y Estructurales</span>
+                      <span className="text-[10px] text-zinc-500 font-normal">Tolerancia fabricante OK</span>
+                    </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                    {Object.entries(scoreDetails).map(([k, v]) => {
-                      const numVal = Number(v) || 85;
-                      const isHigh = numVal >= 90;
-                      const isGood = numVal >= 80;
-                      return (
-                        <div key={k} className="p-3 bg-[#0a0a0b]/60 border border-white/5 rounded-sm hover:border-white/10 transition-colors">
-                          <div className="flex items-center justify-between text-xs mb-2">
-                            <span className="text-zinc-200 font-medium flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${isHigh ? 'bg-emerald-400' : isGood ? 'bg-amber-400' : 'bg-red-400'}`} />
-                              {k}
-                            </span>
-                            <span className="text-white font-bold font-mono">{numVal}%</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                      {Object.entries(scoreDetails).map(([k, v]) => {
+                        const numVal = Number(v) || 0;
+                        const isHigh = numVal >= 90;
+                        const isGood = numVal >= 80;
+                        return (
+                          <div key={k} className="p-3 bg-[#0a0a0b]/60 border border-white/5 rounded-sm hover:border-white/10 transition-colors">
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="text-zinc-200 font-medium flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${isHigh ? 'bg-emerald-400' : isGood ? 'bg-amber-400' : 'bg-red-400'}`} />
+                                {k}
+                              </span>
+                              <span className="text-white font-bold font-mono">{numVal}%</span>
+                            </div>
+                            <div className="h-2 bg-[#1a1a1c] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  isHigh
+                                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                                    : isGood
+                                    ? 'bg-gradient-to-r from-red-brand to-red-500'
+                                    : 'bg-gradient-to-r from-amber-500 to-amber-400'
+                                }`}
+                                style={{ width: `${numVal}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-2 bg-[#1a1a1c] rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                isHigh
-                                  ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
-                                  : isGood
-                                  ? 'bg-gradient-to-r from-red-brand to-red-500'
-                                  : 'bg-gradient-to-r from-amber-500 to-amber-400'
-                              }`}
-                              style={{ width: `${numVal}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-[#0a0a0b] border border-white/5 rounded-sm text-center">
+                    <p className="text-xs text-zinc-400">
+                      Evaluación detallada por subsistemas mecánicos disponible al concluir el peritaje oficial.
+                    </p>
+                  </div>
+                )}
 
                 {/* Diagnostic notes */}
                 <div className="p-4 bg-[#0a0a0b] border border-white/5 rounded-sm space-y-2">
@@ -814,19 +817,25 @@ const MotoDetailPage = () => {
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <Award size={14} className="text-red-brand" /> Resultados por Módulo de Inspección Certificada
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.entries(scoreDetails).map(([cat, val]) => (
-                  <div key={cat} className="flex items-center justify-between p-3 bg-[#141417] border border-white/5 rounded-sm text-xs">
-                    <span className="text-zinc-300 font-medium flex items-center gap-2">
-                      <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
-                      {cat}
-                    </span>
-                    <span className="font-mono font-bold text-white bg-black/40 px-2 py-0.5 rounded border border-white/10">
-                      {val}%
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {scoreDetails ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Object.entries(scoreDetails).map(([cat, val]) => (
+                    <div key={cat} className="flex items-center justify-between p-3 bg-[#141417] border border-white/5 rounded-sm text-xs">
+                      <span className="text-zinc-300 font-medium flex items-center gap-2">
+                        <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
+                        {cat}
+                      </span>
+                      <span className="font-mono font-bold text-white bg-black/40 px-2 py-0.5 rounded border border-white/10">
+                        {val}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 bg-[#141417] border border-white/5 rounded-sm text-xs text-zinc-400 text-center">
+                  El desglose por componentes se registrará en el peritaje técnico oficial.
+                </div>
+              )}
             </div>
 
             {/* Technical Notes & Peritaje */}

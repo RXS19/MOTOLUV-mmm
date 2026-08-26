@@ -40,7 +40,7 @@ import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
 import BoostPublicationModal from '../components/dashboard/BoostPublicationModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { calculateCommission } from '../utils/commission';
-import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
+import { getStatusStyle } from '../utils/status';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
 import { toast } from '../hooks/use-toast';
 
@@ -66,44 +66,26 @@ const SellerDashboard = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Chat message thread state
-  const [activeChatUser, setActiveChatUser] = useState('especialista');
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: 'especialista',
-      senderName: 'Especialista Técnico Motoluv',
-      text: '¡Hola Luis! Tu cita de inspección para la Yamaha MT-07 está programada para este viernes a las 11:00 AM en CDMX.',
-      time: '10:15 AM',
-      isMe: false
-    },
-    {
-      id: 2,
-      sender: 'me',
-      senderName: 'Tú',
-      text: 'Excelente, ya tengo la factura original y tenencias listas.',
-      time: '10:18 AM',
-      isMe: true
-    },
-    {
-      id: 3,
-      sender: 'pedro',
-      senderName: 'Pedro Contreras (Comprador)',
-      text: 'Hola Luis, te acabo de mandar una oferta por la MT-07. ¿Aceptas pago inmediato por transferencia?',
-      time: '11:30 AM',
-      isMe: false
-    }
-  ]);
-
   // Bank form state
   const [bankForm, setBankForm] = useState({
-    clabe: '012180015948372615',
-    bank: 'BBVA México',
-    holder: user?.name || 'Luis Ramírez',
-    rfc: 'RAL890412KJ1',
+    clabe: user?.bank_clabe || '',
+    bank: user?.bank_name || '',
+    holder: user?.bank_holder || user?.name || '',
+    rfc: user?.rfc || '',
     notifications: true
   });
+
+  useEffect(() => {
+    if (user) {
+      setBankForm(prev => ({
+        ...prev,
+        clabe: user.bank_clabe || prev.clabe,
+        bank: user.bank_name || prev.bank,
+        holder: user.bank_holder || user.name || prev.holder,
+        rfc: user.rfc || prev.rfc,
+      }));
+    }
+  }, [user]);
 
   // Sync tab with URL search params
   useEffect(() => {
@@ -118,81 +100,42 @@ const SellerDashboard = () => {
     setSearchParams({ tab: tabId });
   };
 
-  // Sample default received offers
-  const [allOffers, setAllOffers] = useState([
-    {
-      id: 'off-1',
-      buyerName: 'Pedro Contreras',
-      motoBrand: 'Yamaha',
-      motoModel: 'MT-07 2021',
-      originalPrice: 128900,
-      offeredAmount: 123000,
-      date: 'Hoy, hace 1h',
-      status: 'Pendiente',
-      message: 'Ofrezco $123,000 en pago de contado inmediato con entrega esta semana.',
-      motoId: 'pub-1'
-    },
-    {
-      id: 'off-2',
-      buyerName: 'Andrés Molina',
-      motoBrand: 'KTM',
-      motoModel: 'Duke 390 2022',
-      originalPrice: 96900,
-      offeredAmount: 92500,
-      date: 'Hoy, hace 3h',
-      status: 'Pendiente',
-      message: '¿Aceptas $92,500? Cuento con apartado listo en la plataforma.',
-      motoId: 'pub-2'
-    },
-    {
-      id: 'off-3',
-      buyerName: 'Roberto Garza',
-      motoBrand: 'Yamaha',
-      motoModel: 'MT-07 2021',
-      originalPrice: 128900,
-      offeredAmount: 125000,
-      date: 'Ayer',
-      status: 'Aceptada',
-      message: 'Oferta acordada sujeta a dictamen de inspección técnica.',
-      motoId: 'pub-1'
-    }
-  ]);
-
   const [loadingMotos, setLoadingMotos] = useState(true);
 
   const loadData = () => {
     setLoadingMotos(true);
-    motoApi.mine().then((data) => {
+    const p1 = motoApi.mine().then((data) => {
       if (Array.isArray(data)) setMotos(data);
       else setMotos([]);
     }).catch(() => {
       setMotos([]);
-    }).finally(() => {
+    });
+
+    const p2 = offerApi.received().then((data) => {
+      if (Array.isArray(data)) setOffers(data);
+      else setOffers([]);
+    }).catch(() => {
+      setOffers([]);
+    });
+
+    Promise.all([p1, p2]).finally(() => {
       setLoadingMotos(false);
     });
-    offerApi.received().then((data) => {
-      if (Array.isArray(data) && data.length > 0) setOffers(data);
-    }).catch(() => {});
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Vendedor';
-
+  const firstName = user?.name ? user.name.split(' ')[0] : (user?.email ? user.email.split('@')[0] : 'Vendedor');
   const currentCalc = calculateCommission(calcPrice || 0);
 
-  const handleStatusChange = async (motoId, newStatus) => {
-    try {
-      await motoApi.update(motoId, { status: newStatus });
-      toast({ title: 'Estatus actualizado', description: `La operación ahora está en estatus "${newStatus}".` });
-      loadData();
-    } catch {
-      toast({ title: 'Estatus actualizado localmente' });
-      setMotos(prev => prev.map(m => m.id === motoId ? { ...m, status: newStatus } : m));
-    }
-  };
+  // Derived offer collections
+  const pendingOffers = offers.filter(o => o.status === 'pending' || o.status === 'Pendiente' || !o.status);
+  const inProcessSales = offers.filter(o => (o.status === 'accepted' || o.status === 'Aceptada' || o.status === 'inspeccion' || o.is_apartado) && o.status !== 'completed' && o.status !== 'Entregada');
+  const completedSales = offers.filter(o => o.status === 'completed' || o.status === 'Entregada');
+  const inspections = offers.filter(o => o.status === 'inspeccion' || (o.status === 'accepted' && o.is_apartado));
+  const totalCompletedEarnings = completedSales.reduce((acc, curr) => acc + (Number(curr.amount || curr.offeredAmount || 0)), 0);
 
   const handleOpenBoostModal = (moto = null) => {
     setSelectedMotoForBoost(moto || (motos.length > 0 ? motos[0] : null));
@@ -247,54 +190,45 @@ const SellerDashboard = () => {
     }
   };
 
-  const handleAcceptOffer = (offerId) => {
-    setAllOffers(prev => prev.map(o => o.id === offerId ? { ...o, status: 'Aceptada' } : o));
-    toast({ title: '¡Oferta Aceptada!', description: 'Se ha notificado al comprador para iniciar el depósito en custodia.' });
+  const handleAcceptOffer = async (offerId) => {
+    try {
+      await offerApi.respond(offerId, 'accepted');
+      toast({ title: '¡Oferta Aceptada!', description: 'Se ha notificado al comprador para iniciar el depósito en custodia.' });
+      loadData();
+    } catch {
+      setOffers(prev => prev.map(o => o.id === offerId ? { ...o, status: 'Aceptada' } : o));
+      toast({ title: '¡Oferta Aceptada!' });
+    }
   };
 
-  const handleRejectOffer = (offerId) => {
-    setAllOffers(prev => prev.map(o => o.id === offerId ? { ...o, status: 'Rechazada' } : o));
-    toast({ title: 'Oferta rechazada', description: 'La oferta ha sido declinada cortésmente.' });
+  const handleRejectOffer = async (offerId) => {
+    try {
+      await offerApi.respond(offerId, 'rejected');
+      toast({ title: 'Oferta rechazada', description: 'La oferta ha sido declinada cortésmente.' });
+      loadData();
+    } catch {
+      setOffers(prev => prev.map(o => o.id === offerId ? { ...o, status: 'Rechazada' } : o));
+      toast({ title: 'Oferta rechazada' });
+    }
   };
 
-  const handleSendCounterOffer = (e) => {
+  const handleSendCounterOffer = async (e) => {
     e.preventDefault();
-    if (!counterPrice) return;
-    setAllOffers(prev => prev.map(o => o.id === counterOfferModal.id ? { ...o, status: 'Contraoferta enviada', offeredAmount: Number(counterPrice) } : o));
-    toast({ title: 'Contraoferta enviada', description: `Has propuesto $${Number(counterPrice).toLocaleString()} MXN.` });
-    setCounterOfferModal(null);
-    setCounterPrice('');
-    setCounterNote('');
-  };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const newMsg = {
-      id: Date.now(),
-      sender: 'me',
-      senderName: 'Tú',
-      text: chatInput,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: true
-    };
-    setMessages(prev => [...prev, newMsg]);
-    setChatInput('');
-
-    // Simulated reply
-    setTimeout(() => {
-      const reply = {
-        id: Date.now() + 1,
-        sender: activeChatUser,
-        senderName: activeChatUser === 'especialista' ? 'Especialista Motoluv' : 'Pedro Contreras',
-        text: activeChatUser === 'especialista' 
-          ? 'Recibido Luis. Nuestro perito llevará el protocolo de certificación técnica y el lector OBD2.'
-          : '¡Gracias por responder! Estoy al pendiente del reporte de inspección.',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMe: false
-      };
-      setMessages(prev => [...prev, reply]);
-    }, 1200);
+    if (!counterPrice || !counterOfferModal) return;
+    try {
+      await offerApi.respond(counterOfferModal.id, 'counter', Number(counterPrice));
+      toast({ title: 'Contraoferta enviada', description: `Has propuesto $${Number(counterPrice).toLocaleString()} MXN.` });
+      setCounterOfferModal(null);
+      setCounterPrice('');
+      setCounterNote('');
+      loadData();
+    } catch {
+      setOffers(prev => prev.map(o => o.id === counterOfferModal.id ? { ...o, status: 'Contraoferta enviada', amount: Number(counterPrice) } : o));
+      toast({ title: 'Contraoferta enviada' });
+      setCounterOfferModal(null);
+      setCounterPrice('');
+      setCounterNote('');
+    }
   };
 
   const handleSaveBank = (e) => {
@@ -359,21 +293,21 @@ const SellerDashboard = () => {
               <KpiCard
                 icon={Tag}
                 label="Ofertas recibidas"
-                value={allOffers.filter(o => o.status === 'Pendiente').length.toString()}
+                value={pendingOffers.length.toString()}
                 linkText="Ver todas →"
                 onClick={() => handleTabChange('ofertas')}
               />
               <KpiCard
                 icon={Clock}
                 label="Ventas en proceso"
-                value="1"
+                value={inProcessSales.length.toString()}
                 linkText="Ver todas →"
                 onClick={() => handleTabChange('proceso')}
               />
               <KpiCard
                 icon={CheckCircle2}
                 label="Ventas completadas"
-                value="4"
+                value={completedSales.length.toString()}
                 linkText="Ver todas →"
                 onClick={() => handleTabChange('completadas')}
               />
@@ -405,8 +339,8 @@ const SellerDashboard = () => {
                   {loadingMotos ? (
                     <div className="p-8 text-center text-zinc-500 text-xs">Cargando tus publicaciones...</div>
                   ) : motos.length === 0 ? (
-                    <div className="p-8 text-center bg-[#141418] border border-white/5 rounded-xl">
-                      <p className="text-zinc-400 text-sm mb-4">Aún no tienes motocicletas publicadas</p>
+                    <div className="p-8 text-center bg-[#141418] border border-white/5 rounded-xl space-y-3">
+                      <p className="text-zinc-400 text-sm">Aún no tienes motocicletas publicadas</p>
                       <Link
                         to="/panel/publicar"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-lg transition-colors"
@@ -440,10 +374,10 @@ const SellerDashboard = () => {
                                 <span>{pub.brand} {pub.model} {pub.year}</span>
                               </h3>
                               <p className="text-zinc-400 text-xs mt-0.5">
-                                Publicado el {pub.publishDate || 'Recientemente'}
+                                Publicado el {pub.created_at ? new Date(pub.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recientemente'}
                               </p>
                               <p className="text-zinc-200 text-xs font-bold mt-0.5">
-                                ${Number(pub.price).toLocaleString()} MXN
+                                ${Number(pub.price || 0).toLocaleString()} MXN
                               </p>
                             </div>
                           </div>
@@ -452,15 +386,15 @@ const SellerDashboard = () => {
                             <div className="flex items-center gap-3 text-xs text-zinc-400">
                               <div className="text-center">
                                 <span className="text-[10px] text-zinc-500 block">Vistas</span>
-                                <span className="font-semibold text-white">{pub.views || 412}</span>
+                                <span className="font-semibold text-white">{pub.views || 0}</span>
                               </div>
                               <div className="text-center">
                                 <span className="text-[10px] text-zinc-500 block">Guardados</span>
-                                <span className="font-semibold text-white">{pub.savedCount || 25}</span>
+                                <span className="font-semibold text-white">{pub.savedCount || 0}</span>
                               </div>
                               <div className="text-center">
                                 <span className="text-[10px] text-zinc-500 block">Ofertas</span>
-                                <span className="font-semibold text-white">{pub.offersCount || 2}</span>
+                                <span className="font-semibold text-white">{pub.offersCount || 0}</span>
                               </div>
                             </div>
 
@@ -566,37 +500,51 @@ const SellerDashboard = () => {
                     </button>
                   </div>
 
-                  <div className="p-3.5 bg-[#141418] border border-white/5 rounded-xl space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-red-brand/10 text-red-brand flex items-center justify-center flex-shrink-0 mt-0.5">
+                  {inspections.length === 0 ? (
+                    <div className="p-4 bg-[#141418] border border-white/5 rounded-xl text-center space-y-2">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 text-zinc-500 flex items-center justify-center mx-auto">
                         <ShieldCheck size={16} />
                       </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-bold text-white leading-tight">
-                          Inspección programada
-                        </h4>
-                        <p className="text-[11px] text-zinc-400 leading-snug">
-                          Tu moto Yamaha MT-07 2021 será inspeccionada el 20 May a las 11:00 AM.
-                        </p>
-                      </div>
+                      <p className="text-xs text-zinc-400">No tienes citas de inspección programadas actualmente.</p>
+                      <span className="text-[11px] text-zinc-500 block">Se agendan automáticamente al apartar una moto.</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedInspection({
-                          moto: 'Yamaha MT-07 2021',
-                          date: '20 de Mayo 2025, 11:00 AM',
-                          address: 'Av. Insurgentes Sur 1450, Benito Juárez, CDMX',
-                          inspector: 'Ing. Carlos Mendoza (Perito Certificado Motoluv)',
-                          protocol: 'Certificación Técnica Integral',
-                          status: 'Programada'
-                        });
-                        setShowInspectionModal(true);
-                      }}
-                      className="w-full py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors"
-                    >
-                      Ver detalles
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {inspections.slice(0, 1).map((insp) => (
+                        <div key={insp.id} className="p-3.5 bg-[#141418] border border-white/5 rounded-xl space-y-3">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-red-brand/10 text-red-brand flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <ShieldCheck size={16} />
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-bold text-white leading-tight">
+                                Inspección programada
+                              </h4>
+                              <p className="text-[11px] text-zinc-400 leading-snug">
+                                {insp.moto_brand} {insp.moto_model} {insp.moto_year || ''}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedInspection({
+                                moto: `${insp.moto_brand || ''} ${insp.moto_model || ''}`,
+                                date: 'En coordinación con asesor Motoluv',
+                                address: 'Centro de Inspección Autorizado Motoluv',
+                                inspector: 'Especialista Pericial Certificado Motoluv',
+                                protocol: 'Certificación Integral y Escaneo',
+                                status: 'Programada'
+                              });
+                              setShowInspectionModal(true);
+                            }}
+                            className="w-full py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors"
+                          >
+                            Ver detalles
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Widget 2: Ofertas recientes */}
@@ -613,37 +561,47 @@ const SellerDashboard = () => {
                     </button>
                   </div>
 
-                  <div className="space-y-3">
-                    {allOffers.slice(0, 2).map((off) => (
-                      <div key={off.id} className="p-3 bg-[#141418] border border-white/5 rounded-xl space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-[#1e1e24] text-white flex items-center justify-center text-[10px] font-bold">
-                              {off.buyerName.split(' ').map(n => n[0]).join('')}
+                  {offers.length === 0 ? (
+                    <div className="p-4 bg-[#141418] border border-white/5 rounded-xl text-center text-xs text-zinc-400">
+                      No tienes ofertas recibidas aún.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {offers.slice(0, 2).map((off) => {
+                        const buyerDisplayName = off.buyer_name || off.buyerName || 'Comprador interesado';
+                        const initials = buyerDisplayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                        return (
+                          <div key={off.id} className="p-3 bg-[#141418] border border-white/5 rounded-xl space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-full bg-[#1e1e24] text-white flex items-center justify-center text-[10px] font-bold">
+                                  {initials}
+                                </div>
+                                <div>
+                                  <h4 className="text-xs font-bold text-white">{buyerDisplayName}</h4>
+                                  <p className="text-[11px] text-zinc-400 mt-0.5">{off.moto_brand} {off.moto_model}</p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] text-zinc-500 whitespace-nowrap">{off.created_at ? new Date(off.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : 'Reciente'}</span>
                             </div>
-                            <div>
-                              <h4 className="text-xs font-bold text-white">{off.buyerName}</h4>
-                              <p className="text-[11px] text-zinc-400 mt-0.5">{off.motoModel}</p>
+
+                            <div className="flex items-center justify-between pt-1 border-t border-white/5 text-xs">
+                              <span className="text-zinc-300 font-bold">
+                                Oferta: <span className="text-red-brand">${Number(off.amount || off.offeredAmount || 0).toLocaleString()} MXN</span>
+                              </span>
+                              <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${
+                                off.status === 'accepted' || off.status === 'Aceptada'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                              }`}>
+                                {off.status === 'accepted' ? 'Aceptada' : (off.status || 'Pendiente')}
+                              </span>
                             </div>
                           </div>
-                          <span className="text-[10px] text-zinc-500 whitespace-nowrap">{off.date}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-1 border-t border-white/5 text-xs">
-                          <span className="text-zinc-300 font-bold">
-                            Oferta: <span className="text-red-brand">${off.offeredAmount.toLocaleString()} MXN</span>
-                          </span>
-                          <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border ${
-                            off.status === 'Aceptada'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                              : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                          }`}>
-                            {off.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Widget 3: Promo Banner ¿Necesitas vender más rápido? */}
@@ -662,7 +620,7 @@ const SellerDashboard = () => {
                       ¿Necesitas vender más rápido?
                     </h3>
                     <p className="text-xs text-zinc-400 leading-snug">
-                      Destaca tu publicación para posicionarla en primeros lugares y vender más rápido.
+                      Destaca tu publicación para posicionarla en primeros lugares y acelerar la venta.
                     </p>
                     <button
                       onClick={() => handleOpenBoostModal()}
@@ -742,20 +700,20 @@ const SellerDashboard = () => {
                             )}
                           </div>
                           <div className="absolute top-3 right-3 bg-black/70 backdrop-blur text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1">
-                            <Eye size={12} /> {m.views || 412}
+                            <Eye size={12} /> {m.views || 0}
                           </div>
                         </div>
 
                         <div className="p-4 space-y-3">
                           <div>
                             <h3 className="font-bold text-base text-white">{m.brand} {m.model}</h3>
-                            <div className="text-xs text-zinc-400">Año {m.year} · ${(m.km || 14500).toLocaleString()} km</div>
+                            <div className="text-xs text-zinc-400">Año {m.year} · {(Number(m.km) || 0).toLocaleString()} km</div>
                           </div>
 
                           <div className="flex items-center justify-between">
-                            <div className="text-red-brand font-black text-base">${Number(m.price).toLocaleString()} MXN</div>
+                            <div className="text-red-brand font-black text-base">${Number(m.price || 0).toLocaleString()} MXN</div>
                             <span className="text-xs text-zinc-400 bg-white/5 px-2 py-0.5 rounded">
-                              {m.savedCount || 25} interesados
+                              {m.savedCount || 0} interesados
                             </span>
                           </div>
 
@@ -831,89 +789,121 @@ const SellerDashboard = () => {
                 </p>
               </div>
               <span className="text-xs bg-red-brand/10 text-red-brand px-3 py-1 rounded-full border border-red-brand/20 font-bold">
-                {allOffers.filter(o => o.status === 'Pendiente').length} Ofertas Pendientes
+                {pendingOffers.length} Ofertas Pendientes
               </span>
             </div>
 
-            <div className="space-y-4">
-              {allOffers.map((off) => (
-                <div key={off.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-red-brand/10 text-red-brand border border-red-brand/30 flex items-center justify-center font-bold text-sm">
-                        {off.buyerName.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                          <span>{off.buyerName}</span>
-                          <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                            <CheckCircle2 size={11} /> Comprador Verificado
+            {offers.length === 0 ? (
+              <div className="p-16 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-3">
+                <Tag size={32} className="text-zinc-600 mx-auto" />
+                <h3 className="text-base font-bold text-white">No has recibido ofertas de compra aún</h3>
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                  Cuando los compradores envíen propuestas económicas sobre tus motocicletas publicadas, aparecerán aquí para que puedas aceptarlas o contraofertar.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {offers.map((off) => {
+                  const buyerDisplayName = off.buyer_name || off.buyerName || 'Comprador interesado';
+                  const initials = buyerDisplayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                  const offerAmount = Number(off.amount || off.offeredAmount || 0);
+                  const origPrice = Number(off.original_price || off.originalPrice || offerAmount);
+                  const diff = origPrice - offerAmount;
+                  const isPending = off.status === 'pending' || off.status === 'Pendiente' || !off.status;
+
+                  return (
+                    <div key={off.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-red-brand/10 text-red-brand border border-red-brand/30 flex items-center justify-center font-bold text-sm">
+                            {initials}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                              <span>{buyerDisplayName}</span>
+                              <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                                <CheckCircle2 size={11} /> Comprador Verificado
+                              </span>
+                            </h3>
+                            <p className="text-xs text-zinc-400 mt-0.5">
+                              Para: <strong className="text-zinc-200">{off.moto_brand || off.motoBrand} {off.moto_model || off.motoModel}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-zinc-500">
+                            {off.created_at ? new Date(off.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Reciente'}
                           </span>
-                        </h3>
-                        <p className="text-xs text-zinc-400 mt-0.5">Para: <strong className="text-zinc-200">{off.motoBrand} {off.motoModel}</strong></p>
+                          <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                            off.status === 'accepted' || off.status === 'Aceptada'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : off.status === 'rejected' || off.status === 'Rechazada'
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                              : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                          }`}>
+                            {off.status === 'accepted' ? 'Aceptada' : (off.status || 'Pendiente')}
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-zinc-500">{off.date}</span>
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
-                        off.status === 'Aceptada'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : off.status === 'Rechazada'
-                          ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                          : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                      }`}>
-                        {off.status}
-                      </span>
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
+                        {origPrice > 0 && (
+                          <div>
+                            <span className="text-zinc-500 block">Precio Publicado</span>
+                            <span className="text-white font-bold text-sm">${origPrice.toLocaleString()} MXN</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-zinc-500 block">Oferta del Comprador</span>
+                          <span className="text-red-brand font-black text-sm">${offerAmount.toLocaleString()} MXN</span>
+                        </div>
+                        {diff > 0 && origPrice > 0 && (
+                          <div>
+                            <span className="text-zinc-500 block">Diferencia</span>
+                            <span className="text-zinc-300 font-semibold">
+                              -${diff.toLocaleString()} MXN ({((diff / origPrice) * 100).toFixed(1)}%)
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
-                    <div>
-                      <span className="text-zinc-500 block">Precio Publicado</span>
-                      <span className="text-white font-bold text-sm">${off.originalPrice.toLocaleString()} MXN</span>
+                      {isPending && (
+                        <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+                          <button
+                            onClick={() => {
+                              setCounterOfferModal({
+                                id: off.id,
+                                buyerName: buyerDisplayName,
+                                motoModel: `${off.moto_brand || ''} ${off.moto_model || ''}`,
+                                offeredAmount: offerAmount
+                              });
+                              setCounterPrice(offerAmount.toString());
+                            }}
+                            className="px-4 py-2 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 border border-white/10 text-xs font-bold rounded-xl transition-colors"
+                          >
+                            Contraofertar
+                          </button>
+                          <button
+                            onClick={() => handleRejectOffer(off.id)}
+                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold rounded-xl transition-colors"
+                          >
+                            Rechazar
+                          </button>
+                          <button
+                            onClick={() => handleAcceptOffer(off.id)}
+                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-emerald-900/30 flex items-center gap-1.5"
+                          >
+                            <Check size={14} />
+                            <span>Aceptar Oferta (${offerAmount.toLocaleString()} MXN)</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-zinc-500 block">Oferta del Comprador</span>
-                      <span className="text-red-brand font-black text-sm">${off.offeredAmount.toLocaleString()} MXN</span>
-                    </div>
-                    <div>
-                      <span className="text-zinc-500 block">Diferencia</span>
-                      <span className="text-zinc-300 font-semibold">
-                        -${(off.originalPrice - off.offeredAmount).toLocaleString()} MXN ({(((off.originalPrice - off.offeredAmount)/off.originalPrice)*100).toFixed(1)}%)
-                      </span>
-                    </div>
-                  </div>
-
-                  {off.status === 'Pendiente' && (
-                    <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
-                      <button
-                        onClick={() => {
-                          setCounterOfferModal(off);
-                          setCounterPrice(off.offeredAmount.toString());
-                        }}
-                        className="px-4 py-2 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 border border-white/10 text-xs font-bold rounded-xl transition-colors"
-                      >
-                        Contraofertar
-                      </button>
-                      <button
-                        onClick={() => handleRejectOffer(off.id)}
-                        className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold rounded-xl transition-colors"
-                      >
-                        Rechazar
-                      </button>
-                      <button
-                        onClick={() => handleAcceptOffer(off.id)}
-                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors shadow-lg shadow-emerald-900/30 flex items-center gap-1.5"
-                      >
-                        <Check size={14} />
-                        <span>Aceptar Oferta (${off.offeredAmount.toLocaleString()} MXN)</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -938,102 +928,66 @@ const SellerDashboard = () => {
               </a>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Inspection 1 */}
-              <div className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold">
-                    Programada
-                  </span>
-                  <span className="text-xs text-zinc-500">Folio: #INS-2025-084</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80"
-                    alt="Yamaha MT-07"
-                    className="w-14 h-14 rounded-xl object-cover"
-                  />
-                  <div>
-                    <h3 className="font-bold text-sm text-white">Yamaha MT-07 2021</h3>
-                    <p className="text-xs text-zinc-400">Cita: 20 de Mayo, 11:00 AM</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-xs text-zinc-300 p-3 bg-[#141418] rounded-xl border border-white/5">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Lugar:</span>
-                    <span className="font-medium text-white">Centro Autorizado Motoluv (CDMX)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Perito Asignado:</span>
-                    <span className="font-medium text-white">Ing. Carlos Mendoza (Cert. #402)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Evaluación técnica:</span>
-                    <span className="text-emerald-400 font-bold">Certificación Integral + Escaneo OBD2</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setSelectedInspection({
-                      moto: 'Yamaha MT-07 2021',
-                      date: '20 de Mayo 2025, 11:00 AM',
-                      address: 'Av. Insurgentes Sur 1450, Benito Juárez, CDMX',
-                      inspector: 'Ing. Carlos Mendoza (Perito Certificado Motoluv)',
-                      protocol: 'Certificación Técnica Integral',
-                      status: 'Programada'
-                    });
-                    setShowInspectionModal(true);
-                  }}
-                  className="w-full py-2.5 bg-[#1b1b20] hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 transition-colors"
-                >
-                  Ver Protocolo de Inspección
-                </button>
+            {inspections.length === 0 ? (
+              <div className="p-16 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-3">
+                <ShieldCheck size={36} className="text-zinc-600 mx-auto" />
+                <h3 className="text-base font-bold text-white">No tienes inspecciones mecánicas activas</h3>
+                <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                  Cuando un comprador formaliza un apartado para una de tus motos, el equipo pericial de Motoluv coordina la cita de inspección y la verás reflejada en esta sección.
+                </p>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {inspections.map((insp) => (
+                  <div key={insp.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold">
+                        En Proceso
+                      </span>
+                      <span className="text-xs text-zinc-500">Folio: #{insp.id}</span>
+                    </div>
 
-              {/* Inspection 2 - Completed */}
-              <div className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Dictamen Aprobado (9.4/10)
-                  </span>
-                  <span className="text-xs text-zinc-500">Folio: #INS-2025-052</span>
-                </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-red-brand">
+                        <Bike size={24} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-sm text-white">{insp.moto_brand} {insp.moto_model}</h3>
+                        <p className="text-xs text-zinc-400">Coordinación con Asesor Motoluv</p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-3">
-                  <img
-                    src="https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80"
-                    alt="Honda CB650R"
-                    className="w-14 h-14 rounded-xl object-cover"
-                  />
-                  <div>
-                    <h3 className="font-bold text-sm text-white">Honda CB650R 2020</h3>
-                    <p className="text-xs text-zinc-400">Inspeccionada el 28 Abr 2025</p>
-                  </div>
-                </div>
+                    <div className="space-y-2 text-xs text-zinc-300 p-3 bg-[#141418] rounded-xl border border-white/5">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500">Lugar:</span>
+                        <span className="font-medium text-white">Centro Autorizado Motoluv</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-500">Evaluación técnica:</span>
+                        <span className="text-emerald-400 font-bold">Certificación Integral + Escaneo</span>
+                      </div>
+                    </div>
 
-                <div className="space-y-2 text-xs text-zinc-300 p-3 bg-[#141418] rounded-xl border border-white/5">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Compresión Motor:</span>
-                    <span className="font-bold text-emerald-400">Excelente (175 PSI)</span>
+                    <button
+                      onClick={() => {
+                        setSelectedInspection({
+                          moto: `${insp.moto_brand || ''} ${insp.moto_model || ''}`,
+                          date: 'Coordinado vía WhatsApp Motoluv',
+                          address: 'Centro Autorizado Motoluv',
+                          inspector: 'Perito Certificado Motoluv',
+                          protocol: 'Certificación Integral',
+                          status: 'En Proceso'
+                        });
+                        setShowInspectionModal(true);
+                      }}
+                      className="w-full py-2.5 bg-[#1b1b20] hover:bg-white/10 text-white font-bold text-xs rounded-xl border border-white/10 transition-colors"
+                    >
+                      Ver Protocolo de Inspección
+                    </button>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Llantas y Frenos:</span>
-                    <span className="font-medium text-white">85% de vida útil</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Legal y REPUVE:</span>
-                    <span className="text-emerald-400 font-bold">100% Limpio sin reporte</span>
-                  </div>
-                </div>
-
-                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center text-xs text-emerald-300 font-bold">
-                  Sello Certificado Motoluv Emitido
-                </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1047,74 +1001,90 @@ const SellerDashboard = () => {
               </p>
             </div>
 
-            <div className="p-6 bg-[#101013] border border-white/5 rounded-2xl space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
-                <div className="flex items-center gap-3.5">
-                  <img
-                    src="https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80"
-                    alt="Yamaha MT-07"
-                    className="w-16 h-16 rounded-xl object-cover"
-                  />
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
-                      Operación #OP-8834
-                    </span>
-                    <h3 className="font-bold text-base text-white mt-1">Yamaha MT-07 2021</h3>
-                    <p className="text-xs text-zinc-400">Comprador: Pedro Contreras • Precio Acordado: $125,000 MXN</p>
-                  </div>
-                </div>
-
-                <div className="text-left sm:text-right">
-                  <span className="text-xs text-zinc-400 block">Tu Ganancia Neta a Recibir</span>
-                  <span className="text-xl font-black text-emerald-400">$118,750 MXN</span>
-                </div>
+            {inProcessSales.length === 0 ? (
+              <div className="p-16 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-3">
+                <Clock size={36} className="text-zinc-600 mx-auto" />
+                <h3 className="text-base font-bold text-white">No tienes ventas en proceso actualmente</h3>
+                <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                  Aquí podrás dar seguimiento paso a paso al apartado, peritaje mecánico, validación de documentos y liquidación por transferencia SPEI una vez que aceptes una oferta de compra.
+                </p>
               </div>
+            ) : (
+              <div className="space-y-6">
+                {inProcessSales.map((sale) => {
+                  const saleAmount = Number(sale.amount || sale.offeredAmount || 0);
+                  const netGain = Math.round(saleAmount * 0.95);
+                  return (
+                    <div key={sale.id} className="p-6 bg-[#101013] border border-white/5 rounded-2xl space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-16 h-16 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-red-brand">
+                            <Bike size={28} />
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
+                              Operación #{sale.id}
+                            </span>
+                            <h3 className="font-bold text-base text-white mt-1">{sale.moto_brand} {sale.moto_model}</h3>
+                            <p className="text-xs text-zinc-400">Comprador: {sale.buyer_name || 'Comprador Verificado'} • Precio: ${saleAmount.toLocaleString()} MXN</p>
+                          </div>
+                        </div>
 
-              {/* Progress Milestones Bar */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                  Progreso de la Venta (4 Fases de Seguridad)
-                </h4>
+                        <div className="text-left sm:text-right">
+                          <span className="text-xs text-zinc-400 block">Tu Ganancia Neta a Recibir</span>
+                          <span className="text-xl font-black text-emerald-400">${netGain.toLocaleString()} MXN</span>
+                        </div>
+                      </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase">Paso 1</span>
-                      <CheckCircle2 size={14} className="text-emerald-400" />
+                      {/* Progress Milestones Bar */}
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                          Progreso de la Venta (4 Fases de Seguridad)
+                        </h4>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-emerald-400 uppercase">Paso 1</span>
+                              <CheckCircle2 size={14} className="text-emerald-400" />
+                            </div>
+                            <h5 className="font-bold text-xs text-white">Apartado en Custodia</h5>
+                            <p className="text-[11px] text-zinc-400">Protegido en Fideicomiso</p>
+                          </div>
+
+                          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-blue-400 uppercase">Paso 2</span>
+                              <Clock size={14} className="text-blue-400 animate-spin" />
+                            </div>
+                            <h5 className="font-bold text-xs text-white">Inspección Mecánica</h5>
+                            <p className="text-[11px] text-zinc-400">En coordinación</p>
+                          </div>
+
+                          <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1 opacity-60">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-zinc-500 uppercase">Paso 3</span>
+                              <FileCheck size={14} className="text-zinc-600" />
+                            </div>
+                            <h5 className="font-bold text-xs text-white">Cesión & Papelería</h5>
+                            <p className="text-[11px] text-zinc-500">Validación legal</p>
+                          </div>
+
+                          <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1 opacity-60">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-zinc-500 uppercase">Paso 4</span>
+                              <DollarSign size={14} className="text-zinc-600" />
+                            </div>
+                            <h5 className="font-bold text-xs text-white">Liquidación a Cuenta</h5>
+                            <p className="text-[11px] text-zinc-500">SPEI inmediato</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <h5 className="font-bold text-xs text-white">Apartado en Custodia</h5>
-                    <p className="text-[11px] text-zinc-400">$2,000 MXN retenidos</p>
-                  </div>
-
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-blue-400 uppercase">Paso 2</span>
-                      <Clock size={14} className="text-blue-400 animate-spin" />
-                    </div>
-                    <h5 className="font-bold text-xs text-white">Inspección Mecánica</h5>
-                    <p className="text-[11px] text-zinc-400">En curso para el 20 May</p>
-                  </div>
-
-                  <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1 opacity-60">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase">Paso 3</span>
-                      <FileCheck size={14} className="text-zinc-600" />
-                    </div>
-                    <h5 className="font-bold text-xs text-white">Cesión & Papelería</h5>
-                    <p className="text-[11px] text-zinc-500">Validación legal</p>
-                  </div>
-
-                  <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1 opacity-60">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase">Paso 4</span>
-                      <DollarSign size={14} className="text-zinc-600" />
-                    </div>
-                    <h5 className="font-bold text-xs text-white">Liquidación a Cuenta</h5>
-                    <p className="text-[11px] text-zinc-500">SPEI inmediato</p>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1128,71 +1098,58 @@ const SellerDashboard = () => {
                   Historial de motocicletas vendidas y pagos recibidos exitosamente.
                 </p>
               </div>
-              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-                Total acumulado: $412,000 MXN
-              </span>
+              {totalCompletedEarnings > 0 && (
+                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+                  Total acumulado: ${totalCompletedEarnings.toLocaleString()} MXN
+                </span>
+              )}
             </div>
 
-            <div className="space-y-3">
-              {[
-                {
-                  id: 'vnt-1',
-                  moto: 'Kawasaki Z900 2022',
-                  date: '15 Mar 2025',
-                  price: 195000,
-                  net: 185250,
-                  buyer: 'Diego Morales',
-                  status: 'Transferido a BBVA',
-                  image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&q=80'
-                },
-                {
-                  id: 'vnt-2',
-                  moto: 'Suzuki GSX-S750 2021',
-                  date: '12 Ene 2025',
-                  price: 165000,
-                  net: 156750,
-                  buyer: 'Mauricio Peña',
-                  status: 'Transferido a BBVA',
-                  image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80'
-                },
-                {
-                  id: 'vnt-3',
-                  moto: 'Bajaj Dominar 400 2023',
-                  date: '04 Nov 2024',
-                  price: 75000,
-                  net: 71250,
-                  buyer: 'Gabriel Soto',
-                  status: 'Transferido a BBVA',
-                  image: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=600&q=80'
-                }
-              ].map((item) => (
-                <div key={item.id} className="p-4 bg-[#101013] border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <img src={item.image} alt={item.moto} className="w-14 h-14 rounded-xl object-cover" />
-                    <div>
-                      <h3 className="font-bold text-sm text-white">{item.moto}</h3>
-                      <p className="text-xs text-zinc-400">Vendido el {item.date} a {item.buyer}</p>
-                      <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
-                        <CheckCircle2 size={10} /> {item.status}
-                      </span>
-                    </div>
-                  </div>
+            {completedSales.length === 0 ? (
+              <div className="p-16 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-3">
+                <CheckCircle2 size={36} className="text-zinc-600 mx-auto" />
+                <h3 className="text-base font-bold text-white">No tienes ventas completadas registradas</h3>
+                <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                  Aquí se archivará el historial detallado de las motocicletas que hayas vendido a través de Motoluv con sus recibos y comprobantes de dispersión bancaria.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {completedSales.map((item) => {
+                  const saleAmount = Number(item.amount || item.offeredAmount || 0);
+                  const netGain = Math.round(saleAmount * 0.95);
+                  return (
+                    <div key={item.id} className="p-4 bg-[#101013] border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-14 h-14 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-emerald-400">
+                          <Bike size={24} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-sm text-white">{item.moto_brand} {item.moto_model}</h3>
+                          <p className="text-xs text-zinc-400">Comprador: {item.buyer_name || 'Comprador Verificado'}</p>
+                          <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                            <CheckCircle2 size={10} /> Dispersión SPEI Realizada
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-6">
-                    <div className="text-left sm:text-right">
-                      <span className="text-[10px] text-zinc-500 block">Ganancia Neta</span>
-                      <span className="text-base font-black text-white">${item.net.toLocaleString()} MXN</span>
+                      <div className="flex items-center justify-between sm:justify-end gap-6">
+                        <div className="text-left sm:text-right">
+                          <span className="text-[10px] text-zinc-500 block">Ganancia Neta</span>
+                          <span className="text-base font-black text-white">${netGain.toLocaleString()} MXN</span>
+                        </div>
+                        <button
+                          onClick={() => toast({ title: 'Comprobante digital', description: `Descarga de liquidación fiscal #${item.id} generada.` })}
+                          className="px-3.5 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-semibold rounded-lg transition-colors"
+                        >
+                          Recibo Fiscal
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => toast({ title: 'Comprobante digital', description: `Descarga de liquidación fiscal #${item.id} generada.` })}
-                      className="px-3.5 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-semibold rounded-lg transition-colors"
-                    >
-                      Recibo Fiscal
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1222,8 +1179,9 @@ const SellerDashboard = () => {
                         type="text"
                         required
                         maxLength={18}
+                        placeholder="18 dígitos (ej. 012...)"
                         value={bankForm.clabe}
-                        onChange={(e) => setBankForm({ ...bankForm, clabe: e.target.value })}
+                        onChange={(e) => setBankForm({ ...bankForm, clabe: e.target.value.replace(/\D/g, '') })}
                         className="w-full px-3.5 py-2.5 bg-[#16161c] border border-white/10 rounded-xl text-xs text-white font-mono outline-none focus:border-red-brand"
                       />
                     </div>
@@ -1232,6 +1190,7 @@ const SellerDashboard = () => {
                       <input
                         type="text"
                         required
+                        placeholder="Ej. BBVA, Santander, Banorte"
                         value={bankForm.bank}
                         onChange={(e) => setBankForm({ ...bankForm, bank: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-[#16161c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-red-brand"
@@ -1245,6 +1204,7 @@ const SellerDashboard = () => {
                       <input
                         type="text"
                         required
+                        placeholder="Nombre como aparece en el estado de cuenta"
                         value={bankForm.holder}
                         onChange={(e) => setBankForm({ ...bankForm, holder: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-[#16161c] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-red-brand"
@@ -1254,9 +1214,9 @@ const SellerDashboard = () => {
                       <label className="text-xs text-zinc-400 font-medium block mb-1">RFC con Homoclave</label>
                       <input
                         type="text"
-                        required
+                        placeholder="Ej. XAXX010101000"
                         value={bankForm.rfc}
-                        onChange={(e) => setBankForm({ ...bankForm, rfc: e.target.value })}
+                        onChange={(e) => setBankForm({ ...bankForm, rfc: e.target.value.toUpperCase() })}
                         className="w-full px-3.5 py-2.5 bg-[#16161c] border border-white/10 rounded-xl text-xs text-white uppercase outline-none focus:border-red-brand"
                       />
                     </div>
@@ -1308,11 +1268,11 @@ const SellerDashboard = () => {
                 <div className="space-y-3 text-xs">
                   <div>
                     <span className="text-zinc-500 block">Nombre Completo:</span>
-                    <span className="text-white font-semibold">{user?.name || 'Luis Ramírez'}</span>
+                    <span className="text-white font-semibold">{user?.name || user?.email?.split('@')[0] || 'Vendedor Motoluv'}</span>
                   </div>
                   <div>
                     <span className="text-zinc-500 block">Correo Electrónico:</span>
-                    <span className="text-white font-semibold">{user?.email || 'vendedor@motoluv.mx'}</span>
+                    <span className="text-white font-semibold">{user?.email || 'No registrado'}</span>
                   </div>
                   <div className="pt-2 border-t border-white/5">
                     <span className="text-zinc-400 text-[11px] block">
@@ -1328,13 +1288,13 @@ const SellerDashboard = () => {
                   <div className="flex items-center justify-between p-2.5 bg-white/[0.02] rounded-lg">
                     <span className="text-zinc-300">Identidad INE / Pasaporte:</span>
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 size={12} /> Verificado
+                      <CheckCircle2 size={12} /> {user?.ine_url ? 'Documento Subido' : 'Verificado'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-2.5 bg-white/[0.02] rounded-lg">
                     <span className="text-zinc-300">Validación de Cuenta Bancaria:</span>
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 size={12} /> Activa
+                      <CheckCircle2 size={12} /> {user?.bank_clabe ? 'Configurada' : 'Activa'}
                     </span>
                   </div>
                 </div>
@@ -1346,7 +1306,7 @@ const SellerDashboard = () => {
 
       {/* ================= POPUP MODALS ================= */}
 
-      {/* 1. Modal: Destacar Publicación (Con Stripe y Clip México) */}
+      {/* 1. Modal: Destacar Publicación */}
       <BoostPublicationModal
         isOpen={showBoostModal}
         onClose={() => setShowBoostModal(false)}
@@ -1389,7 +1349,7 @@ const SellerDashboard = () => {
                 <span className="text-zinc-200">{selectedInspection.address}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-400">Inspector Certificado:</span>
+                <span className="text-zinc-400">Inspector:</span>
                 <span className="text-emerald-400 font-medium">{selectedInspection.inspector}</span>
               </div>
               <div className="flex justify-between">

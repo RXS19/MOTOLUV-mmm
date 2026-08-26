@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShoppingBag, Star, Search, Eye, ShoppingCart, ShieldCheck, CreditCard, Sparkles, Filter } from 'lucide-react';
-import { accessories } from '../mock';
+import { accessories } from '../data/accessories';
 import { useCart } from '../context/CartContext';
 import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 

@@ -13,10 +13,15 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
   const isBuyer = mode === 'comprador';
 
   const getInitials = (name) => {
-    if (!name) return isBuyer ? 'PC' : 'LR';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    return name.slice(0, 2).toUpperCase();
+    if (name && name.trim()) {
+      const parts = name.trim().split(' ');
+      if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      return name.slice(0, 2).toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
   };
 
   const initials = getInitials(user?.name);
@@ -35,29 +40,8 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const notifications = [
-    {
-      id: 1,
-      title: 'Inspección certificada en curso',
-      desc: 'El especialista técnico está validando el peritaje y certificación vehicular.',
-      time: 'Hace 2h',
-      unread: true,
-    },
-    {
-      id: 2,
-      title: 'Nueva actualización de oferta',
-      desc: 'El vendedor ha recibido y revisado tu propuesta de compra.',
-      time: 'Hace 5h',
-      unread: true,
-    },
-    {
-      id: 3,
-      title: 'Protección Motoluv Activa',
-      desc: 'Tu cobertura de garantía mecánica por 30 días está vigente.',
-      time: 'Ayer',
-      unread: false,
-    },
-  ];
+  const [notifications] = useState([]);
+  const unreadCount = notifications.filter(n => n.unread).length;
 
   return (
     <div className="flex items-center justify-end gap-3 pb-6 border-b border-white/5">
@@ -93,32 +77,40 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
           title="Notificaciones"
         >
           <Bell size={17} />
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-brand text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-[#0a0a0c]">
-            2
-          </span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-brand text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-[#0a0a0c]">
+              {unreadCount}
+            </span>
+          )}
         </button>
 
         {showNotifications && (
           <div className="absolute right-0 mt-2 w-80 sm:w-88 bg-[#121216] border border-white/10 rounded-xl shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150 text-left">
             <div className="flex items-center justify-between pb-3 border-b border-white/5">
               <h4 className="text-white text-xs font-bold uppercase tracking-wider">Notificaciones</h4>
-              <span className="text-[10px] text-red-brand font-semibold">2 nuevas</span>
+              <span className="text-[10px] text-zinc-400">{unreadCount > 0 ? `${unreadCount} nuevas` : 'Al día'}</span>
             </div>
             <div className="py-2 space-y-2 max-h-72 overflow-y-auto">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`p-2.5 rounded-lg text-xs transition-colors ${
-                    n.unread ? 'bg-red-brand/5 border border-red-brand/20' : 'bg-white/[0.02] border border-white/5'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-semibold text-white text-[11px] leading-tight">{n.title}</span>
-                    <span className="text-[10px] text-zinc-500 whitespace-nowrap">{n.time}</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.desc}</p>
+              {notifications.length === 0 ? (
+                <div className="py-6 text-center text-zinc-500 text-xs">
+                  No tienes notificaciones pendientes
                 </div>
-              ))}
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`p-2.5 rounded-lg text-xs transition-colors ${
+                      n.unread ? 'bg-red-brand/5 border border-red-brand/20' : 'bg-white/[0.02] border border-white/5'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-semibold text-white text-[11px] leading-tight">{n.title}</span>
+                      <span className="text-[10px] text-zinc-500 whitespace-nowrap">{n.time}</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.desc}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

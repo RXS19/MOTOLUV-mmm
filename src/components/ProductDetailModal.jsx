@@ -136,16 +136,22 @@ const ProductDetailModal = () => {
                 </h2>
 
                 {/* Rating & reviews */}
-                <div className="flex items-center gap-2 mt-2 text-sm">
-                  <div className="flex items-center gap-1 text-yellow-400 font-bold">
-                    <Star size={16} className="fill-yellow-400" />
-                    <span>{selectedProduct.rating?.toFixed(1) || '4.8'}</span>
+                {Boolean(selectedProduct.rating) && (
+                  <div className="flex items-center gap-2 mt-2 text-sm">
+                    <div className="flex items-center gap-1 text-yellow-400 font-bold">
+                      <Star size={16} className="fill-yellow-400" />
+                      <span>{selectedProduct.rating.toFixed(1)}</span>
+                    </div>
+                    {Boolean(selectedProduct.reviewsCount) && (
+                      <>
+                        <span className="text-zinc-500">•</span>
+                        <span className="text-zinc-400 text-xs">
+                          {selectedProduct.reviewsCount} opiniones verificadas
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <span className="text-zinc-500">•</span>
-                  <span className="text-zinc-400 text-xs">
-                    {selectedProduct.reviewsCount || 24} opiniones verificadas
-                  </span>
-                </div>
+                )}
 
                 {/* Price Display */}
                 <div className="mt-4 p-3 bg-red-brand/10 border border-red-brand/20 rounded-md flex items-baseline gap-2">

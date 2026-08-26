@@ -28,15 +28,20 @@ const DashboardSidebar = ({ activeTab = 'resumen', setActiveTab, mode = 'comprad
 
   // Get user initials for avatar
   const getInitials = (name) => {
-    if (!name) return isBuyer ? 'PC' : 'LR';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    if (name && name.trim()) {
+      const parts = name.trim().split(' ');
+      if (parts.length >= 2) {
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return name.slice(0, 2).toUpperCase();
     }
-    return name.slice(0, 2).toUpperCase();
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
   };
 
-  const displayName = user?.name || (isBuyer ? 'Pedro Contreras' : 'Luis Ramírez');
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : (isBuyer ? 'Comprador' : 'Vendedor'));
   const initials = getInitials(user?.name);
 
   // Buyer nav items from reference

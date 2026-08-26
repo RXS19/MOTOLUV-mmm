@@ -49,17 +49,6 @@ const StripeCheckoutModal = () => {
 
   if (!isCheckoutOpen) return null;
 
-  const handleFillTestCard = () => {
-    setCardNumber('4242 4242 4242 4242');
-    setCardExpiry('12/28');
-    setCardCvc('123');
-    if (!name) setName('Motociclista Test');
-    if (!email) setEmail('cliente@motoluv.mx');
-    if (!address) setAddress('Av. Insurgentes Sur 1602');
-    if (!postalCode) setPostalCode('03900');
-    toast({ title: 'Tarjeta de Prueba', description: 'Datos de prueba cargados automáticamente.' });
-  };
-
   const handleProcessPayment = async (e) => {
     e.preventDefault();
 
@@ -263,13 +252,6 @@ const StripeCheckoutModal = () => {
                     ${totalAmount.toLocaleString()} MXN
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleFillTestCard}
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[11px] font-bold tracking-wider uppercase rounded transition-colors"
-                >
-                  ⚡ Autocompletar Datos
-                </button>
               </div>
 
               {/* Section 1: Customer & Shipping */}

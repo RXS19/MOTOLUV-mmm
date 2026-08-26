@@ -830,7 +830,7 @@ const ProfilePage = () => {
                       maxLength={18}
                       value={form.bank_clabe}
                       onChange={(e) => updateField('bank_clabe', e.target.value.replace(/\D/g, ''))}
-                      placeholder="012180015948372615"
+                      placeholder="18 dígitos (ej. 012...)"
                       className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors placeholder:text-zinc-600 font-mono tracking-wider font-semibold"
                     />
                     <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5">

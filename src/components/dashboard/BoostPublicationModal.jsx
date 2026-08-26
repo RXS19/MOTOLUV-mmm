@@ -17,6 +17,7 @@ import {
 import { stripeApi, clipApi, motoApi } from '../../services/api';
 import { toast } from '../../hooks/use-toast';
 import { resolveSafeImageUrl, handleImageError } from '../../utils/imageFallback';
+import { useAuth } from '../../context/AuthContext';
 
 export const BOOST_PLANS = [
   {
@@ -67,6 +68,7 @@ export const BOOST_PLANS = [
 ];
 
 const BoostPublicationModal = ({ isOpen, onClose, moto, allMotos = [], onBoostSuccess }) => {
+  const { user } = useAuth();
   const [selectedMoto, setSelectedMoto] = useState(moto || allMotos[0] || null);
   const [selectedPlanId, setSelectedPlanId] = useState('plan_15');
   const [paymentProvider, setPaymentProvider] = useState('clip'); // 'clip' | 'stripe'
@@ -75,9 +77,9 @@ const BoostPublicationModal = ({ isOpen, onClose, moto, allMotos = [], onBoostSu
   const [transactionData, setTransactionData] = useState(null);
 
   // Form details
-  const [customerName, setCustomerName] = useState('Luis Ramírez');
-  const [customerEmail, setCustomerEmail] = useState('vendedor@motoluv.mx');
-  const [customerPhone, setCustomerPhone] = useState('5643048865');
+  const [customerName, setCustomerName] = useState(user?.name || '');
+  const [customerEmail, setCustomerEmail] = useState(user?.email || '');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
   
   // Card details
   const [cardNumber, setCardNumber] = useState('');
@@ -88,13 +90,6 @@ const BoostPublicationModal = ({ isOpen, onClose, moto, allMotos = [], onBoostSu
 
   const currentMoto = selectedMoto || moto || allMotos[0];
   const activePlan = BOOST_PLANS.find((p) => p.id === selectedPlanId) || BOOST_PLANS[1];
-
-  const handleFillTestCard = () => {
-    setCardNumber('4242 4242 4242 4242');
-    setCardExpiry('12/28');
-    setCardCvc('123');
-    toast({ title: 'Datos de prueba cargados', description: 'Tarjeta de prueba lista para procesar.' });
-  };
 
   const handleProceedToPayment = () => {
     if (!currentMoto) {
@@ -407,13 +402,6 @@ const BoostPublicationModal = ({ isOpen, onClose, moto, allMotos = [], onBoostSu
                   className="text-xs text-zinc-400 hover:text-white flex items-center gap-1"
                 >
                   ← Cambiar paquete
-                </button>
-                <button
-                  type="button"
-                  onClick={handleFillTestCard}
-                  className="text-[11px] text-red-brand hover:text-red-400 font-bold bg-red-brand/10 px-2.5 py-1 rounded border border-red-brand/20"
-                >
-                  ⚡ Cargar datos de prueba
                 </button>
               </div>
 

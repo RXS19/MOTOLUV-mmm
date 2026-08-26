@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, Shield, Users, FileText, CreditCard, ArrowRight, HelpCircle, Search, HandCoins, UserCheck, ClipboardCheck, PackageCheck, Bike, ShoppingCart } from 'lucide-react';
-import { packages, sellerPackages } from '../mock';
+import { packages, sellerPackages } from '../data/plans';
 import { useAuth } from '../context/AuthContext';
 
 const HowItWorksPage = () => {
