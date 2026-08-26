@@ -264,6 +264,17 @@ export const AuthProvider = ({ children }) => {
     if (role === 'comprador') setActiveView('comprador');
     else setActiveView('vendedor');
 
+    // Sincronización exclusiva de nuevo registro con Kommo (Edge Function kommo-register-user)
+    // Se ejecuta únicamente tras un registro exitoso utilizando la sesión autenticada.
+    // Un eventual fallo o demora de Kommo NUNCA bloquea ni cancela el registro del usuario en Motoluv.
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.functions.invoke('kommo-register-user');
+      }
+    } catch (kommoErr) {
+      console.warn('[Kommo] Aviso en sincronización de registro de nuevo usuario:', kommoErr?.message || kommoErr);
+    }
+
     return {
       ...userObj,
       session: data.session,
