@@ -12,7 +12,7 @@ const OfferRow = ({ offer, isSeller, onUpdate }) => {
     setLoading(true);
     try {
       await offerApi.respond(offer.id, status);
-      toast({ title: `Oferta ${status === 'accepted' ? 'Aceptada' : 'Rechazada'}` });
+      toast({ title: `Oferta ${status === 'ACEPTADA' ? 'Aceptada' : 'Rechazada'}` });
       onUpdate && onUpdate();
     } catch {
       toast({ title: 'Estado de oferta actualizado' });
@@ -22,18 +22,23 @@ const OfferRow = ({ offer, isSeller, onUpdate }) => {
   };
 
   const getStatusBadge = (st) => {
-    switch (st) {
-      case 'accepted':
-      case 'Aceptada':
+    const s = (st || '').toUpperCase();
+    switch (s) {
+      case 'ACEPTADA':
+      case 'ACCEPTED':
         return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Aceptada</span>;
-      case 'rejected':
-      case 'Rechazada':
+      case 'RECHAZADA':
+      case 'REJECTED':
         return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20">Rechazada</span>;
-      case 'counter':
-      case 'Contraoferta':
-        return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">Contraoferta</span>;
+      case 'EXPIRADA':
+      case 'EXPIRED':
+        return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">Expirada</span>;
+      case 'ENVIADA':
+        return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Enviada</span>;
+      case 'PENDIENTE':
+      case 'PENDING':
       default:
-        return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Pendiente</span>;
+        return <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Pendiente</span>;
     }
   };
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, ChevronLeft, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle, FileText, Download, Printer, ShieldCheck, CheckCheck, Heart } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Wrench, Palette, Gauge, Award, Eye, Star, Shield, ChevronRight, ChevronLeft, MessageCircle, User, Activity, Lock, CheckCircle2, BookmarkCheck, CreditCard, X, AlertCircle, FileText, Download, Printer, ShieldCheck, CheckCheck, Heart, Clock } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
-import { motoApi, offerApi, clipApi } from '../services/api';
+import { motoApi, offerApi, apartadoApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { toast } from '../hooks/use-toast';
@@ -25,11 +25,15 @@ const MotoDetailPage = () => {
   const [offerMsg, setOfferMsg] = useState('');
   const [offerLoading, setOfferLoading] = useState(false);
 
-  // Apartado state
-  const [hasApartado, setHasApartado] = useState(false);
+  // Apartado state from public.apartados
+  const [apartado, setApartado] = useState(null);
   const [showApartadoModal, setShowApartadoModal] = useState(false);
   const [apartadoPaymentMethod, setApartadoPaymentMethod] = useState('card');
   const [apartadoLoading, setApartadoLoading] = useState(false);
+
+  const hasApartado = Boolean(apartado && apartado.status === 'REALIZADO');
+  const certStatusNormalized = String(apartado?.certification_status || '').toUpperCase();
+  const isCertificationApproved = hasApartado && certStatusNormalized === 'APROBADA';
 
   const fav = isFavorite(moto?.id);
 
@@ -68,13 +72,9 @@ const MotoDetailPage = () => {
 
   useEffect(() => {
     if (user && moto) {
-      offerApi.mine().then((myOffers) => {
-        const existing = myOffers.find(
-          (o) => String(o.moto_id) === String(moto.id) && (o.is_apartado || o.amount === 600 || o.status === 'accepted')
-        );
-        if (existing) {
-          setHasApartado(true);
-          if (existing.package) setSelectedPkg(existing.package);
+      apartadoApi.getByMotoForBuyer(moto.id).then((apt) => {
+        if (apt) {
+          setApartado(apt);
         }
       }).catch(() => {});
     }
@@ -99,55 +99,30 @@ const MotoDetailPage = () => {
     if (!user) {
       toast({
         title: 'Registro requerido',
-        description: 'Para realizar un apartado de $600 MXN debes estar registrado e iniciar sesión.',
+        description: 'Para realizar un apartado debes estar registrado e iniciar sesión.',
       });
       navigate('/iniciar-sesion');
       return;
     }
     setApartadoLoading(true);
     try {
-      if (apartadoPaymentMethod === 'clip') {
-        const clipReq = await clipApi.createPaymentRequest({
-          amount: 600,
-          description: `Apartado Motocicleta ${moto.brand} ${moto.model}`,
-          customerEmail: user.email,
-          customerName: user.name,
-          isApartado: true,
-          motoId: moto.id,
-        });
+      // Create real record in public.apartados (no nod, no is_apartado, status REALIZADO)
+      const apt = await apartadoApi.create({
+        moto_id: moto.id,
+      });
 
-        await clipApi.processCheckout({
-          amount: 600,
-          customerInfo: { email: user.email, name: user.name },
-          clipReference: clipReq.clipReference,
-          isApartado: true,
-          motoId: moto.id,
-        });
-
-        toast({
-          title: '¡Apartado Exitoso!',
-          description: `Has apartado ${moto.brand} ${moto.model} con $600 MXN. Ref: ${clipReq.clipReference}`,
-        });
-      } else {
-        await offerApi.create({
-          moto_id: moto.id,
-          amount: 600,
-          is_apartado: true,
-          message: 'Apartado inicial de $600 MXN',
-        });
-        toast({
-          title: '¡Apartado exitoso!',
-          description: `Has reservado ${moto.brand} ${moto.model} con $600 MXN. Ahora puedes seleccionar tu paquete de protección.`,
-        });
-      }
-
-      setHasApartado(true);
+      setApartado(apt);
       setShowApartadoModal(false);
       setMoto((prev) => prev ? { ...prev, status: 'Apartada' } : prev);
+
+      toast({
+        title: '¡Apartado Realizado!',
+        description: `Has apartado la unidad ${moto.brand} ${moto.model}. La certificación técnica continuará con el peritaje oficial.`,
+      });
     } catch (err) {
       toast({
         title: 'Error al procesar el apartado',
-        description: err?.response?.data?.detail || err?.message || 'Intenta nuevamente.',
+        description: err?.message || 'Intenta nuevamente.',
       });
     } finally {
       setApartadoLoading(false);
@@ -156,12 +131,16 @@ const MotoDetailPage = () => {
 
   const handleOffer = async () => {
     if (!user) {
-      toast({ title: 'Inicia sesión', description: 'Necesitas una cuenta para completar tu solicitud.' });
+      toast({ title: 'Inicia sesión', description: 'Necesitas una cuenta para enviar tu oferta.' });
       navigate('/iniciar-sesion');
       return;
     }
     if (!hasApartado) {
-      toast({ title: 'Apartado requerido', description: 'Primero debes realizar tu apartado de $600 MXN.' });
+      toast({ title: 'Apartado requerido', description: 'Debes contar con un apartado REALIZADO para ofertar.' });
+      return;
+    }
+    if (!isCertificationApproved) {
+      toast({ title: 'Certificación pendiente', description: 'Solo puedes ofertar cuando la certificación esté APROBADA.' });
       return;
     }
     if (user.id === moto.owner_id) {
@@ -177,12 +156,13 @@ const MotoDetailPage = () => {
         message: offerMsg,
       });
       toast({
-        title: '¡Paquete y oferta confirmados!',
-        description: `Un asesor Motoluv se pondrá en contacto contigo para coordinar la entrega y la inspección final.`,
+        title: '¡Oferta enviada!',
+        description: 'Tu oferta ha sido registrada y enviada al vendedor.',
       });
       setOfferMsg('');
     } catch (err) {
-      toast({ title: 'Error al enviar solicitud', description: err?.response?.data?.detail || 'Intenta nuevamente.' });
+      const msg = err?.message || 'El monto ingresado no puede procesarse. Revisa tu oferta e inténtalo nuevamente.';
+      toast({ title: 'Oferta no procesada', description: msg });
     } finally {
       setOfferLoading(false);
     }
@@ -194,17 +174,17 @@ const MotoDetailPage = () => {
     'Color': moto.color, 'Categoría': moto.category, 'Ubicación': moto.city,
   };
 
+  const certStatusDisplay = apartado?.certification_status || (moto?.score ? 'APROBADA' : 'PENDIENTE');
+  const certApptDate = apartado?.certification_appointment_at 
+    ? new Date(apartado.certification_appointment_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : (moto?.created_at ? new Date(moto.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pendiente de asignación');
+  const certApptStatus = apartado?.certification_appointment_status || 'Pendiente de coordinación';
+
   const rawScoreDetails = (moto && (moto.score_details || moto.scoreDetails)) || null;
   const scoreDetails = (rawScoreDetails && typeof rawScoreDetails === 'object' && Object.keys(rawScoreDetails).length > 0)
     ? rawScoreDetails
     : null;
-
   const scoreValue = moto && moto.score !== undefined && moto.score !== null ? Number(moto.score) : null;
-  const certFolio = moto?.certification_id || (moto?.id ? `CERT-MLV-${String(moto.id).replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}` : 'En trámite');
-  const certDate = moto?.certified_date || (moto?.created_at ? new Date(moto.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'En trámite');
-  const certInspector = moto?.certifier || 'Taller Mecánico Especializado Motoluv MX';
-  const certStatus = moto?.certified_status || (scoreValue !== null ? 'Certificación Técnica Aprobada' : 'En proceso de inspección');
-  const certNotes = moto?.inspection_notes || (scoreValue !== null ? 'Inspección técnica y peritaje integral completados satisfactoriamente bajo protocolo de verificación integral Motoluv.' : 'Esta motocicleta se encuentra en proceso de validación técnica y documental pericial.');
 
   return (
     <div className="max-w-7xl mx-auto px-5 lg:px-8 py-8">
@@ -535,23 +515,61 @@ const MotoDetailPage = () => {
           <div className="bg-[#111112] border border-black rounded-md p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-display font-bold text-white uppercase tracking-wide text-base flex items-center gap-2">
-                <BookmarkCheck size={18} className="text-red-brand" /> APARTAR
+                <BookmarkCheck size={18} className="text-red-brand" /> APARTADO
               </h3>
+              {apartado && (
+                <span className={`px-2.5 py-1 text-[10px] font-bold rounded-sm uppercase tracking-wider ${
+                  apartado.status === 'REALIZADO' 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                    : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/30'
+                }`}>
+                  {apartado.status || 'REALIZADO'}
+                </span>
+              )}
             </div>
 
             {hasApartado ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-sm text-xs space-y-1">
-                <div className="flex items-center gap-2 text-emerald-400 font-bold uppercase tracking-wider">
-                  <CheckCircle2 size={16} /> Motocicleta Apartada
+              <div className="space-y-3">
+                <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-sm text-xs space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold uppercase tracking-wider">
+                    <CheckCircle2 size={16} /> Apartado Realizado
+                  </div>
+                  <p className="text-zinc-300 text-[11px] leading-relaxed">
+                    Tu apartado para esta unidad está activo en el sistema.
+                  </p>
                 </div>
-                <p className="text-zinc-300 text-[11px] leading-relaxed">
-                  La motocicleta ha sido separada del inventario por 24 hrs. Ahora puedes seleccionar tu paquete de protección.
-                </p>
+
+                {/* Certification Status from public.apartados */}
+                <div className="p-3 bg-[#0a0a0c] border border-white/10 rounded-sm text-xs space-y-1.5">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Estado de Certificación</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-medium">Dictamen:</span>
+                    <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${
+                      isCertificationApproved 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {apartado.certification_status || 'PENDIENTE'}
+                    </span>
+                  </div>
+                  {apartado.certification_appointment_at && (
+                    <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                      <span>Cita programada:</span>
+                      <span className="text-zinc-200">{new Date(apartado.certification_appointment_at).toLocaleString('es-MX')}</span>
+                    </div>
+                  )}
+                  {apartado.certification_appointment_status && (
+                    <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                      <span>Estado de cita:</span>
+                      <span className="text-zinc-200">{apartado.certification_appointment_status}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Al hacer el apartado la motocicleta será separada del inventario por 24 hrs.
+                  Aparta esta motocicleta para iniciar el proceso de verificación y compra.
                 </p>
 
                 {user ? (
@@ -565,7 +583,7 @@ const MotoDetailPage = () => {
                   <div className="space-y-2">
                     <button
                       onClick={() => {
-                        toast({ title: 'Registro requerido', description: 'Crea tu cuenta para hacer el apartado y separar la unidad por 24 hrs.' });
+                        toast({ title: 'Registro requerido', description: 'Crea tu cuenta o inicia sesión para realizar un apartado.' });
                         navigate('/iniciar-sesion');
                       }}
                       className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm"
@@ -574,7 +592,7 @@ const MotoDetailPage = () => {
                     </button>
                     <p className="text-[10px] text-amber-400/90 flex items-center gap-1.5 pt-1">
                       <AlertCircle size={12} className="flex-shrink-0" />
-                      Debes estar registrado para hacer el apartado y separar la unidad por 24 hrs.
+                      Debes estar registrado para realizar un apartado.
                     </p>
                   </div>
                 )}
@@ -582,50 +600,70 @@ const MotoDetailPage = () => {
             )}
           </div>
 
-          {/* PASO 2: DESPLEGAR PAQUETES DE PROTECCIÓN (ÚNICAMENTE SI YA APARTÓ) */}
+          {/* FORMULARIO DE OFERTA (ÚNICAMENTE SI APARTADO REALIZADO Y CERTIFICACIÓN APROBADA) */}
           {hasApartado && (
             <div className="bg-[#111112] border border-white/5 rounded-md p-6 relative">
               <h3 className="font-display font-bold text-white uppercase tracking-wide text-sm mb-4 flex items-center gap-2">
-                <Shield size={16} className="text-red-brand" /> Paquetes de Protección
+                <Shield size={16} className="text-red-brand" /> Oferta de Compra
               </h3>
 
-              <div className="space-y-4">
-                <div className="text-xs text-zinc-400 leading-relaxed">
-                  Elige el nivel de cobertura e inspección mecánica antes de finalizar la compra:
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { id: 'basico', name: 'Básico', price: 'Gratis', desc: 'Revisión documental' },
-                    { id: 'plus', name: 'Plus', price: '$1,800 MXN', rec: true, desc: 'Score mecánico + Garantía 30 días' },
-                    { id: 'total', name: 'Total', price: '$3,500 MXN', desc: 'Garantía 90 días + Asistencia vial' },
-                  ].map((p) => (
-                    <label key={p.id} className={`flex items-center justify-between p-3 border rounded-sm cursor-pointer transition-colors ${selectedPkg === p.id ? 'border-red-brand bg-red-brand/5' : 'border-white/10 hover:border-red-brand/40'}`}>
-                      <div className="flex items-center gap-3">
-                        <input type="radio" checked={selectedPkg === p.id} onChange={() => setSelectedPkg(p.id)} className="accent-red-500" />
-                        <div>
-                          <div className="text-white text-sm font-medium">{p.name}</div>
-                          <div className="text-[10px] text-zinc-500">{p.desc}</div>
-                          {p.rec && <div className="text-[9px] text-red-brand tracking-widest uppercase font-bold mt-0.5">Recomendado</div>}
-                        </div>
-                      </div>
-                      <div className="text-zinc-300 text-xs font-bold">{p.price}</div>
-                    </label>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-2 border-t border-white/5">
-                  <div>
-                    <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Monto de oferta final (MXN)</label>
-                    <input type="number" value={offerAmount} onChange={(e) => setOfferAmount(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors" />
+              {isCertificationApproved ? (
+                <div className="space-y-4">
+                  <div className="text-xs text-zinc-400 leading-relaxed">
+                    Certificación APROBADA. Ingresa tu oferta para enviarla al vendedor:
                   </div>
-                </div>
 
-                <button onClick={handleOffer} disabled={offerLoading}
-                  className="btn-red mt-2 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm disabled:opacity-70">
-                  {offerLoading ? 'Guardando...' : 'Confirmar Paquete y Oferta'}
-                </button>
-              </div>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'basico', name: 'Básico', price: 'Gratis', desc: 'Revisión documental' },
+                      { id: 'plus', name: 'Plus', price: '$1,800 MXN', rec: true, desc: 'Garantía 30 días' },
+                      { id: 'total', name: 'Total', price: '$3,500 MXN', desc: 'Garantía 90 días + Asistencia vial' },
+                    ].map((p) => (
+                      <label key={p.id} className={`flex items-center justify-between p-3 border rounded-sm cursor-pointer transition-colors ${selectedPkg === p.id ? 'border-red-brand bg-red-brand/5' : 'border-white/10 hover:border-red-brand/40'}`}>
+                        <div className="flex items-center gap-3">
+                          <input type="radio" checked={selectedPkg === p.id} onChange={() => setSelectedPkg(p.id)} className="accent-red-500" />
+                          <div>
+                            <div className="text-white text-sm font-medium">{p.name}</div>
+                            <div className="text-[10px] text-zinc-500">{p.desc}</div>
+                            {p.rec && <div className="text-[9px] text-red-brand tracking-widest uppercase font-bold mt-0.5">Recomendado</div>}
+                          </div>
+                        </div>
+                        <div className="text-zinc-300 text-xs font-bold">{p.price}</div>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 pt-2 border-t border-white/5">
+                    <div>
+                      <label className="text-xs text-zinc-500 uppercase tracking-widest mb-1.5 block">Monto de oferta (MXN)</label>
+                      <input 
+                        type="number" 
+                        value={offerAmount} 
+                        onChange={(e) => setOfferAmount(e.target.value)}
+                        placeholder="Ej. 120000"
+                        className="w-full px-4 py-2.5 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors" 
+                      />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleOffer} 
+                    disabled={offerLoading}
+                    className="btn-red mt-2 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm disabled:opacity-70"
+                  >
+                    {offerLoading ? 'Enviando...' : 'Enviar Oferta'}
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-sm text-xs space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider">
+                    <Clock size={15} /> Certificación en Proceso
+                  </div>
+                  <p className="text-zinc-300 leading-relaxed text-[11px]">
+                    El envío de ofertas se habilitará automáticamente una vez que el peritaje técnico concluya y la certificación de la motocicleta sea <strong className="text-white">APROBADA</strong>.
+                  </p>
+                </div>
+              )}
 
               <button className="btn-outline mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
                 <MessageCircle size={13} /> Contactar asesor Motoluv
@@ -684,12 +722,12 @@ const MotoDetailPage = () => {
             </button>
 
             <div>
-              <span className="text-xs font-bold text-red-brand tracking-widest uppercase">Paso 1 de 2</span>
+              <span className="text-xs font-bold text-red-brand tracking-widest uppercase">Confirmación</span>
               <h3 className="font-display font-bold text-white text-2xl uppercase mt-1">
-                APARTAR
+                APARTAR MOTOCICLETA
               </h3>
               <p className="text-zinc-400 text-xs mt-1">
-                Al hacer el apartado la motocicleta será separada del inventario por 24 hrs.
+                Registra tu apartado para dar inicio a la verificación técnica de la unidad.
               </p>
             </div>
 
@@ -706,39 +744,11 @@ const MotoDetailPage = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-red-brand/10 border border-red-brand/30 rounded-sm flex items-center justify-between">
-              <div>
-                <span className="text-white font-extrabold text-sm block">Separación de Inventario (24 hrs)</span>
-                <p className="text-zinc-300 text-[11px] leading-relaxed mt-0.5">
-                  La unidad será bloqueada del inventario por 24 horas a tu favor.
-                </p>
-              </div>
-              <div className="text-right flex-shrink-0 ml-3">
-                <span className="text-[10px] text-zinc-400 uppercase block">Costo de Apartado</span>
-                <span className="font-display font-bold text-red-brand text-xl">$600.00 MXN</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="text-xs text-zinc-400 uppercase tracking-wider block">Método de Confirmación y Pago</label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'card', label: 'Tarjeta Bancaria' },
-                  { id: 'spei', label: 'Transferencia SPEI' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setApartadoPaymentMethod(m.id)}
-                    className={`py-2 px-3 border text-xs font-bold rounded-sm uppercase tracking-wider transition-colors text-center ${
-                      apartadoPaymentMethod === m.id
-                        ? 'border-red-brand bg-red-brand/10 text-white'
-                        : 'border-white/10 text-zinc-400 hover:border-white/20'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
+            <div className="p-4 bg-[#18181c] border border-white/10 rounded-sm">
+              <span className="text-white font-extrabold text-sm block">Apartado en Custodia</span>
+              <p className="text-zinc-300 text-[11px] leading-relaxed mt-1">
+                Al confirmar el apartado se generará tu registro oficial para proceder con la cita de certificación mecánica y legal.
+              </p>
             </div>
 
             <div className="pt-2">
@@ -747,11 +757,8 @@ const MotoDetailPage = () => {
                 disabled={apartadoLoading}
                 className="btn-red w-full py-3.5 text-xs font-bold tracking-widest uppercase rounded-sm flex items-center justify-center shadow-lg disabled:opacity-70 text-center"
               >
-                {apartadoLoading ? 'Procesando...' : 'Confirmar y Pagar $600.00 MXN'}
+                {apartadoLoading ? 'Procesando...' : 'Confirmar Apartado'}
               </button>
-              <p className="text-[10px] text-zinc-500 text-center mt-3">
-                Al hacer el apartado la motocicleta será separada del inventario por 24 hrs.
-              </p>
             </div>
           </div>
         </div>

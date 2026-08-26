@@ -314,23 +314,154 @@ export const motoApi = {
   },
 };
 
+export const apartadoApi = {
+  create: async ({ moto_id }) => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) throw new Error('Debes iniciar sesión para realizar un apartado.');
+
+        // Insert into public.apartados with buyer_id and moto_id
+        // NO nod sent, NO is_apartado used. Status REALIZADO
+        const { data, error } = await supabase
+          .from('apartados')
+          .insert([
+            {
+              buyer_id: session.user.id,
+              moto_id: String(moto_id),
+              status: 'REALIZADO',
+            },
+          ])
+          .select('*, moto:motos(*)')
+          .single();
+
+        if (error) {
+          console.error('Error creating apartado in Supabase:', error);
+          throw error;
+        }
+        return data;
+      } catch (err) {
+        console.warn('Supabase apartado create error:', err);
+        throw err;
+      }
+    }
+
+    return api.post('/apartados', { moto_id }).then((r) => r.data);
+  },
+
+  mine: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('apartados')
+            .select('*, moto:motos(*)')
+            .eq('buyer_id', session.user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data.map((a) => ({
+              ...a,
+              moto_brand: a.moto?.brand,
+              moto_model: a.moto?.model,
+              moto_year: a.moto?.year,
+              moto_price: a.moto?.price,
+              moto_image: a.moto?.images?.[0] || a.moto?.image,
+              seller_name: a.moto?.owner_name || 'Vendedor Verificado',
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying apartados from Supabase:', err);
+      }
+    }
+
+    try {
+      const res = await api.get('/my/apartados');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getByMotoForBuyer: async (motoId) => {
+    if (!motoId) return null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('apartados')
+            .select('*')
+            .eq('buyer_id', session.user.id)
+            .eq('moto_id', String(motoId))
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (!error && Array.isArray(data) && data.length > 0) {
+            return data[0];
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying apartado by moto:', err);
+      }
+    }
+    return null;
+  },
+
+  received: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('apartados')
+            .select('*, moto:motos(*)')
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data
+              .filter((a) => a.moto?.owner_id === session.user.id)
+              .map((a) => ({
+                ...a,
+                moto_brand: a.moto?.brand,
+                moto_model: a.moto?.model,
+                moto_year: a.moto?.year,
+                moto_price: a.moto?.price,
+                moto_image: a.moto?.images?.[0] || a.moto?.image,
+                seller_name: a.moto?.owner_name || 'Vendedor',
+              }));
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying received apartados from Supabase:', err);
+      }
+    }
+
+    try {
+      const res = await api.get('/my/received-apartados');
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+};
+
 export const offerApi = {
   create: async (data) => {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) throw new Error('Usuario no autenticado');
+
         const offerRecord = {
-          id: `off_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          moto_id: data.moto_id,
-          buyer_id: session?.user?.id || null,
-          buyer_name: session?.user?.user_metadata?.full_name || session?.user?.email?.split('@')[0] || 'Comprador',
-          seller_id: data.seller_id || null,
+          moto_id: String(data.moto_id),
+          buyer_id: session.user.id,
           amount: Number(data.amount) || 0,
-          package: data.package || 'plus',
-          status: 'pending',
-          is_apartado: Boolean(data.is_apartado),
-          message: data.message || '',
-          created_at: new Date().toISOString(),
+          status: 'ENVIADA',
+          ...(data.package ? { package: data.package } : {}),
+          ...(data.message ? { message: data.message } : {}),
         };
 
         const { data: inserted, error } = await supabase
@@ -339,11 +470,38 @@ export const offerApi = {
           .select('*')
           .single();
 
-        if (!error && inserted) {
+        if (error) {
+          console.error('Supabase offer insert error:', error);
+          const errMsg = (error.message || '').toLowerCase();
+          if (
+            errMsg.includes('monto') ||
+            errMsg.includes('amount') ||
+            errMsg.includes('constraint') ||
+            errMsg.includes('check') ||
+            errMsg.includes('invalid') ||
+            error.code === '23514'
+          ) {
+            throw new Error('El monto ingresado no puede procesarse. Revisa tu oferta e inténtalo nuevamente.');
+          }
+          throw error;
+        }
+
+        if (inserted) {
           return inserted;
         }
       } catch (err) {
-        console.warn('Error creating offer in Supabase:', err);
+        const errMsg = (err?.message || '').toLowerCase();
+        if (
+          errMsg.includes('monto') ||
+          errMsg.includes('amount') ||
+          errMsg.includes('constraint') ||
+          errMsg.includes('check') ||
+          errMsg.includes('invalid') ||
+          err?.code === '23514'
+        ) {
+          throw new Error('El monto ingresado no puede procesarse. Revisa tu oferta e inténtalo nuevamente.');
+        }
+        throw err;
       }
     }
     return api.post('/offers', data).then((r) => r.data);
@@ -363,6 +521,7 @@ export const offerApi = {
           if (!error && Array.isArray(data)) {
             return data.map((o) => ({
               ...o,
+              status: o.status || 'ENVIADA',
               moto_brand: o.moto?.brand,
               moto_model: o.moto?.model,
               moto_year: o.moto?.year,
@@ -392,18 +551,20 @@ export const offerApi = {
           const { data, error } = await supabase
             .from('offers')
             .select('*, moto:motos(*)')
-            .eq('seller_id', session.user.id)
             .order('created_at', { ascending: false });
 
           if (!error && Array.isArray(data)) {
-            return data.map((o) => ({
-              ...o,
-              motoBrand: o.moto?.brand,
-              motoModel: o.moto?.model,
-              originalPrice: o.moto?.price,
-              offeredAmount: o.amount,
-              buyerName: o.buyer_name || 'Comprador',
-            }));
+            return data
+              .filter((o) => o.moto?.owner_id === session.user.id || o.seller_id === session.user.id)
+              .map((o) => ({
+                ...o,
+                status: o.status || 'ENVIADA',
+                motoBrand: o.moto?.brand,
+                motoModel: o.moto?.model,
+                originalPrice: o.moto?.price,
+                offeredAmount: o.amount,
+                buyerName: o.buyer_name || 'Comprador',
+              }));
           }
         }
       } catch (err) {
@@ -419,12 +580,19 @@ export const offerApi = {
     }
   },
 
-  updateStatus: async (id, status) => {
+  respond: async (id, status) => {
+    // Map to strictly allowed states: ENVIADA, PENDIENTE, ACEPTADA, RECHAZADA, EXPIRADA
+    let finalStatus = status;
+    if (status === 'accepted' || status === 'Aceptada') finalStatus = 'ACEPTADA';
+    else if (status === 'rejected' || status === 'Rechazada') finalStatus = 'RECHAZADA';
+    else if (status === 'pending' || status === 'Pendiente') finalStatus = 'PENDIENTE';
+    else if (status === 'expired' || status === 'Expirada') finalStatus = 'EXPIRADA';
+
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from('offers')
-          .update({ status })
+          .update({ status: finalStatus })
           .eq('id', String(id))
           .select('*')
           .single();
@@ -436,7 +604,33 @@ export const offerApi = {
         console.warn('Error updating offer in Supabase:', err);
       }
     }
-    return api.patch(`/offers/${id}`, { status }).then((r) => r.data);
+    return api.patch(`/offers/${id}`, { status: finalStatus }).then((r) => r.data);
+  },
+
+  updateStatus: async (id, status) => {
+    let finalStatus = status;
+    if (status === 'accepted' || status === 'Aceptada') finalStatus = 'ACEPTADA';
+    else if (status === 'rejected' || status === 'Rechazada') finalStatus = 'RECHAZADA';
+    else if (status === 'pending' || status === 'Pendiente') finalStatus = 'PENDIENTE';
+    else if (status === 'expired' || status === 'Expirada') finalStatus = 'EXPIRADA';
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('offers')
+          .update({ status: finalStatus })
+          .eq('id', String(id))
+          .select('*')
+          .single();
+
+        if (!error && data) {
+          return data;
+        }
+      } catch (err) {
+        console.warn('Error updating offer in Supabase:', err);
+      }
+    }
+    return api.patch(`/offers/${id}`, { status: finalStatus }).then((r) => r.data);
   },
 };
 
