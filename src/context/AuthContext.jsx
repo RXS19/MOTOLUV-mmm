@@ -80,6 +80,19 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  // Sincronización de registro con Kommo (Edge Function kommo-register-user)
+  // La Edge Function verifica kommo_sync para procesar únicamente registros pendientes y evitar duplicados.
+  // Un eventual fallo o demora de Kommo NUNCA bloquea ni cancela la sesión o registro del usuario en Motoluv.
+  const syncKommoRegistration = useCallback(async () => {
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.functions.invoke('kommo-register-user');
+      }
+    } catch (kommoErr) {
+      console.warn('[Kommo] Aviso en sincronización de registro:', kommoErr?.message || kommoErr);
+    }
+  }, []);
+
   // Inicializar y escuchar cambios de sesión con Supabase Auth
   useEffect(() => {
     let mounted = true;
@@ -139,6 +152,9 @@ export const AuthProvider = ({ children }) => {
             else setActiveView('vendedor');
             setLoading(false);
           }
+          if (event === 'SIGNED_IN') {
+            void syncKommoRegistration();
+          }
         } else if (event === 'SIGNED_OUT' || (!currentSession && event !== 'INITIAL_SESSION')) {
           if (mounted) {
             setSession(null);
@@ -154,7 +170,7 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       if (subscription) subscription.unsubscribe();
     };
-  }, [buildUserObject]);
+  }, [buildUserObject, syncKommoRegistration]);
 
   // LOGIN: Directo con Supabase Auth
   const login = async (email, password) => {
@@ -264,16 +280,10 @@ export const AuthProvider = ({ children }) => {
     if (role === 'comprador') setActiveView('comprador');
     else setActiveView('vendedor');
 
-    // Sincronización exclusiva de nuevo registro con Kommo (Edge Function kommo-register-user)
+    // Sincronización de nuevo registro con Kommo (Edge Function kommo-register-user)
     // Se ejecuta únicamente tras un registro exitoso utilizando la sesión autenticada.
     // Un eventual fallo o demora de Kommo NUNCA bloquea ni cancela el registro del usuario en Motoluv.
-    try {
-      if (isSupabaseConfigured && supabase) {
-        await supabase.functions.invoke('kommo-register-user');
-      }
-    } catch (kommoErr) {
-      console.warn('[Kommo] Aviso en sincronización de registro de nuevo usuario:', kommoErr?.message || kommoErr);
-    }
+    await syncKommoRegistration();
 
     return {
       ...userObj,
