@@ -41,16 +41,16 @@ const MotoDetailPage = () => {
   const [showCertModal, setShowCertModal] = useState(false);
 
   const images = moto 
-    ? (moto.images && moto.images.length > 0 
-        ? moto.images.map((img) => resolveSafeImageUrl(img, 'moto')) 
+    ? (Array.isArray(moto.images) && moto.images.length > 0 
+        ? moto.images.filter(Boolean).map((img) => resolveSafeImageUrl(img, 'moto')) 
         : [resolveSafeImageUrl(moto.image || FALLBACK_MOTO_IMAGE, 'moto')]) 
-    : [];
+    : [resolveSafeImageUrl(FALLBACK_MOTO_IMAGE, 'moto')];
 
   // Keyboard navigation for image slider
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowLeft') {
-        setSelectedImage((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+        setSelectedImage((prev) => (prev > 0 ? prev - 1 : Math.max(0, images.length - 1)));
       } else if (e.key === 'ArrowRight') {
         setSelectedImage((prev) => (prev < images.length - 1 ? prev + 1 : 0));
       }
@@ -63,15 +63,27 @@ const MotoDetailPage = () => {
     setLoading(true);
     motoApi.get(id).then((m) => {
       setMoto(m);
-      setOfferAmount(String(m.price));
-      motoApi.list({ category: m.category, limit: 6 }).then((list) => {
-        setSimilar(list.filter((x) => x.id !== m.id).slice(0, 3));
-      });
+      if (m && m.price !== null && m.price !== undefined) {
+        setOfferAmount(String(m.price));
+      }
+      if (m?.category) {
+        motoApi.list({ category: m.category, limit: 6 }).then((list) => {
+          if (Array.isArray(list)) {
+            setSimilar(list.filter((x) => x && x.id !== m.id).slice(0, 3));
+          }
+        }).catch(() => setSimilar([]));
+      } else {
+        motoApi.list({ limit: 4 }).then((list) => {
+          if (Array.isArray(list)) {
+            setSimilar(list.filter((x) => x && x.id !== m.id).slice(0, 3));
+          }
+        }).catch(() => setSimilar([]));
+      }
     }).catch(() => setMoto(null)).finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {
-    if (user && moto) {
+    if (user && moto && moto.id) {
       apartadoApi.getByMotoForBuyer(moto.id).then((apt) => {
         if (apt) {
           setApartado(apt);
@@ -117,7 +129,7 @@ const MotoDetailPage = () => {
 
       toast({
         title: '¡Apartado Realizado!',
-        description: `Has apartado la unidad ${moto.brand} ${moto.model}. La certificación técnica continuará con el peritaje oficial.`,
+        description: `Has apartado la unidad ${moto.brand || ''} ${moto.model || ''}. La certificación técnica continuará con el peritaje oficial.`,
       });
     } catch (err) {
       toast({
@@ -151,7 +163,7 @@ const MotoDetailPage = () => {
     try {
       await offerApi.create({
         moto_id: moto.id,
-        amount: Number(offerAmount) || moto.price,
+        amount: Number(offerAmount) || (moto.price ? Number(moto.price) : 0),
         package: selectedPkg,
         message: offerMsg,
       });
@@ -168,23 +180,39 @@ const MotoDetailPage = () => {
     }
   };
 
+  const hasKm = (moto.km !== null && moto.km !== undefined && moto.km !== '') || (moto.mileage !== null && moto.mileage !== undefined && moto.mileage !== '');
+  const kmFormatted = hasKm ? `${Number(moto.km ?? moto.mileage).toLocaleString()} km` : 'No disponible';
+
   const specs = {
-    'Marca': moto.brand, 'Modelo': moto.model, 'Año': moto.year,
-    'Kilometraje': `${moto.km.toLocaleString()} km`, 'Motor': moto.engine,
-    'Color': moto.color, 'Categoría': moto.category, 'Ubicación': moto.city,
+    'Marca': moto.brand || 'No disponible',
+    'Modelo': moto.model || 'No disponible',
+    'Año': moto.year ? String(moto.year) : 'No disponible',
+    'Kilometraje': kmFormatted,
+    'Motor': moto.engine || moto.displacement || 'No disponible',
+    'Color': moto.color || 'No disponible',
+    'Categoría': moto.category || 'No disponible',
+    'Ubicación': moto.city || moto.location || 'No disponible',
   };
 
-  const certStatusDisplay = apartado?.certification_status || (moto?.score ? 'APROBADA' : 'PENDIENTE');
-  const certApptDate = apartado?.certification_appointment_at 
+  const certStatus = apartado?.certification_status || moto?.certification_status || 'PENDIENTE';
+  const certFolio = apartado?.id 
+    ? `FOL-${String(apartado.id).slice(0, 8).toUpperCase()}` 
+    : (moto?.id ? `FOL-${String(moto.id).slice(0, 8).toUpperCase()}` : 'FOL-PENDIENTE');
+  const certDate = apartado?.certification_appointment_at 
     ? new Date(apartado.certification_appointment_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : (moto?.created_at ? new Date(moto.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pendiente de asignación');
-  const certApptStatus = apartado?.certification_appointment_status || 'Pendiente de coordinación';
+    : (moto?.certification_appointment_at 
+        ? new Date(moto.certification_appointment_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : 'Por programar');
+  const certInspector = apartado?.inspector_name || moto?.inspector_name || 'Perito Asignado Motoluv';
+  const certNotes = apartado?.inspection_notes || moto?.inspection_notes || moto?.certification_notes || 'Diagnóstico e inspección técnica conforme al protocolo oficial de Motoluv.';
 
   const rawScoreDetails = (moto && (moto.score_details || moto.scoreDetails)) || null;
   const scoreDetails = (rawScoreDetails && typeof rawScoreDetails === 'object' && Object.keys(rawScoreDetails).length > 0)
     ? rawScoreDetails
     : null;
-  const scoreValue = moto && moto.score !== undefined && moto.score !== null ? Number(moto.score) : null;
+  const scoreValue = moto && moto.score !== undefined && moto.score !== null && !isNaN(Number(moto.score)) 
+    ? Number(moto.score) 
+    : null;
 
   return (
     <div className="max-w-7xl mx-auto px-5 lg:px-8 py-8">
@@ -195,15 +223,15 @@ const MotoDetailPage = () => {
         <ChevronRight size={12} />
         <Link to="/motos" className="hover:text-red-brand transition-colors">Catálogo</Link>
         <ChevronRight size={12} />
-        <span className="text-zinc-300">{moto.brand} {moto.model}</span>
+        <span className="text-zinc-300">{moto.brand || 'Moto'} {moto.model || ''}</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <div className="relative aspect-[16/10] rounded-md overflow-hidden bg-[#111112] border border-white/5 group">
             <img 
-              src={images[selectedImage]} 
-              alt={moto.model} 
+              src={images[selectedImage] || resolveSafeImageUrl(FALLBACK_MOTO_IMAGE, 'moto')} 
+              alt={moto.model || 'Motocicleta'} 
               onError={(e) => handleImageError(e, 'moto')}
               className="w-full h-full object-cover transition-all duration-300" 
             />
@@ -253,13 +281,13 @@ const MotoDetailPage = () => {
                 }`}
               />
             </button>
-            {user && moto.score && (
+            {user && scoreValue !== null && (
               <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur text-white text-sm font-medium px-3 py-1.5 rounded-sm flex items-center gap-1.5">
-                <Wrench size={13} className="text-red-brand" /> Score {moto.score.toFixed(1)}/5
+                <Wrench size={13} className="text-red-brand" /> Score {scoreValue.toFixed(1)}/5
               </div>
             )}
             <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-white text-xs px-3 py-1.5 rounded-sm flex items-center gap-1.5">
-              <Eye size={12} /> {moto.views} vistas
+              <Eye size={12} /> {moto.views ?? 0} vistas
             </div>
           </div>
 
@@ -269,7 +297,7 @@ const MotoDetailPage = () => {
                 className={`aspect-[4/3] rounded-md overflow-hidden border-2 transition-colors ${selectedImage === i ? 'border-red-brand' : 'border-white/5 hover:border-red-brand/50'}`}>
                 <img 
                   src={img} 
-                  alt={`${moto.model} ${i + 1}`} 
+                  alt={`${moto.model || 'Motocicleta'} ${i + 1}`} 
                   onError={(e) => handleImageError(e, 'moto')}
                   className="w-full h-full object-cover" 
                 />
@@ -472,26 +500,40 @@ const MotoDetailPage = () => {
               })()}
             </div>
             <h1 className="font-display font-bold text-white text-3xl uppercase leading-tight">
-              {moto.brand} <br /><span className="text-red-brand">{moto.model}</span>
+              {moto.brand || 'Motocicleta'} <br /><span className="text-red-brand">{moto.model || ''}</span>
             </h1>
             <div className="flex items-center gap-1 mt-3">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} size={14} className={i < moto.rating ? 'fill-yellow-400 text-yellow-400' : 'text-zinc-700'} />
+                <Star key={i} size={14} className={i < (Number(moto.rating) || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-zinc-700'} />
               ))}
-              <span className="text-xs text-zinc-400 ml-1">({moto.views} vistas)</span>
+              <span className="text-xs text-zinc-400 ml-1">({moto.views ?? 0} vistas)</span>
             </div>
 
             <div className="mt-6 pt-6 border-t border-black">
               <div className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Precio Publicado</div>
-              <div className="font-display font-bold text-red-brand text-4xl">${moto.price.toLocaleString()} MXN</div>
+              <div className="font-display font-bold text-red-brand text-4xl">
+                {moto.price !== null && moto.price !== undefined && !isNaN(Number(moto.price))
+                  ? `$${Number(moto.price).toLocaleString()} MXN`
+                  : 'Precio no disponible'}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-black text-sm">
-              <div className="flex items-center gap-2 text-zinc-300"><Calendar size={14} className="text-red-brand" /> {moto.year}</div>
-              <div className="flex items-center gap-2 text-zinc-300"><Gauge size={14} className="text-red-brand" /> {moto.km.toLocaleString()} km</div>
-              <div className="flex items-center gap-2 text-zinc-300"><Wrench size={14} className="text-red-brand" /> {moto.engine}</div>
-              <div className="flex items-center gap-2 text-zinc-300"><Palette size={14} className="text-red-brand" /> {moto.color}</div>
-              <div className="flex items-center gap-2 text-zinc-300 col-span-2"><MapPin size={14} className="text-red-brand" /> {moto.city}</div>
+              <div className="flex items-center gap-2 text-zinc-300">
+                <Calendar size={14} className="text-red-brand" /> {moto.year ? `Año ${moto.year}` : 'Año no disponible'}
+              </div>
+              <div className="flex items-center gap-2 text-zinc-300">
+                <Gauge size={14} className="text-red-brand" /> {kmFormatted}
+              </div>
+              <div className="flex items-center gap-2 text-zinc-300">
+                <Wrench size={14} className="text-red-brand" /> {moto.engine || moto.displacement || 'Motor no especificado'}
+              </div>
+              <div className="flex items-center gap-2 text-zinc-300">
+                <Palette size={14} className="text-red-brand" /> {moto.color || 'Color no especificado'}
+              </div>
+              <div className="flex items-center gap-2 text-zinc-300 col-span-2">
+                <MapPin size={14} className="text-red-brand" /> {moto.city || moto.location || 'Ubicación no disponible'}
+              </div>
             </div>
 
             {/* Quick Favorites Action Button */}
@@ -733,14 +775,16 @@ const MotoDetailPage = () => {
 
             <div className="flex items-center gap-3 p-3 bg-[#0a0a0a] border border-white/5 rounded-sm">
               <img 
-                src={resolveSafeImageUrl(moto.image, 'moto')} 
-                alt={moto.model} 
+                src={resolveSafeImageUrl(moto.image || (Array.isArray(moto.images) ? moto.images[0] : null), 'moto')} 
+                alt={moto.model || 'Motocicleta'} 
                 onError={(e) => handleImageError(e, 'moto')}
                 className="w-14 h-14 object-cover rounded-sm" 
               />
               <div>
-                <div className="text-white text-sm font-bold">{moto.brand} {moto.model}</div>
-                <div className="text-zinc-500 text-xs">Precio de lista: ${moto.price.toLocaleString()} MXN</div>
+                <div className="text-white text-sm font-bold">{moto.brand || 'Motocicleta'} {moto.model || ''}</div>
+                <div className="text-zinc-500 text-xs">
+                  Precio de lista: {moto.price !== null && moto.price !== undefined && !isNaN(Number(moto.price)) ? `$${Number(moto.price).toLocaleString()} MXN` : 'No disponible'}
+                </div>
               </div>
             </div>
 
@@ -801,15 +845,15 @@ const MotoDetailPage = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-[#141417] border border-white/5 rounded-sm text-xs">
               <div>
                 <span className="text-zinc-500 text-[10px] uppercase block">Motocicleta</span>
-                <span className="text-white font-bold">{moto.brand} {moto.model}</span>
+                <span className="text-white font-bold">{moto.brand || 'Moto'} {moto.model || ''}</span>
               </div>
               <div>
                 <span className="text-zinc-500 text-[10px] uppercase block">Año / KM</span>
-                <span className="text-white font-bold">{moto.year} • {moto.km?.toLocaleString()} km</span>
+                <span className="text-white font-bold">{moto.year || 'N/D'} • {kmFormatted}</span>
               </div>
               <div>
                 <span className="text-zinc-500 text-[10px] uppercase block">Motor / Color</span>
-                <span className="text-white font-bold">{moto.engine} • {moto.color}</span>
+                <span className="text-white font-bold">{moto.engine || 'N/D'} • {moto.color || 'N/D'}</span>
               </div>
               <div>
                 <span className="text-zinc-500 text-[10px] uppercase block">Dictamen Final</span>
