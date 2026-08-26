@@ -43,5 +43,6 @@ export function calculateCommission(price) {
     percentageLabel,
     commissionAmount,
     netEarnings,
+    netAmount: netEarnings,
   };
 }

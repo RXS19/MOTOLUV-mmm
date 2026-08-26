@@ -399,7 +399,7 @@ const SellerDashboard = () => {
                       <div>
                         <span className="text-[11px] text-zinc-500 block">Recibirás neto aprox.</span>
                         <span className="text-lg font-black text-emerald-400">
-                          ${currentCalc.netAmount.toLocaleString()} MXN
+                          ${Number(currentCalc?.netEarnings ?? currentCalc?.netAmount ?? 0).toLocaleString()} MXN
                         </span>
                       </div>
                     </div>
