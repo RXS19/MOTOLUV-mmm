@@ -735,22 +735,26 @@ export const notificationApi = {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
+        const currentUserId = session?.user?.id;
+        if (currentUserId) {
+          // Consultar notificaciones de la tabla public.notifications donde recipient_id = auth.uid() y read_at IS NULL
           const { data, error } = await supabase
             .from('notifications')
             .select('*')
-            .eq('user_id', session.user.id)
+            .eq('recipient_id', currentUserId)
             .is('read_at', null)
             .order('created_at', { ascending: false });
 
           if (!error && Array.isArray(data)) {
             return data.map((n) => ({
-              id: n.id,
-              user_id: n.user_id,
+              id: String(n.id),
+              recipient_id: n.recipient_id || n.user_id,
+              user_id: n.user_id || n.recipient_id,
               type: n.type,
               title: n.title || 'Notificación',
-              message: n.message || '',
-              desc: n.message || '',
+              body: n.body || n.message || '',
+              message: n.body || n.message || '',
+              desc: n.body || n.message || '',
               moto_id: n.moto_id,
               apartado_id: n.apartado_id,
               offer_id: n.offer_id,
@@ -758,6 +762,33 @@ export const notificationApi = {
               read_at: n.read_at,
               unread: !n.read_at,
             }));
+          } else if (error) {
+            // Fallback si la columna recipient_id tuviese user_id como alias o viceversa
+            const { data: dataFallback, error: errFallback } = await supabase
+              .from('notifications')
+              .select('*')
+              .eq('user_id', currentUserId)
+              .is('read_at', null)
+              .order('created_at', { ascending: false });
+
+            if (!errFallback && Array.isArray(dataFallback)) {
+              return dataFallback.map((n) => ({
+                id: String(n.id),
+                recipient_id: n.recipient_id || n.user_id,
+                user_id: n.user_id || n.recipient_id,
+                type: n.type,
+                title: n.title || 'Notificación',
+                body: n.body || n.message || '',
+                message: n.body || n.message || '',
+                desc: n.body || n.message || '',
+                moto_id: n.moto_id,
+                apartado_id: n.apartado_id,
+                offer_id: n.offer_id,
+                created_at: n.created_at,
+                read_at: n.read_at,
+                unread: !n.read_at,
+              }));
+            }
           }
         }
       } catch (err) {
@@ -772,13 +803,13 @@ export const notificationApi = {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
+        const currentUserId = session?.user?.id;
+        if (currentUserId) {
           const now = new Date().toISOString();
           const { error } = await supabase
             .from('notifications')
             .update({ read_at: now })
-            .eq('id', notificationId)
-            .eq('user_id', session.user.id);
+            .eq('id', notificationId);
 
           if (!error) {
             return true;
@@ -795,12 +826,13 @@ export const notificationApi = {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
+        const currentUserId = session?.user?.id;
+        if (currentUserId) {
           const now = new Date().toISOString();
           const { error } = await supabase
             .from('notifications')
             .update({ read_at: now })
-            .eq('user_id', session.user.id)
+            .eq('recipient_id', currentUserId)
             .is('read_at', null);
 
           if (!error) {

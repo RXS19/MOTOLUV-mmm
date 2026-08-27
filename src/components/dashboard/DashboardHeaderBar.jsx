@@ -85,16 +85,23 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
         if (!currentUserId) return;
 
         channel = supabase
-          .channel(`public:notifications:user:${currentUserId}`)
+          .channel(`public:notifications:recipient:${currentUserId}`)
           .on(
             'postgres_changes',
             {
               event: '*',
               schema: 'public',
               table: 'notifications',
-              filter: `user_id=eq.${currentUserId}`,
             },
             (payload) => {
+              const record = payload.new || payload.old || {};
+              const targetRecipient = record.recipient_id || record.user_id;
+
+              // Filtrar únicamente eventos destinados a este usuario
+              if (targetRecipient && String(targetRecipient) !== String(currentUserId)) {
+                return;
+              }
+
               if (payload.eventType === 'INSERT') {
                 const newRecord = payload.new;
                 if (!newRecord.read_at) {
@@ -102,12 +109,14 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
                     if (prev.some((p) => String(p.id) === String(newRecord.id))) return prev;
                     return [
                       {
-                        id: newRecord.id,
-                        user_id: newRecord.user_id,
+                        id: String(newRecord.id),
+                        recipient_id: newRecord.recipient_id || newRecord.user_id,
+                        user_id: newRecord.user_id || newRecord.recipient_id,
                         type: newRecord.type,
                         title: newRecord.title || 'Notificación',
-                        message: newRecord.message || '',
-                        desc: newRecord.message || '',
+                        body: newRecord.body || newRecord.message || '',
+                        message: newRecord.body || newRecord.message || '',
+                        desc: newRecord.body || newRecord.message || '',
                         moto_id: newRecord.moto_id,
                         apartado_id: newRecord.apartado_id,
                         offer_id: newRecord.offer_id,
@@ -229,7 +238,7 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
                       <span className="font-semibold text-white text-[11px] leading-tight">{n.title}</span>
                       <span className="text-[10px] text-zinc-500 whitespace-nowrap">{n.time || formatTimeAgo(n.created_at)}</span>
                     </div>
-                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.desc || n.message}</p>
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.body || n.desc || n.message}</p>
                   </div>
                 ))
               )}
