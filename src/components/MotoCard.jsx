@@ -47,7 +47,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
 
         {/* Top Right: Apartada Badge & Favorite Heart Button */}
         <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-          {moto.is_apartada && (
+          {(moto.apartado_status === 'APARTADA' || moto.is_apartada) && (
             <span className="bg-white text-black text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-sm shadow-md pointer-events-none select-none">
               APARTADA
             </span>
