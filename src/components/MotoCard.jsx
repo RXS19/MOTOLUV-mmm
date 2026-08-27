@@ -45,25 +45,32 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
         />
 
-        {/* Favorite Heart Button */}
-        <button
-          type="button"
-          onClick={handleFavoriteClick}
-          aria-label={fav ? 'Quitar de favoritos' : 'Guardar en favoritos'}
-          title={fav ? 'Quitar de tus motos guardadas' : 'Guardar en tus motos guardadas'}
-          className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center ${
-            fav
-              ? 'bg-red-brand text-white scale-105 shadow-red-brand/40'
-              : 'bg-black/60 text-white/90 hover:text-white hover:bg-black/90 hover:scale-110 border border-white/10'
-          }`}
-        >
-          <Heart
-            size={16}
-            className={`transition-all duration-200 ${
-              fav ? 'fill-white stroke-white' : 'stroke-current stroke-2 hover:fill-red-brand/40'
+        {/* Top Right: Apartada Badge & Favorite Heart Button */}
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+          {moto.is_apartada && (
+            <span className="bg-white text-black text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-sm shadow-md pointer-events-none select-none">
+              APARTADA
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleFavoriteClick}
+            aria-label={fav ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+            title={fav ? 'Quitar de tus motos guardadas' : 'Guardar en tus motos guardadas'}
+            className={`p-2 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center ${
+              fav
+                ? 'bg-red-brand text-white scale-105 shadow-red-brand/40'
+                : 'bg-black/60 text-white/90 hover:text-white hover:bg-black/90 hover:scale-110 border border-white/10'
             }`}
-          />
-        </button>
+          >
+            <Heart
+              size={16}
+              className={`transition-all duration-200 ${
+                fav ? 'fill-white stroke-white' : 'stroke-current stroke-2 hover:fill-red-brand/40'
+              }`}
+            />
+          </button>
+        </div>
 
         <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start z-10 pointer-events-none">
           {moto.featured && (

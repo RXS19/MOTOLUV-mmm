@@ -53,6 +53,7 @@ const formatMotoRecord = (m) => {
     views: Number(m.views) || 0,
     featured: Boolean(m.featured),
     status: m.status || 'Publicada',
+    is_apartada: Boolean(m.is_apartada),
     owner_id: m.owner_id || null,
     owner_name: m.owner_name || null,
     created_at: m.created_at || new Date().toISOString(),
@@ -94,8 +95,30 @@ export const motoApi = {
 
         const { data, error } = await query;
         if (!error && Array.isArray(data)) {
+          // Consultar exclusivamente en public.apartados con status = 'REALIZADO'
+          const reservedSet = new Set();
+          try {
+            const { data: apData } = await supabase
+              .from('apartados')
+              .select('moto_id')
+              .eq('status', 'REALIZADO');
+            if (Array.isArray(apData)) {
+              apData.forEach((a) => {
+                if (a.moto_id) reservedSet.add(String(a.moto_id));
+              });
+            }
+          } catch (apErr) {
+            console.warn('Error fetching apartados status in motoApi.list:', apErr);
+          }
+
           let list = data
-            .map(formatMotoRecord)
+            .map((m) => {
+              const formatted = formatMotoRecord(m);
+              if (formatted) {
+                formatted.is_apartada = reservedSet.has(String(formatted.id));
+              }
+              return formatted;
+            })
             .filter((m) => m && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'rejected' && m.status !== 'Rechazada');
 
           if (params.q) {
@@ -138,7 +161,21 @@ export const motoApi = {
           .maybeSingle();
 
         if (!error && data) {
-          return formatMotoRecord(data);
+          const formatted = formatMotoRecord(data);
+          if (formatted) {
+            try {
+              const { data: apData } = await supabase
+                .from('apartados')
+                .select('id')
+                .eq('moto_id', String(id))
+                .eq('status', 'REALIZADO')
+                .limit(1);
+              formatted.is_apartada = Array.isArray(apData) && apData.length > 0;
+            } catch (apErr) {
+              console.warn('Error fetching apartado status in motoApi.get:', apErr);
+            }
+          }
+          return formatted;
         }
       } catch (err) {
         console.warn('Error fetching moto from Supabase:', err);
@@ -297,7 +334,28 @@ export const motoApi = {
             .order('created_at', { ascending: false });
 
           if (!error && Array.isArray(data)) {
-            return data.map(formatMotoRecord);
+            const reservedSet = new Set();
+            try {
+              const { data: apData } = await supabase
+                .from('apartados')
+                .select('moto_id')
+                .eq('status', 'REALIZADO');
+              if (Array.isArray(apData)) {
+                apData.forEach((a) => {
+                  if (a.moto_id) reservedSet.add(String(a.moto_id));
+                });
+              }
+            } catch (apErr) {
+              console.warn('Error fetching apartados status in motoApi.mine:', apErr);
+            }
+
+            return data.map((m) => {
+              const formatted = formatMotoRecord(m);
+              if (formatted) {
+                formatted.is_apartada = reservedSet.has(String(formatted.id));
+              }
+              return formatted;
+            });
           }
         }
       } catch (err) {

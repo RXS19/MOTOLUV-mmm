@@ -493,9 +493,26 @@ api.get('/auth/me', authenticateToken, (req, res) => {
   api.patch('/auth/bank-account', authenticateToken, handleBankUpdate);
 
   // Moto Routes
-  api.get('/motos', (req, res) => {
+  api.get('/motos', async (req, res) => {
     const { brand, category, city, q, featured, limit, status } = req.query;
     let list = Array.from(db.motos.values());
+
+    const reservedSet = new Set<string>();
+    if (supabaseServer) {
+      try {
+        const { data: apData } = await supabaseServer
+          .from('apartados')
+          .select('moto_id')
+          .eq('status', 'REALIZADO');
+        if (Array.isArray(apData)) {
+          apData.forEach((a: any) => {
+            if (a.moto_id) reservedSet.add(String(a.moto_id));
+          });
+        }
+      } catch (err: any) {
+        console.warn('Error querying apartados in server GET /motos:', err?.message || err);
+      }
+    }
 
     if (status) {
       list = list.filter((m) => m.status === status);
@@ -520,14 +537,32 @@ api.get('/auth/me', authenticateToken, (req, res) => {
 
     list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     const max = limit ? parseInt(String(limit), 10) : 100;
-    return res.json(list.slice(0, max));
+    const result = list.slice(0, max).map((m) => ({
+      ...m,
+      is_apartada: reservedSet.has(String(m.id)),
+    }));
+    return res.json(result);
   });
 
-  api.get('/motos/:id', (req, res) => {
+  api.get('/motos/:id', async (req, res) => {
     const moto = db.motos.get(req.params.id);
     if (!moto) return res.status(404).json({ detail: 'Motocicleta no encontrada' });
     moto.views += 1;
-    return res.json(moto);
+    let isApartada = false;
+    if (supabaseServer) {
+      try {
+        const { data: apData } = await supabaseServer
+          .from('apartados')
+          .select('id')
+          .eq('moto_id', String(req.params.id))
+          .eq('status', 'REALIZADO')
+          .limit(1);
+        isApartada = Array.isArray(apData) && apData.length > 0;
+      } catch (err: any) {
+        console.warn('Error querying apartado in server GET /motos/:id:', err?.message || err);
+      }
+    }
+    return res.json({ ...moto, is_apartada: isApartada });
   });
 
   api.post('/motos', authenticateToken, (req, res) => {
