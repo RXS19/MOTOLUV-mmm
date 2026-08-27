@@ -129,12 +129,12 @@ const MotoDetailPage = () => {
 
       toast({
         title: '¡Apartado Realizado!',
-        description: `Has apartado la unidad ${moto.brand || ''} ${moto.model || ''}. La certificación técnica continuará con el peritaje oficial.`,
+        description: `Pago simulado de $600 MXN completado. Has apartado la unidad ${moto.brand || ''} ${moto.model || ''}. Tu apartado ha quedado registrado con estatus REALIZADO.`,
       });
     } catch (err) {
       toast({
         title: 'Error al procesar el apartado',
-        description: err?.message || 'Intenta nuevamente.',
+        description: err?.message || 'No fue posible registrar el apartado. Intenta nuevamente.',
       });
     } finally {
       setApartadoLoading(false);
@@ -752,56 +752,93 @@ const MotoDetailPage = () => {
         </div>
       )}
 
-      {/* MODAL INTERACTIVO DE APARTADO */}
+      {/* MODAL DE PAGO DE PRUEBA / APARTADO */}
       {showApartadoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#111112] border border-white/10 rounded-md max-w-md w-full p-6 space-y-6 relative shadow-2xl">
+          <div className="bg-[#111112] border border-white/10 rounded-md max-w-md w-full p-6 space-y-5 relative shadow-2xl">
             <button
-              onClick={() => setShowApartadoModal(false)}
-              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+              onClick={() => !apartadoLoading && setShowApartadoModal(false)}
+              disabled={apartadoLoading}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors disabled:opacity-50"
             >
               <X size={18} />
             </button>
 
             <div>
-              <span className="text-xs font-bold text-red-brand tracking-widest uppercase">Confirmación</span>
-              <h3 className="font-display font-bold text-white text-2xl uppercase mt-1">
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/15 border border-amber-500/30 rounded text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-2">
+                <ShieldCheck size={12} /> Pago de Prueba • Modo Test
+              </div>
+              <h3 className="font-display font-bold text-white text-xl uppercase tracking-wide">
                 APARTAR MOTOCICLETA
               </h3>
-              <p className="text-zinc-400 text-xs mt-1">
-                Registra tu apartado para dar inicio a la verificación técnica de la unidad.
+              <p className="text-zinc-400 text-xs mt-0.5">
+                Flujo de prueba de pago de apartado en custodia.
               </p>
             </div>
 
+            {/* Unidad a apartar */}
             <div className="flex items-center gap-3 p-3 bg-[#0a0a0a] border border-white/5 rounded-sm">
               <img 
                 src={resolveSafeImageUrl(moto.image || (Array.isArray(moto.images) ? moto.images[0] : null), 'moto')} 
                 alt={moto.model || 'Motocicleta'} 
                 onError={(e) => handleImageError(e, 'moto')}
-                className="w-14 h-14 object-cover rounded-sm" 
+                className="w-14 h-14 object-cover rounded-sm border border-white/5" 
               />
-              <div>
-                <div className="text-white text-sm font-bold">{moto.brand || 'Motocicleta'} {moto.model || ''}</div>
-                <div className="text-zinc-500 text-xs">
+              <div className="min-w-0 flex-1">
+                <div className="text-white text-sm font-bold truncate">{moto.brand || 'Motocicleta'} {moto.model || ''}</div>
+                <div className="text-zinc-500 text-xs mt-0.5">
                   Precio de lista: {moto.price !== null && moto.price !== undefined && !isNaN(Number(moto.price)) ? `$${Number(moto.price).toLocaleString()} MXN` : 'No disponible'}
                 </div>
               </div>
             </div>
 
-            <div className="p-4 bg-[#18181c] border border-white/10 rounded-sm">
-              <span className="text-white font-extrabold text-sm block">Apartado en Custodia</span>
-              <p className="text-zinc-300 text-[11px] leading-relaxed mt-1">
-                Al confirmar el apartado se generará tu registro oficial para proceder con la cita de certificación mecánica y legal.
-              </p>
+            {/* Desglose del pago de prueba */}
+            <div className="p-4 bg-[#18181c] border border-white/10 rounded-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400 text-xs">Monto de apartado en custodia:</span>
+                <span className="text-red-brand font-display font-black text-xl">$600 MXN</span>
+              </div>
+              <div className="pt-2.5 border-t border-white/5 space-y-1.5 text-[11px] text-zinc-400">
+                <div className="flex items-center justify-between">
+                  <span>Concepto:</span>
+                  <span className="text-zinc-200 font-medium">Apartado & Certificación Oficial</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Método:</span>
+                  <span className="text-zinc-200 font-medium">Simulación de Pago (Test Mode)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Estatus resultante:</span>
+                  <span className="text-emerald-400 font-bold uppercase text-[10px]">REALIZADO</span>
+                </div>
+              </div>
             </div>
 
-            <div className="pt-2">
+            {/* Nota de ambiente simulado */}
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-sm flex items-start gap-2.5 text-[11px] text-amber-300/90 leading-relaxed">
+              <AlertCircle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <span>
+                Al confirmar, se simulará el cobro de <strong>$600 MXN</strong> y se registrará el apartado en Supabase con estatus <strong>REALIZADO</strong> para iniciar la certificación técnica.
+              </span>
+            </div>
+
+            {/* Acciones */}
+            <div className="pt-1 space-y-2">
               <button
                 onClick={handlePerformApartado}
                 disabled={apartadoLoading}
-                className="btn-red w-full py-3.5 text-xs font-bold tracking-widest uppercase rounded-sm flex items-center justify-center shadow-lg disabled:opacity-70 text-center"
+                className="btn-red w-full py-3.5 text-xs font-bold tracking-widest uppercase rounded-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 text-center"
               >
-                {apartadoLoading ? 'Procesando...' : 'Confirmar Apartado'}
+                <CreditCard size={14} />
+                {apartadoLoading ? 'Procesando pago de prueba...' : 'Simular pago de $600'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowApartadoModal(false)}
+                disabled={apartadoLoading}
+                className="w-full py-2 text-[11px] text-zinc-400 hover:text-white transition-colors text-center"
+              >
+                Cancelar
               </button>
             </div>
           </div>
