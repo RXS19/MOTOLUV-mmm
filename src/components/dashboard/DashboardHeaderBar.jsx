@@ -2,11 +2,35 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, Plus, ChevronDown, User, LogOut, Shield, Repeat, Check, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { notificationApi } from '../../services/api';
+
+const formatTimeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    if (isNaN(diffMs) || diffMs < 0) return 'Ahora';
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Hace ${diffHours} h`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Ayer';
+    if (diffDays < 7) return `Hace ${diffDays} d`;
+    return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  } catch {
+    return '';
+  }
+};
 
 const DashboardHeaderBar = ({ mode = 'comprador' }) => {
   const { user, logout, activeView, setActiveView } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const notifRef = useRef(null);
   const userRef = useRef(null);
 
@@ -40,8 +64,99 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const [notifications] = useState([]);
-  const unreadCount = notifications.filter(n => n.unread).length;
+  // Fetch real unread notifications from Supabase and subscribe to Realtime
+  useEffect(() => {
+    let channel = null;
+
+    const loadRealNotifications = async () => {
+      try {
+        const notifs = await notificationApi.getUnread();
+        setNotifications(Array.isArray(notifs) ? notifs : []);
+      } catch (err) {
+        console.warn('Error fetching notifications:', err);
+      }
+    };
+
+    loadRealNotifications();
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        const currentUserId = session?.user?.id;
+        if (!currentUserId) return;
+
+        channel = supabase
+          .channel(`public:notifications:user:${currentUserId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${currentUserId}`,
+            },
+            (payload) => {
+              if (payload.eventType === 'INSERT') {
+                const newRecord = payload.new;
+                if (!newRecord.read_at) {
+                  setNotifications((prev) => {
+                    if (prev.some((p) => String(p.id) === String(newRecord.id))) return prev;
+                    return [
+                      {
+                        id: newRecord.id,
+                        user_id: newRecord.user_id,
+                        type: newRecord.type,
+                        title: newRecord.title || 'Notificación',
+                        message: newRecord.message || '',
+                        desc: newRecord.message || '',
+                        moto_id: newRecord.moto_id,
+                        apartado_id: newRecord.apartado_id,
+                        offer_id: newRecord.offer_id,
+                        created_at: newRecord.created_at,
+                        read_at: newRecord.read_at,
+                        unread: true,
+                      },
+                      ...prev,
+                    ];
+                  });
+                }
+              } else if (payload.eventType === 'UPDATE') {
+                const updatedRecord = payload.new;
+                if (updatedRecord.read_at) {
+                  setNotifications((prev) =>
+                    prev.filter((p) => String(p.id) !== String(updatedRecord.id))
+                  );
+                }
+              } else if (payload.eventType === 'DELETE') {
+                const deletedRecord = payload.old;
+                setNotifications((prev) =>
+                  prev.filter((p) => String(p.id) !== String(deletedRecord.id))
+                );
+              }
+            }
+          )
+          .subscribe();
+      });
+    }
+
+    return () => {
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user?.id]);
+
+  const handleNotificationClick = async (notif) => {
+    // 1. Optimistically remove from state & counter
+    setNotifications((prev) => prev.filter((n) => String(n.id) !== String(notif.id)));
+    // 2. Persist read_at in Supabase
+    try {
+      await notificationApi.markAsRead(notif.id);
+    } catch (err) {
+      console.warn('Error marking notification as attended:', err);
+    }
+  };
+
+  const unreadCount = notifications.length;
 
   return (
     <div className="flex items-center justify-end gap-3 pb-6 border-b border-white/5">
@@ -99,15 +214,22 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
                 notifications.map((n) => (
                   <div
                     key={n.id}
-                    className={`p-2.5 rounded-lg text-xs transition-colors ${
-                      n.unread ? 'bg-red-brand/5 border border-red-brand/20' : 'bg-white/[0.02] border border-white/5'
-                    }`}
+                    onClick={() => handleNotificationClick(n)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleNotificationClick(n);
+                      }
+                    }}
+                    className="p-2.5 rounded-lg text-xs transition-colors bg-red-brand/5 border border-red-brand/20 hover:bg-red-brand/10 hover:border-red-brand/40 cursor-pointer block text-left outline-none"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-semibold text-white text-[11px] leading-tight">{n.title}</span>
-                      <span className="text-[10px] text-zinc-500 whitespace-nowrap">{n.time}</span>
+                      <span className="text-[10px] text-zinc-500 whitespace-nowrap">{n.time || formatTimeAgo(n.created_at)}</span>
                     </div>
-                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.desc}</p>
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.desc || n.message}</p>
                   </div>
                 ))
               )}

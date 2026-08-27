@@ -730,6 +730,91 @@ export const partnerApi = {
   apply: (data) => api.post('/partners', data).then((r) => r.data),
 };
 
+export const notificationApi = {
+  getUnread: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .is('read_at', null)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data.map((n) => ({
+              id: n.id,
+              user_id: n.user_id,
+              type: n.type,
+              title: n.title || 'Notificación',
+              message: n.message || '',
+              desc: n.message || '',
+              moto_id: n.moto_id,
+              apartado_id: n.apartado_id,
+              offer_id: n.offer_id,
+              created_at: n.created_at,
+              read_at: n.read_at,
+              unread: !n.read_at,
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying notifications from Supabase:', err);
+      }
+    }
+    return [];
+  },
+
+  markAsRead: async (notificationId) => {
+    if (!notificationId) return false;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const now = new Date().toISOString();
+          const { error } = await supabase
+            .from('notifications')
+            .update({ read_at: now })
+            .eq('id', notificationId)
+            .eq('user_id', session.user.id);
+
+          if (!error) {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn('Error marking notification as read in Supabase:', err);
+      }
+    }
+    return false;
+  },
+
+  markAllAsRead: async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const now = new Date().toISOString();
+          const { error } = await supabase
+            .from('notifications')
+            .update({ read_at: now })
+            .eq('user_id', session.user.id)
+            .is('read_at', null);
+
+          if (!error) {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn('Error marking all notifications as read in Supabase:', err);
+      }
+    }
+    return false;
+  },
+};
+
 export const chatApi = {
   send: (message, history = []) => api.post('/chat', { message, history }).then((r) => r.data),
 };
