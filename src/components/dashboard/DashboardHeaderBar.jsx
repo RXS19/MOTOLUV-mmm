@@ -92,19 +92,12 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
               event: '*',
               schema: 'public',
               table: 'notifications',
+              filter: `recipient_id=eq.${currentUserId}`,
             },
             (payload) => {
-              const record = payload.new || payload.old || {};
-              const targetRecipient = record.recipient_id;
-
-              // Filtrar únicamente eventos destinados a este usuario
-              if (targetRecipient && String(targetRecipient) !== String(currentUserId)) {
-                return;
-              }
-
               if (payload.eventType === 'INSERT') {
                 const newRecord = payload.new;
-                if (String(newRecord.recipient_id) === String(currentUserId) && !newRecord.read_at) {
+                if (!newRecord.read_at) {
                   setNotifications((prev) => {
                     if (prev.some((p) => String(p.id) === String(newRecord.id))) return prev;
                     return [
