@@ -95,7 +95,7 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
             },
             (payload) => {
               const record = payload.new || payload.old || {};
-              const targetRecipient = record.recipient_id || record.user_id;
+              const targetRecipient = record.recipient_id;
 
               // Filtrar únicamente eventos destinados a este usuario
               if (targetRecipient && String(targetRecipient) !== String(currentUserId)) {
@@ -104,25 +104,21 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
 
               if (payload.eventType === 'INSERT') {
                 const newRecord = payload.new;
-                if (!newRecord.read_at) {
+                if (String(newRecord.recipient_id) === String(currentUserId) && !newRecord.read_at) {
                   setNotifications((prev) => {
                     if (prev.some((p) => String(p.id) === String(newRecord.id))) return prev;
                     return [
                       {
                         id: String(newRecord.id),
-                        recipient_id: newRecord.recipient_id || newRecord.user_id,
-                        user_id: newRecord.user_id || newRecord.recipient_id,
+                        recipient_id: String(newRecord.recipient_id),
                         type: newRecord.type,
                         title: newRecord.title || 'Notificación',
-                        body: newRecord.body || newRecord.message || '',
-                        message: newRecord.body || newRecord.message || '',
-                        desc: newRecord.body || newRecord.message || '',
+                        body: newRecord.body || '',
                         moto_id: newRecord.moto_id,
                         apartado_id: newRecord.apartado_id,
                         offer_id: newRecord.offer_id,
                         created_at: newRecord.created_at,
                         read_at: newRecord.read_at,
-                        unread: true,
                       },
                       ...prev,
                     ];
@@ -236,9 +232,9 @@ const DashboardHeaderBar = ({ mode = 'comprador' }) => {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-semibold text-white text-[11px] leading-tight">{n.title}</span>
-                      <span className="text-[10px] text-zinc-500 whitespace-nowrap">{n.time || formatTimeAgo(n.created_at)}</span>
+                      <span className="text-[10px] text-zinc-500 whitespace-nowrap">{formatTimeAgo(n.created_at)}</span>
                     </div>
-                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.body || n.desc || n.message}</p>
+                    <p className="text-[11px] text-zinc-400 mt-1 leading-snug">{n.body}</p>
                   </div>
                 ))
               )}

@@ -737,10 +737,9 @@ export const notificationApi = {
         const { data: { session } } = await supabase.auth.getSession();
         const currentUserId = session?.user?.id;
         if (currentUserId) {
-          // Consultar notificaciones de la tabla public.notifications donde recipient_id = auth.uid() y read_at IS NULL
           const { data, error } = await supabase
             .from('notifications')
-            .select('*')
+            .select('id, recipient_id, type, title, body, moto_id, apartado_id, offer_id, created_at, read_at')
             .eq('recipient_id', currentUserId)
             .is('read_at', null)
             .order('created_at', { ascending: false });
@@ -748,47 +747,16 @@ export const notificationApi = {
           if (!error && Array.isArray(data)) {
             return data.map((n) => ({
               id: String(n.id),
-              recipient_id: n.recipient_id || n.user_id,
-              user_id: n.user_id || n.recipient_id,
+              recipient_id: String(n.recipient_id),
               type: n.type,
               title: n.title || 'Notificación',
-              body: n.body || n.message || '',
-              message: n.body || n.message || '',
-              desc: n.body || n.message || '',
+              body: n.body || '',
               moto_id: n.moto_id,
               apartado_id: n.apartado_id,
               offer_id: n.offer_id,
               created_at: n.created_at,
               read_at: n.read_at,
-              unread: !n.read_at,
             }));
-          } else if (error) {
-            // Fallback si la columna recipient_id tuviese user_id como alias o viceversa
-            const { data: dataFallback, error: errFallback } = await supabase
-              .from('notifications')
-              .select('*')
-              .eq('user_id', currentUserId)
-              .is('read_at', null)
-              .order('created_at', { ascending: false });
-
-            if (!errFallback && Array.isArray(dataFallback)) {
-              return dataFallback.map((n) => ({
-                id: String(n.id),
-                recipient_id: n.recipient_id || n.user_id,
-                user_id: n.user_id || n.recipient_id,
-                type: n.type,
-                title: n.title || 'Notificación',
-                body: n.body || n.message || '',
-                message: n.body || n.message || '',
-                desc: n.body || n.message || '',
-                moto_id: n.moto_id,
-                apartado_id: n.apartado_id,
-                offer_id: n.offer_id,
-                created_at: n.created_at,
-                read_at: n.read_at,
-                unread: !n.read_at,
-              }));
-            }
           }
         }
       } catch (err) {
@@ -809,7 +777,8 @@ export const notificationApi = {
           const { error } = await supabase
             .from('notifications')
             .update({ read_at: now })
-            .eq('id', notificationId);
+            .eq('id', notificationId)
+            .eq('recipient_id', currentUserId);
 
           if (!error) {
             return true;
