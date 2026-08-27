@@ -16,7 +16,8 @@ import {
   Check,
   Trash2,
   BookmarkCheck,
-  FileText
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { motoApi, offerApi, apartadoApi } from '../services/api';
@@ -49,6 +50,12 @@ const SellerDashboard = () => {
   const [motoToDelete, setMotoToDelete] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Offer rejection modal state
+  const [offerToReject, setOfferToReject] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectionError, setRejectionError] = useState('');
+  const [rejectLoading, setRejectLoading] = useState(false);
 
   // Bank form state
   const [bankForm, setBankForm] = useState({
@@ -179,13 +186,46 @@ const SellerDashboard = () => {
     }
   };
 
-  const handleRejectOffer = async (offerId) => {
+  const handleOpenRejectModal = (offer) => {
+    setOfferToReject(offer);
+    setRejectionReason('');
+    setRejectionError('');
+  };
+
+  const handleCloseRejectModal = () => {
+    if (!rejectLoading) {
+      setOfferToReject(null);
+      setRejectionReason('');
+      setRejectionError('');
+    }
+  };
+
+  const handleConfirmRejectOffer = async (e) => {
+    if (e) e.preventDefault();
+    const reasonTrimmed = rejectionReason.trim();
+    if (!reasonTrimmed) {
+      setRejectionError('El motivo de rechazo es obligatorio.');
+      return;
+    }
+    if (!offerToReject?.id) return;
+
+    setRejectLoading(true);
     try {
-      await offerApi.respond(offerId, 'RECHAZADA');
-      toast({ title: 'Oferta rechazada', description: 'La oferta ha sido declinada.' });
+      await offerApi.respond(offerToReject.id, 'RECHAZADA', reasonTrimmed);
+      toast({
+        title: 'Oferta rechazada',
+        description: 'La oferta ha sido declinada con el motivo capturado.',
+      });
+      handleCloseRejectModal();
       loadData();
     } catch {
-      toast({ title: 'Error al actualizar', description: 'No se pudo procesar la respuesta.', variant: 'destructive' });
+      toast({
+        title: 'Error al actualizar',
+        description: 'No se pudo procesar la respuesta.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRejectLoading(false);
     }
   };
 
@@ -595,10 +635,23 @@ const SellerDashboard = () => {
                         </div>
                       </div>
 
+                      {off.package && (
+                        <div className="text-xs text-zinc-400">
+                          Paquete de protección: <span className="text-zinc-200 uppercase font-semibold">{off.package}</span>
+                        </div>
+                      )}
+
+                      {off.status === 'RECHAZADA' && off.message && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs space-y-1">
+                          <span className="text-red-400 font-bold block">Motivo de rechazo registrado:</span>
+                          <p className="text-zinc-300">{off.message}</p>
+                        </div>
+                      )}
+
                       {isPending && (
                         <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
                           <button
-                            onClick={() => handleRejectOffer(off.id)}
+                            onClick={() => handleOpenRejectModal(off)}
                             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold rounded-xl transition-colors"
                           >
                             Rechazar
@@ -862,6 +915,80 @@ const SellerDashboard = () => {
         moto={motoToDelete}
         loading={deleteLoading}
       />
+
+      {/* Modal: Captura Obligatoria de Motivo de Rechazo de Oferta */}
+      {offerToReject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[#121216] border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 text-left relative shadow-2xl">
+            <button
+              onClick={handleCloseRejectModal}
+              disabled={rejectLoading}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-white disabled:opacity-50"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Rechazar Oferta</h3>
+                <p className="text-xs text-zinc-400">
+                  {offerToReject.moto_brand || offerToReject.motoBrand} {offerToReject.moto_model || offerToReject.motoModel} • ${Number(offerToReject.amount || offerToReject.offeredAmount || 0).toLocaleString()} MXN
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300">
+              Indica al comprador el motivo por el cual no puedes aceptar esta oferta. Este campo es <strong className="text-white">obligatorio</strong>.
+            </p>
+
+            <form onSubmit={handleConfirmRejectOffer} className="space-y-3">
+              <div>
+                <label className="text-[11px] text-zinc-400 uppercase tracking-wider block mb-1.5 font-bold">
+                  Motivo de rechazo *
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectionReason}
+                  onChange={(e) => {
+                    setRejectionReason(e.target.value);
+                    if (rejectionError) setRejectionError('');
+                  }}
+                  placeholder="Ej. El precio ofrecido está por debajo de mi margen mínimo actual..."
+                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-500 text-white text-xs rounded-xl outline-none resize-none transition-colors"
+                  disabled={rejectLoading}
+                  autoFocus
+                />
+                {rejectionError && (
+                  <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle size={12} /> {rejectionError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseRejectModal}
+                  disabled={rejectLoading}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={rejectLoading || !rejectionReason.trim()}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow"
+                >
+                  {rejectLoading ? 'Rechazando...' : 'Confirmar Rechazo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

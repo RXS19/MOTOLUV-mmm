@@ -460,8 +460,7 @@ export const offerApi = {
           buyer_id: session.user.id,
           amount: Number(data.amount) || 0,
           status: 'ENVIADA',
-          ...(data.package ? { package: data.package } : {}),
-          ...(data.message ? { message: data.message } : {}),
+          ...(data.package ? { package: data.package } : { package: null }),
         };
 
         const { data: inserted, error } = await supabase
@@ -504,7 +503,12 @@ export const offerApi = {
         throw err;
       }
     }
-    return api.post('/offers', data).then((r) => r.data);
+    const payload = {
+      moto_id: data.moto_id,
+      amount: Number(data.amount) || 0,
+      ...(data.package ? { package: data.package } : { package: null }),
+    };
+    return api.post('/offers', payload).then((r) => r.data);
   },
 
   mine: async () => {
@@ -580,7 +584,7 @@ export const offerApi = {
     }
   },
 
-  respond: async (id, status) => {
+  respond: async (id, status, rejectionReason = null) => {
     // Map to strictly allowed states: ENVIADA, PENDIENTE, ACEPTADA, RECHAZADA, EXPIRADA
     let finalStatus = status;
     if (status === 'accepted' || status === 'Aceptada') finalStatus = 'ACEPTADA';
@@ -588,11 +592,19 @@ export const offerApi = {
     else if (status === 'pending' || status === 'Pendiente') finalStatus = 'PENDIENTE';
     else if (status === 'expired' || status === 'Expirada') finalStatus = 'EXPIRADA';
 
+    const updatePayload = {
+      status: finalStatus,
+    };
+
+    if (finalStatus === 'RECHAZADA' && rejectionReason) {
+      updatePayload.message = String(rejectionReason).trim();
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from('offers')
-          .update({ status: finalStatus })
+          .update(updatePayload)
           .eq('id', String(id))
           .select('*')
           .single();
@@ -604,21 +616,29 @@ export const offerApi = {
         console.warn('Error updating offer in Supabase:', err);
       }
     }
-    return api.patch(`/offers/${id}`, { status: finalStatus }).then((r) => r.data);
+    return api.patch(`/offers/${id}`, updatePayload).then((r) => r.data);
   },
 
-  updateStatus: async (id, status) => {
+  updateStatus: async (id, status, rejectionReason = null) => {
     let finalStatus = status;
     if (status === 'accepted' || status === 'Aceptada') finalStatus = 'ACEPTADA';
     else if (status === 'rejected' || status === 'Rechazada') finalStatus = 'RECHAZADA';
     else if (status === 'pending' || status === 'Pendiente') finalStatus = 'PENDIENTE';
     else if (status === 'expired' || status === 'Expirada') finalStatus = 'EXPIRADA';
 
+    const updatePayload = {
+      status: finalStatus,
+    };
+
+    if (finalStatus === 'RECHAZADA' && rejectionReason) {
+      updatePayload.message = String(rejectionReason).trim();
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from('offers')
-          .update({ status: finalStatus })
+          .update(updatePayload)
           .eq('id', String(id))
           .select('*')
           .single();
@@ -630,7 +650,7 @@ export const offerApi = {
         console.warn('Error updating offer in Supabase:', err);
       }
     }
-    return api.patch(`/offers/${id}`, { status: finalStatus }).then((r) => r.data);
+    return api.patch(`/offers/${id}`, updatePayload).then((r) => r.data);
   },
 };
 

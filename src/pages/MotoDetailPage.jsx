@@ -20,9 +20,8 @@ const MotoDetailPage = () => {
   const [similar, setSimilar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedPkg, setSelectedPkg] = useState('plus');
+  const [selectedPkg, setSelectedPkg] = useState(null);
   const [offerAmount, setOfferAmount] = useState('');
-  const [offerMsg, setOfferMsg] = useState('');
   const [offerLoading, setOfferLoading] = useState(false);
 
   // Apartado state from public.apartados
@@ -164,14 +163,13 @@ const MotoDetailPage = () => {
       await offerApi.create({
         moto_id: moto.id,
         amount: Number(offerAmount) || (moto.price ? Number(moto.price) : 0),
-        package: selectedPkg,
-        message: offerMsg,
+        ...(selectedPkg ? { package: selectedPkg } : { package: null }),
       });
       toast({
         title: '¡Oferta enviada!',
         description: 'Tu oferta ha sido registrada y enviada al vendedor.',
       });
-      setOfferMsg('');
+      setOfferAmount('');
     } catch (err) {
       const msg = err?.message || 'El monto ingresado no puede procesarse. Revisa tu oferta e inténtalo nuevamente.';
       toast({ title: 'Oferta no procesada', description: msg });
@@ -656,14 +654,39 @@ const MotoDetailPage = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                      <span>Paquete de protección (opcional):</span>
+                      {selectedPkg && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPkg(null)}
+                          className="text-red-brand hover:underline font-semibold text-[10px]"
+                        >
+                          Continuar sin paquete
+                        </button>
+                      )}
+                    </div>
                     {[
                       { id: 'basico', name: 'Básico', price: 'Gratis', desc: 'Revisión documental' },
                       { id: 'plus', name: 'Plus', price: '$1,800 MXN', rec: true, desc: 'Garantía 30 días' },
                       { id: 'total', name: 'Total', price: '$3,500 MXN', desc: 'Garantía 90 días + Asistencia vial' },
                     ].map((p) => (
-                      <label key={p.id} className={`flex items-center justify-between p-3 border rounded-sm cursor-pointer transition-colors ${selectedPkg === p.id ? 'border-red-brand bg-red-brand/5' : 'border-white/10 hover:border-red-brand/40'}`}>
+                      <label 
+                        key={p.id} 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setSelectedPkg((prev) => (prev === p.id ? null : p.id));
+                        }}
+                        className={`flex items-center justify-between p-3 border rounded-sm cursor-pointer transition-colors select-none ${selectedPkg === p.id ? 'border-red-brand bg-red-brand/5' : 'border-white/10 hover:border-red-brand/40'}`}
+                      >
                         <div className="flex items-center gap-3">
-                          <input type="radio" checked={selectedPkg === p.id} onChange={() => setSelectedPkg(p.id)} className="accent-red-500" />
+                          <input 
+                            type="radio" 
+                            name="moto_package"
+                            checked={selectedPkg === p.id} 
+                            onChange={() => {}}
+                            className="accent-red-500 pointer-events-none" 
+                          />
                           <div>
                             <div className="text-white text-sm font-medium">{p.name}</div>
                             <div className="text-[10px] text-zinc-500">{p.desc}</div>

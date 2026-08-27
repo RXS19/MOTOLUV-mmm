@@ -982,13 +982,28 @@ const BuyerDashboard = () => {
             <div className="space-y-3 py-2 border-y border-white/5 text-xs">
               <div className="flex justify-between">
                 <span className="text-zinc-400">Estado de la Oferta:</span>
-                <span className="text-emerald-400 font-bold uppercase">{selectedOffer.status}</span>
+                <span className={`font-bold uppercase ${selectedOffer.status === 'ACEPTADA' ? 'text-emerald-400' : selectedOffer.status === 'RECHAZADA' ? 'text-red-400' : 'text-amber-400'}`}>
+                  {selectedOffer.status}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Monto Ofertado:</span>
                 <span className="text-white font-bold">${Number(selectedOffer.amount || 0).toLocaleString()} MXN</span>
               </div>
+              {selectedOffer.package && (
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Paquete de protección:</span>
+                  <span className="text-zinc-200 uppercase font-semibold">{selectedOffer.package}</span>
+                </div>
+              )}
             </div>
+
+            {selectedOffer.status === 'RECHAZADA' && selectedOffer.message && (
+              <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs space-y-1">
+                <span className="text-red-400 font-bold block">Motivo de rechazo del vendedor:</span>
+                <p className="text-zinc-300 leading-relaxed">{selectedOffer.message}</p>
+              </div>
+            )}
 
             <button
               onClick={() => setSelectedOffer(null)}
