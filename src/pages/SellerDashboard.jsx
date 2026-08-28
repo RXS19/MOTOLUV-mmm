@@ -20,6 +20,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { motoApi, offerApi, apartadoApi } from '../services/api';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
@@ -56,6 +57,8 @@ const SellerDashboard = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejectionError, setRejectionError] = useState('');
   const [rejectLoading, setRejectLoading] = useState(false);
+  const [previousRejectionsCount, setPreviousRejectionsCount] = useState(0);
+  const [acceptFee, setAcceptFee] = useState(false);
 
   // Bank form state
   const [bankForm, setBankForm] = useState({
@@ -186,10 +189,37 @@ const SellerDashboard = () => {
     }
   };
 
-  const handleOpenRejectModal = (offer) => {
+  const checkPreviousRejections = async (motoId) => {
+    if (!motoId) return 0;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { count, error } = await supabase
+          .from('offers')
+          .select('id', { count: 'exact', head: true })
+          .eq('moto_id', String(motoId))
+          .in('status', ['RECHAZADA', 'REJECTED']);
+        if (!error && typeof count === 'number') {
+          return count;
+        }
+      } catch (err) {
+        console.warn('Error counting rejections from Supabase:', err);
+      }
+    }
+    return offers.filter(
+      (o) =>
+        String(o.moto_id || o.moto?.id) === String(motoId) &&
+        (o.status === 'RECHAZADA' || o.status === 'REJECTED')
+    ).length;
+  };
+
+  const handleOpenRejectModal = async (offer) => {
     setOfferToReject(offer);
     setRejectionReason('');
     setRejectionError('');
+    setAcceptFee(false);
+    const motoId = offer.moto_id || offer.moto?.id;
+    const count = await checkPreviousRejections(motoId);
+    setPreviousRejectionsCount(count);
   };
 
   const handleCloseRejectModal = () => {
@@ -197,6 +227,8 @@ const SellerDashboard = () => {
       setOfferToReject(null);
       setRejectionReason('');
       setRejectionError('');
+      setAcceptFee(false);
+      setPreviousRejectionsCount(0);
     }
   };
 
@@ -207,21 +239,30 @@ const SellerDashboard = () => {
       setRejectionError('El motivo de rechazo es obligatorio.');
       return;
     }
+    if (previousRejectionsCount >= 2 && !acceptFee) {
+      setRejectionError('Debes aceptar el cargo de $500 MXN para proceder con el rechazo.');
+      return;
+    }
     if (!offerToReject?.id) return;
 
     setRejectLoading(true);
     try {
-      await offerApi.respond(offerToReject.id, 'RECHAZADA', reasonTrimmed);
+      const isThird = previousRejectionsCount >= 2;
+      await offerApi.respond(offerToReject.id, 'RECHAZADA', reasonTrimmed, isThird);
       toast({
         title: 'Oferta rechazada',
-        description: 'La oferta ha sido declinada con el motivo capturado.',
+        description: isThird
+          ? 'La oferta ha sido declinada y se aplicó el cargo de $500 MXN.'
+          : 'La oferta ha sido declinada con el motivo capturado.',
       });
       handleCloseRejectModal();
       loadData();
-    } catch {
+    } catch (err) {
+      console.error('Error al rechazar oferta:', err);
+      setRejectionError(err?.message || 'No se pudo rechazar la oferta. Por favor intenta nuevamente.');
       toast({
-        title: 'Error al actualizar',
-        description: 'No se pudo procesar la respuesta.',
+        title: 'Error al rechazar oferta',
+        description: err?.message || 'No se pudo procesar la respuesta en Supabase.',
         variant: 'destructive',
       });
     } finally {
@@ -944,6 +985,26 @@ const SellerDashboard = () => {
               Indica al comprador el motivo por el cual no puedes aceptar esta oferta. Este campo es <strong className="text-white">obligatorio</strong>.
             </p>
 
+            {previousRejectionsCount >= 2 && (
+              <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                <p className="text-xs font-bold text-amber-400">
+                  Este rechazo generará un cargo de $500 MXN.
+                </p>
+                <label className="flex items-start gap-2.5 cursor-pointer text-left">
+                  <input
+                    type="checkbox"
+                    checked={acceptFee}
+                    onChange={(e) => setAcceptFee(e.target.checked)}
+                    disabled={rejectLoading}
+                    className="mt-0.5 rounded border-white/20 bg-black/40 text-red-600 focus:ring-red-500 h-4 w-4 accent-red-600 cursor-pointer"
+                  />
+                  <span className="text-[11px] text-zinc-300 leading-snug font-medium">
+                    Acepto el cargo de $500 MXN y confirmo que deseo rechazar esta oferta.
+                  </span>
+                </label>
+              </div>
+            )}
+
             <form onSubmit={handleConfirmRejectOffer} className="space-y-3">
               <div>
                 <label className="text-[11px] text-zinc-400 uppercase tracking-wider block mb-1.5 font-bold">
@@ -979,7 +1040,11 @@ const SellerDashboard = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={rejectLoading || !rejectionReason.trim()}
+                  disabled={
+                    rejectLoading ||
+                    !rejectionReason.trim() ||
+                    (previousRejectionsCount >= 2 && !acceptFee)
+                  }
                   className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow"
                 >
                   {rejectLoading ? 'Rechazando...' : 'Confirmar Rechazo'}

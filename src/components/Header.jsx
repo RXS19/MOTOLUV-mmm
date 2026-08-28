@@ -105,7 +105,7 @@ const Header = () => {
                     <div className="text-white text-sm font-medium">{user.name}</div>
                     <div className="text-zinc-500 text-xs truncate">{user.email}</div>
                     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-brand/10 border border-red-brand/30 text-red-brand">
-                      {activeView === 'vendedor' ? '🏍️ Perfil Vendedor' : '🛒 Perfil Comprador'}
+                      {activeView === 'vendedor' ? 'Perfil Vendedor' : 'Perfil Comprador'}
                     </div>
                   </div>
                   <div className="py-2">

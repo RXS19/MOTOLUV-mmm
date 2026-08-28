@@ -588,7 +588,7 @@ export const offerApi = {
     }
   },
 
-  respond: async (id, status, rejectionReason = null) => {
+  respond: async (id, status, rejectionReason = null, rejectionConfirmed = false) => {
     // Map to strictly allowed states: ENVIADA, PENDIENTE, ACEPTADA, RECHAZADA, EXPIRADA
     let finalStatus = status;
     if (status === 'accepted' || status === 'Aceptada') finalStatus = 'ACEPTADA';
@@ -600,30 +600,36 @@ export const offerApi = {
       status: finalStatus,
     };
 
-    if (finalStatus === 'RECHAZADA' && rejectionReason) {
-      updatePayload.message = String(rejectionReason).trim();
+    if (finalStatus === 'RECHAZADA') {
+      if (rejectionReason) {
+        updatePayload.message = String(rejectionReason).trim();
+      }
+      if (rejectionConfirmed === true) {
+        updatePayload.rejection_confirmed = true;
+      }
     }
 
     if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('offers')
-          .update(updatePayload)
-          .eq('id', String(id))
-          .select('*')
-          .single();
+      const { data, error } = await supabase
+        .from('offers')
+        .update(updatePayload)
+        .eq('id', String(id))
+        .select('*')
+        .single();
 
-        if (!error && data) {
-          return data;
-        }
-      } catch (err) {
-        console.warn('Error updating offer in Supabase:', err);
+      if (error) {
+        console.error('Error updating offer in Supabase:', error);
+        throw error;
+      }
+
+      if (data) {
+        return data;
       }
     }
     return api.patch(`/offers/${id}`, updatePayload).then((r) => r.data);
   },
 
-  updateStatus: async (id, status, rejectionReason = null) => {
+  updateStatus: async (id, status, rejectionReason = null, rejectionConfirmed = false) => {
     let finalStatus = status;
     if (status === 'accepted' || status === 'Aceptada') finalStatus = 'ACEPTADA';
     else if (status === 'rejected' || status === 'Rechazada') finalStatus = 'RECHAZADA';
@@ -634,24 +640,30 @@ export const offerApi = {
       status: finalStatus,
     };
 
-    if (finalStatus === 'RECHAZADA' && rejectionReason) {
-      updatePayload.message = String(rejectionReason).trim();
+    if (finalStatus === 'RECHAZADA') {
+      if (rejectionReason) {
+        updatePayload.message = String(rejectionReason).trim();
+      }
+      if (rejectionConfirmed === true) {
+        updatePayload.rejection_confirmed = true;
+      }
     }
 
     if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('offers')
-          .update(updatePayload)
-          .eq('id', String(id))
-          .select('*')
-          .single();
+      const { data, error } = await supabase
+        .from('offers')
+        .update(updatePayload)
+        .eq('id', String(id))
+        .select('*')
+        .single();
 
-        if (!error && data) {
-          return data;
-        }
-      } catch (err) {
-        console.warn('Error updating offer in Supabase:', err);
+      if (error) {
+        console.error('Error updating offer in Supabase:', error);
+        throw error;
+      }
+
+      if (data) {
+        return data;
       }
     }
     return api.patch(`/offers/${id}`, updatePayload).then((r) => r.data);
