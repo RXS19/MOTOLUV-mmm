@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowDown, Clock, Users, Shield, Wrench, Sparkles, CheckCircle, Eye, FileText, Handshake } from 'lucide-react';
+import { ArrowRight, ArrowDown, Users, Shield, Wrench, CheckCircle, Eye, FileText, Search, Tag } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import heroBikeImage from '../assets/images/motoluv_hero_bike_1787923976389.jpg';
 import bobberImage from '../assets/images/cinematic_bobber_rider_1787497883792.jpg';
 
 const HomePage = () => {
+  const { user } = useAuth();
   const [featured, setFeatured] = useState([]);
 
   useEffect(() => {
@@ -42,53 +45,67 @@ const HomePage = () => {
   return (
     <div>
       {/* HERO */}
-      <section className="relative min-h-[92vh] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 grid-bg" />
-        <div
-          className="absolute inset-0 opacity-60"
-          style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=1920')",
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'grayscale(0.2) brightness(0.7) contrast(1.15)',
-          }}
-        />
-        <div className="absolute inset-0 hero-vignette opacity-80" />
-
-        <div className="relative z-10 max-w-5xl mx-auto px-5 lg:px-8 text-center py-24">
-          <div className="inline-flex items-center justify-center border border-red-brand/60 text-red-brand text-[11px] font-bold tracking-widest uppercase px-4 py-2 rounded-full mb-10">
-            SUBE · CONECTA · RUEDA
+      <section className="relative min-h-[85vh] lg:min-h-[92vh] flex items-center bg-[#050505] overflow-hidden">
+        {/* Background Motorcycle image positioned on the right */}
+        <div className="absolute inset-0 flex justify-end items-center pointer-events-none select-none">
+          <div className="relative w-full h-full lg:w-[65%] xl:w-[58%] flex items-center justify-end">
+            <img
+              src={heroBikeImage}
+              alt="Motoluv Motorcycle"
+              className="w-full h-full object-cover object-center lg:object-right opacity-60 lg:opacity-100"
+              referrerPolicy="no-referrer"
+            />
+            {/* Gradients to blend motorcycle image seamlessly into the black background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/80 to-transparent w-full lg:w-3/5" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-[#050505]/70" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505]" />
           </div>
+        </div>
 
-          <h1 className="hero-title text-white text-5xl md:text-7xl lg:text-8xl uppercase">
-            El marketplace
-            <br />
-            que <span className="text-red-brand">lo cambia todo.</span>
-          </h1>
+        {/* Hero Content Container */}
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 w-full py-16 sm:py-20 lg:py-28">
+          <div className="max-w-2xl text-left">
+            {/* Red Eyebrow */}
+            <div className="text-[#E10600] font-bold text-xs sm:text-sm tracking-[0.25em] uppercase mb-4 sm:mb-6">
+              SUBE. CONECTA. RUEDA.
+            </div>
 
-          <p className="mt-8 text-zinc-300 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-            Una nueva forma de comprar y vender motocicletas. Regístrate y sé de los primeros en acceder.
-          </p>
+            {/* Headline */}
+            <h1 className="hero-title text-white text-4xl sm:text-6xl md:text-7xl lg:text-8xl uppercase tracking-tight leading-[0.92]">
+              DONDE COMPRAR Y VENDER
+              <br />
+              <span className="text-[#E10600]">SE SIENTE DIFERENTE.</span>
+            </h1>
 
-          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/registro"
-              className="btn-red group inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm"
-            >
-              Quiero Registrarme
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              to="/como-funciona"
-              className="btn-outline inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-8 py-4 rounded-sm"
-            >
-              Cómo Funciona
-            </Link>
-          </div>
+            {/* Description */}
+            <p className="mt-6 sm:mt-7 text-zinc-300 text-base sm:text-lg md:text-xl font-normal leading-relaxed max-w-xl">
+              Motos verificadas. Personas conectadas.
+              <br />
+              Operaciones protegidas. Todo acompañado
+              <br />
+              por <span className="text-[#E10600] font-medium">Motoluv</span>.
+            </p>
 
-          <div className="mt-20 text-xs tracking-widest text-zinc-500 flex flex-col items-center gap-2">
-            DESCUBRIR
-            <ArrowDown size={14} className="bounce-arrow" />
+            {/* Action Buttons */}
+            <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-4">
+              <Link
+                to="/motos"
+                className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 bg-[#E10600] hover:bg-[#c50500] active:bg-[#aa0400] text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg hover:shadow-red-600/30 group"
+              >
+                <Search size={16} className="text-white group-hover:scale-110 transition-transform" />
+                <span>COMPRAR UNA MOTO</span>
+                <ArrowRight size={16} className="text-white group-hover:translate-x-1 transition-transform" />
+              </Link>
+
+              <Link
+                to={user ? '/panel/publicar' : '/registro'}
+                className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 bg-black/60 hover:bg-white/10 active:bg-white/15 border border-white/20 hover:border-white/40 text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all backdrop-blur-sm group"
+              >
+                <Tag size={16} className="text-zinc-300 group-hover:text-white group-hover:scale-110 transition-transform" />
+                <span>VENDER MI MOTO</span>
+                <ArrowRight size={16} className="text-zinc-300 group-hover:text-white group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
