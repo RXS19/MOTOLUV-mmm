@@ -45,65 +45,71 @@ const HomePage = () => {
   return (
     <div>
       {/* HERO */}
-      <section className="relative min-h-[85vh] lg:min-h-[92vh] flex items-center bg-[#050505] overflow-hidden">
-        {/* Background Motorcycle image positioned on the right */}
-        <div className="absolute inset-0 flex justify-end items-center pointer-events-none select-none">
-          <div className="relative w-full h-full lg:w-[65%] xl:w-[58%] flex items-center justify-end">
+      <section className="relative min-h-[85vh] lg:min-h-[90vh] xl:min-h-[92vh] flex items-center bg-black overflow-hidden select-none">
+        {/* Background Motorcycle image positioned on the right (55% width on desktop) */}
+        <div className="absolute inset-0 flex justify-end items-center pointer-events-none">
+          <div className="relative w-full h-full lg:w-[62%] xl:w-[58%] flex items-center justify-end">
             <img
               src={heroBikeImage}
               alt="Motoluv Motorcycle"
-              className="w-full h-full object-cover object-center lg:object-right opacity-60 lg:opacity-100"
+              className="w-full h-full object-cover object-center lg:object-right opacity-50 lg:opacity-100"
               referrerPolicy="no-referrer"
             />
             {/* Gradients to blend motorcycle image seamlessly into the black background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/80 to-transparent w-full lg:w-3/5" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-[#050505]/70" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-[#050505]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent w-full lg:w-[55%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-black" />
           </div>
         </div>
 
-        {/* Hero Content Container */}
-        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 w-full py-16 sm:py-20 lg:py-28">
+        {/* Hero Content Container (approx 45% width on desktop) */}
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 w-full py-16 sm:py-20 lg:py-24">
           <div className="max-w-2xl text-left">
-            {/* Red Eyebrow */}
-            <div className="text-[#E10600] font-bold text-xs sm:text-sm tracking-[0.25em] uppercase mb-4 sm:mb-6">
+            {/* Slogan superior pequeño en rojo */}
+            <div className="text-[#E10600] font-bold text-xs sm:text-sm tracking-[0.22em] uppercase mb-4 sm:mb-5">
               SUBE. CONECTA. RUEDA.
             </div>
 
-            {/* Headline */}
-            <h1 className="hero-title text-white text-4xl sm:text-6xl md:text-7xl lg:text-8xl uppercase tracking-tight leading-[0.92]">
+            {/* Headline Principal dominante */}
+            <h1 className="hero-title text-white text-[38px] sm:text-6xl md:text-7xl lg:text-[76px] xl:text-[84px] uppercase tracking-tight leading-[0.93] font-bold">
               DONDE COMPRAR Y VENDER
               <br />
               <span className="text-[#E10600]">SE SIENTE DIFERENTE.</span>
             </h1>
 
-            {/* Description */}
-            <p className="mt-6 sm:mt-7 text-zinc-300 text-base sm:text-lg md:text-xl font-normal leading-relaxed max-w-xl">
+            {/* Texto Descriptivo en 3 líneas */}
+            <p className="mt-6 sm:mt-8 text-zinc-300 text-[15px] sm:text-lg md:text-xl font-normal leading-[1.6] max-w-xl">
               Motos verificadas. Personas conectadas.
               <br />
               Operaciones protegidas. Todo acompañado
               <br />
-              por <span className="text-[#E10600] font-medium">Motoluv</span>.
+              por <span className="text-[#E10600] font-semibold">Motoluv.</span>
             </p>
 
-            {/* Action Buttons */}
-            <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-4">
+            {/* Botones de Acción */}
+            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5">
+              {/* Botón Principal Rojo */}
               <Link
                 to="/motos"
-                className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 bg-[#E10600] hover:bg-[#c50500] active:bg-[#aa0400] text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg hover:shadow-red-600/30 group"
+                className="inline-flex items-center justify-between sm:justify-center gap-3.5 px-7 h-14 bg-[#E10600] hover:bg-[#c90500] active:bg-[#aa0400] text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg hover:shadow-red-600/30 group"
               >
-                <Search size={16} className="text-white group-hover:scale-110 transition-transform" />
-                <span>COMPRAR UNA MOTO</span>
-                <ArrowRight size={16} className="text-white group-hover:translate-x-1 transition-transform" />
+                <div className="flex items-center gap-3">
+                  <Search size={18} className="text-white group-hover:scale-110 transition-transform stroke-[2.2]" />
+                  <span>COMPRAR UNA MOTO</span>
+                </div>
+                <ArrowRight size={18} className="text-white group-hover:translate-x-1 transition-transform stroke-[2.2]" />
               </Link>
 
+              {/* Segundo Botón Transparente */}
               <Link
                 to={user ? '/panel/publicar' : '/registro'}
-                className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 bg-black/60 hover:bg-white/10 active:bg-white/15 border border-white/20 hover:border-white/40 text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all backdrop-blur-sm group"
+                className="inline-flex items-center justify-between sm:justify-center gap-3.5 px-7 h-14 bg-transparent hover:bg-white/10 active:bg-white/15 border border-white/25 hover:border-white/50 text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all backdrop-blur-sm group"
               >
-                <Tag size={16} className="text-zinc-300 group-hover:text-white group-hover:scale-110 transition-transform" />
-                <span>VENDER MI MOTO</span>
-                <ArrowRight size={16} className="text-zinc-300 group-hover:text-white group-hover:translate-x-1 transition-transform" />
+                <div className="flex items-center gap-3">
+                  <Tag size={18} className="text-zinc-300 group-hover:text-white group-hover:scale-110 transition-transform stroke-[2.2]" />
+                  <span>VENDER MI MOTO</span>
+                </div>
+                <ArrowRight size={18} className="text-zinc-300 group-hover:text-white group-hover:translate-x-1 transition-transform stroke-[2.2]" />
               </Link>
             </div>
           </div>
