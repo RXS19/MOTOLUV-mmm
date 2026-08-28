@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowDown, Users, Shield, Wrench, CheckCircle, Eye, FileText, Search, Tag } from 'lucide-react';
+import { ArrowRight, ArrowDown, Users, Shield, Wrench, CheckCircle, Eye, FileText, ShieldCheck } from 'lucide-react';
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -45,75 +45,98 @@ const HomePage = () => {
   return (
     <div>
       {/* HERO */}
-      <section className="relative min-h-[85vh] lg:min-h-[90vh] xl:min-h-[92vh] flex items-center bg-[#070709] overflow-hidden select-none">
-        {/* Subtle studio glow behind bike (Apple/Kavak product showcase style) */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[700px] h-[550px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute right-[10%] top-1/3 -translate-y-1/2 w-[450px] h-[350px] bg-white/[0.03] rounded-full blur-[100px] pointer-events-none" />
+      <section className="relative min-h-[88vh] lg:min-h-[92vh] flex items-center bg-[#060608] overflow-hidden select-none">
+        {/* Background Studio Lighting & Atmosphere */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[750px] h-[600px] bg-red-600/5 rounded-full blur-[150px] pointer-events-none" />
+        <div className="absolute right-[12%] top-1/4 -translate-y-1/2 w-[450px] h-[350px] bg-white/[0.04] rounded-full blur-[120px] pointer-events-none" />
 
-        {/* Background Motorcycle image positioned on the right (55-60% width on desktop) */}
-        <div className="absolute inset-0 flex justify-end items-center pointer-events-none">
-          <div className="relative w-full h-full lg:w-[64%] xl:w-[60%] flex items-center justify-end">
-            <img
-              src={heroBikeImage}
-              alt="Motoluv Motorcycle"
-              className="w-full h-full object-cover object-center lg:object-right opacity-70 lg:opacity-100 brightness-[1.08] contrast-[1.06] saturate-[1.05] drop-shadow-2xl"
-              referrerPolicy="no-referrer"
-            />
-            {/* Gradients to blend motorcycle image seamlessly into the black background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#070709] via-[#070709]/75 to-transparent w-full lg:w-[48%]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#070709] via-transparent to-[#070709]/40" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#070709]/50 via-transparent to-[#070709]" />
+        {/* Diagonal Studio Tube Light Bar on the right wall (from reference image) */}
+        <div className="absolute right-[-40px] lg:right-[-20px] top-[18%] w-[10px] h-[400px] bg-white/90 rounded-full rotate-[38deg] blur-[2px] opacity-70 shadow-[0_0_40px_#ffffff,0_0_80px_rgba(255,255,255,0.6)] pointer-events-none hidden md:block" />
+
+        {/* Floating Certification Badge (top right over motorcycle area) */}
+        <div className="absolute right-6 sm:right-10 lg:right-16 top-6 sm:top-10 z-20 hidden sm:flex items-center gap-3 px-4 py-2.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 shadow-2xl">
+          <div className="w-8 h-8 rounded-lg bg-red-600/15 border border-red-500/30 flex items-center justify-center shrink-0">
+            <ShieldCheck size={18} className="text-[#E10600]" />
+          </div>
+          <div className="text-left">
+            <div className="text-[11px] font-bold tracking-widest text-white uppercase leading-none">CERTIFICADA</div>
+            <div className="text-[10px] text-zinc-400 font-semibold tracking-wider mt-1">POR <span className="text-[#E10600] font-bold">MOTOLUV</span></div>
           </div>
         </div>
 
-        {/* Hero Content Container (approx 45% width on desktop) */}
-        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 w-full py-16 sm:py-20 lg:py-24">
-          <div className="max-w-2xl text-left">
+        {/* Background Motorcycle image positioned on the right (perspective, 55-60% width on desktop) */}
+        <div className="absolute inset-0 flex justify-end items-center pointer-events-none">
+          <div className="relative w-full h-full lg:w-[65%] xl:w-[60%] flex items-center justify-end">
+            <img
+              src={heroBikeImage}
+              alt="Motoluv Motorcycle"
+              className="w-full h-full object-cover object-center lg:object-right opacity-65 sm:opacity-80 lg:opacity-100 brightness-[1.08] contrast-[1.08] saturate-[1.05] drop-shadow-2xl"
+              referrerPolicy="no-referrer"
+            />
+            {/* Gradients to blend motorcycle image seamlessly into the studio background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#060608] via-[#060608]/85 lg:via-[#060608]/75 to-transparent w-full lg:w-[50%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#060608] via-transparent to-[#060608]/40" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#060608]/50 via-transparent to-[#060608]" />
+          </div>
+        </div>
+
+        {/* Hero Content Container (left 45% on desktop, fully responsive on mobile) */}
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 w-full py-12 sm:py-16 lg:py-20">
+          <div className="max-w-xl lg:max-w-2xl text-left">
             {/* Slogan superior pequeño en rojo */}
-            <div className="text-[#E10600] font-bold text-xs sm:text-sm tracking-[0.22em] uppercase mb-4 sm:mb-5">
+            <div className="text-[#E10600] font-bold text-xs sm:text-sm tracking-[0.24em] uppercase mb-3 sm:mb-5">
               SUBE. CONECTA. RUEDA.
             </div>
 
             {/* Headline Principal dominante */}
-            <h1 className="hero-title text-white text-[32px] sm:text-5xl md:text-6xl lg:text-[68px] xl:text-[76px] uppercase tracking-tight leading-[0.95] font-bold">
-              DONDE COMPRAR Y VENDER
+            <h1 className="hero-title text-white text-[42px] sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[88px] uppercase tracking-tight leading-[0.92] font-bold">
+              COMPRA O VENDE
               <br />
-              <span className="text-[#E10600] whitespace-nowrap">SE SIENTE DIFERENTE.</span>
+              <span className="text-[#E10600]">TU MOTO.</span>
             </h1>
 
-            {/* Texto Descriptivo en 3 líneas */}
-            <p className="mt-6 sm:mt-8 text-zinc-300 text-[15px] sm:text-lg md:text-xl font-normal leading-[1.6] max-w-xl">
-              Motos verificadas. Personas conectadas.
-              <br />
-              Operaciones protegidas. Todo acompañado
-              <br />
-              por <span className="text-[#E10600] font-semibold">Motoluv.</span>
+            {/* Subtítulo */}
+            <p className="mt-3 sm:mt-4 text-zinc-200 text-lg sm:text-2xl md:text-3xl font-light tracking-tight">
+              Nosotros hacemos el resto.
             </p>
 
+            {/* Línea divisoria sutil */}
+            <div className="w-full max-w-sm sm:max-w-md h-px bg-white/15 my-5 sm:my-6" />
+
+            {/* Feature de confianza con icono Shield */}
+            <div className="flex items-center gap-3 sm:gap-3.5 max-w-md">
+              <div className="w-8 h-8 rounded-full border border-red-500/40 bg-red-600/10 flex items-center justify-center shrink-0">
+                <ShieldCheck size={18} className="text-[#E10600]" />
+              </div>
+              <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
+                Motos verificadas y operaciones acompañadas de principio a fin.
+              </p>
+            </div>
+
+            {/* Mobile Badge version (visible only on small screens) */}
+            <div className="mt-4 inline-flex sm:hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-black/60 border border-white/15">
+              <ShieldCheck size={14} className="text-[#E10600]" />
+              <span className="text-[10px] font-bold text-white uppercase tracking-wider">Certificada por <span className="text-[#E10600]">Motoluv</span></span>
+            </div>
+
             {/* Botones de Acción */}
-            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5">
+            <div className="mt-7 sm:mt-9 flex flex-wrap items-center gap-5 sm:gap-8">
               {/* Botón Principal Rojo */}
               <Link
                 to="/motos"
-                className="inline-flex items-center justify-between sm:justify-center gap-3.5 px-7 h-14 bg-[#E10600] hover:bg-[#c90500] active:bg-[#aa0400] text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg hover:shadow-red-600/30 group"
+                className="inline-flex items-center justify-center gap-3.5 px-6 sm:px-7 py-3.5 sm:py-4 bg-[#B91C1C] hover:bg-[#DC2626] active:bg-[#991B1B] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-lg shadow-red-950/50 hover:shadow-red-700/30 group"
               >
-                <div className="flex items-center gap-3">
-                  <Search size={18} className="text-white group-hover:scale-110 transition-transform stroke-[2.2]" />
-                  <span>COMPRAR UNA MOTO</span>
-                </div>
+                <span>Comprar una moto</span>
                 <ArrowRight size={18} className="text-white group-hover:translate-x-1 transition-transform stroke-[2.2]" />
               </Link>
 
-              {/* Segundo Botón Transparente */}
+              {/* Segundo Botón / Enlace Subrayado */}
               <Link
                 to={user ? '/panel/publicar' : '/registro'}
-                className="inline-flex items-center justify-between sm:justify-center gap-3.5 px-7 h-14 bg-transparent hover:bg-white/10 active:bg-white/15 border border-white/25 hover:border-white/50 text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-lg transition-all backdrop-blur-sm group"
+                className="inline-flex items-center gap-2 text-white hover:text-zinc-200 active:text-zinc-300 text-xs sm:text-sm font-medium border-b border-white/40 hover:border-white pb-0.5 transition-colors group"
               >
-                <div className="flex items-center gap-3">
-                  <Tag size={18} className="text-zinc-300 group-hover:text-white group-hover:scale-110 transition-transform stroke-[2.2]" />
-                  <span>VENDER MI MOTO</span>
-                </div>
-                <ArrowRight size={18} className="text-zinc-300 group-hover:text-white group-hover:translate-x-1 transition-transform stroke-[2.2]" />
+                <span>Vender mi moto</span>
+                <ArrowRight size={16} className="text-zinc-300 group-hover:text-white group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
           </div>
