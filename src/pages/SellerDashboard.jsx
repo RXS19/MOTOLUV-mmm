@@ -676,12 +676,6 @@ const SellerDashboard = () => {
                         </div>
                       </div>
 
-                      {off.package && (
-                        <div className="text-xs text-zinc-400">
-                          Paquete de protección: <span className="text-zinc-200 uppercase font-semibold">{off.package}</span>
-                        </div>
-                      )}
-
                       {off.status === 'RECHAZADA' && off.message && (
                         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs space-y-1">
                           <span className="text-red-400 font-bold block">Motivo de rechazo registrado:</span>
