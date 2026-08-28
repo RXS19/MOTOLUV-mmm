@@ -49,6 +49,10 @@ const LuChatbot = () => {
     const handlePointerMove = (e) => {
       if (!isDraggingRef.current) return;
       
+      if (e.touches && e.cancelable) {
+        e.preventDefault();
+      }
+
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
@@ -62,10 +66,10 @@ const LuChatbot = () => {
       let newX = clientX - dragStartOffsetRef.current.x;
       let newY = clientY - dragStartOffsetRef.current.y;
 
-      const width = containerRef.current ? containerRef.current.offsetWidth : 360;
-      const height = containerRef.current ? containerRef.current.offsetHeight : 520;
+      const width = containerRef.current ? containerRef.current.offsetWidth : 60;
+      const height = containerRef.current ? containerRef.current.offsetHeight : 60;
 
-      // Bound within viewport
+      // Bound within viewport with safe margins
       newX = Math.max(10, Math.min(window.innerWidth - width - 10, newX));
       newY = Math.max(10, Math.min(window.innerHeight - height - 10, newY));
 
@@ -81,13 +85,40 @@ const LuChatbot = () => {
     window.addEventListener('touchmove', handlePointerMove, { passive: false });
     window.addEventListener('touchend', handlePointerUp);
 
+    const handleResize = () => {
+      setPosition((prev) => {
+        if (!prev || !containerRef.current) return prev;
+        const width = containerRef.current.offsetWidth || 60;
+        const height = containerRef.current.offsetHeight || 60;
+        return {
+          x: Math.max(10, Math.min(window.innerWidth - width - 10, prev.x)),
+          y: Math.max(10, Math.min(window.innerHeight - height - 10, prev.y)),
+        };
+      });
+    };
+    window.addEventListener('resize', handleResize);
+
     return () => {
       window.removeEventListener('mousemove', handlePointerMove);
       window.removeEventListener('mouseup', handlePointerUp);
       window.removeEventListener('touchmove', handlePointerMove);
       window.removeEventListener('touchend', handlePointerUp);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  // Clamp position when opening chat so the full chatbox fits within viewport
+  useEffect(() => {
+    if (isOpen && position) {
+      const chatWidth = window.innerWidth < 640 ? Math.min(window.innerWidth - 20, 360) : 400;
+      const chatHeight = 520;
+      const clampedX = Math.max(10, Math.min(window.innerWidth - chatWidth - 10, position.x));
+      const clampedY = Math.max(10, Math.min(window.innerHeight - chatHeight - 10, position.y));
+      if (clampedX !== position.x || clampedY !== position.y) {
+        setPosition({ x: clampedX, y: clampedY });
+      }
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -96,8 +127,11 @@ const LuChatbot = () => {
   }, [messages, loading, isWavingAnimation]);
 
   const handleStartDrag = (e) => {
-    if (e.target.closest('button:not(.drag-handle)') || e.target.closest('input')) {
-      return;
+    if (isOpen) {
+      // In open chatbox, ignore clicks on buttons, inputs or form controls
+      if (e.target.closest('button') || e.target.closest('input') || e.target.closest('form')) {
+        return;
+      }
     }
 
     if (containerRef.current) {
@@ -267,7 +301,7 @@ const LuChatbot = () => {
           onMouseDown={handleStartDrag}
           onTouchStart={handleStartDrag}
           onClick={toggleChat}
-          className="group relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#E10600] bg-black shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none ring-2 ring-black/50 cursor-grab active:cursor-grabbing"
+          className="group relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#E10600] bg-black shadow-2xl transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none ring-2 ring-black/50 cursor-grab active:cursor-grabbing touch-none"
           aria-label="Abrir chat con Lu"
           title="Haz clic para abrir • Arrastra para mover"
         >
