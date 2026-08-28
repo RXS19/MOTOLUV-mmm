@@ -75,10 +75,10 @@ const HomePage = () => {
             </div>
 
             {/* Headline Principal dominante */}
-            <h1 className="hero-title text-white text-[38px] sm:text-6xl md:text-7xl lg:text-[76px] xl:text-[84px] uppercase tracking-tight leading-[0.93] font-bold">
+            <h1 className="hero-title text-white text-[32px] sm:text-5xl md:text-6xl lg:text-[68px] xl:text-[76px] uppercase tracking-tight leading-[0.95] font-bold">
               DONDE COMPRAR Y VENDER
               <br />
-              <span className="text-[#E10600]">SE SIENTE DIFERENTE.</span>
+              <span className="text-[#E10600] whitespace-nowrap">SE SIENTE DIFERENTE.</span>
             </h1>
 
             {/* Texto Descriptivo en 3 líneas */}
