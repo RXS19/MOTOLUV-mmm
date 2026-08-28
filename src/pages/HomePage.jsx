@@ -4,7 +4,7 @@ import { ArrowRight, ArrowDown, Users, Shield, Wrench, CheckCircle, Eye, FileTex
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import heroBikeImage from '../assets/images/motoluv_hero_hyperreal_bike_1787926595912.jpg';
+import heroBikeImage from '../assets/images/motoluv_hero_studio_bike_1787926260279.jpg';
 import bobberImage from '../assets/images/cinematic_bobber_rider_1787497883792.jpg';
 
 const HomePage = () => {
