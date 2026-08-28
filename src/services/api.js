@@ -234,6 +234,35 @@ export const motoApi = {
   },
 
   update: async (id, data) => {
+    // 1. Bloqueo de edición si la moto ya está en estado PUBLICADA
+    const isEditingDetails = data && Object.keys(data).some(k => 
+      ['brand', 'model', 'year', 'km', 'price', 'color', 'engine', 'category', 'city', 'location', 'description', 'images', 'image'].includes(k)
+    );
+
+    if (isEditingDetails) {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: currentMoto } = await supabase
+            .from('motos')
+            .select('status')
+            .eq('id', String(id))
+            .single();
+
+          const currentStatus = currentMoto?.status;
+          if (currentStatus === 'Publicada' || currentStatus === 'PUBLICADA' || currentStatus === 'active') {
+            const err = new Error('Esta motocicleta ya se encuentra PUBLICADA. La edición directa está bloqueada por seguridad. Por favor, contacta a Soporte Motoluv.');
+            err.code = 'MOTO_PUBLISHED_EDIT_LOCKED';
+            throw err;
+          }
+        } catch (statusErr) {
+          if (statusErr?.code === 'MOTO_PUBLISHED_EDIT_LOCKED') {
+            throw statusErr;
+          }
+          console.warn('Advertencia al validar estatus de moto:', statusErr?.message);
+        }
+      }
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         if (data.status === 'Rechazada' || data.status === 'rejected') {
@@ -252,6 +281,7 @@ export const motoApi = {
           }
         }
       } catch (err) {
+        if (err?.code === 'MOTO_PUBLISHED_EDIT_LOCKED') throw err;
         console.warn('Error updating moto in Supabase:', err);
       }
     }
@@ -260,6 +290,7 @@ export const motoApi = {
       const res = await api.patch(`/motos/${id}`, data);
       return res.data;
     } catch (err) {
+      if (err?.code === 'MOTO_PUBLISHED_EDIT_LOCKED') throw err;
       if (data.status === 'Rechazada' || data.status === 'rejected') {
         return { deleted: true, status: 'Rechazada' };
       }

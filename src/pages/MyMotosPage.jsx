@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Eye, Trash2, Wrench, Activity, Zap, Sparkles } from 'lucide-react';
+import { Plus, Eye, Trash2, Wrench, Activity, Zap, Sparkles, Edit3, Lock, MessageCircle } from 'lucide-react';
 import { motoApi } from '../services/api';
 import { toast } from '../hooks/use-toast';
 import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
@@ -209,9 +209,31 @@ const MyMotosPage = () => {
                     Destacar Publicación
                   </button>
                   <div className="flex gap-2 pt-2 border-t border-white/5">
-                    <Link to={m.id ? `/motos/${m.id}` : '/motos'} className="flex-1 text-center text-xs font-bold tracking-widest uppercase py-2 rounded-sm border border-white/10 text-white hover:border-red-brand hover:text-red-brand transition-colors">
+                    <Link
+                      to={m.id ? `/motos/${m.id}` : '/motos'}
+                      className="flex-1 text-center text-xs font-bold tracking-wider uppercase py-2 rounded-sm border border-white/10 text-white hover:border-red-brand hover:text-red-brand transition-colors"
+                    >
                       Ver Ficha
                     </Link>
+
+                    {m.status === 'Publicada' || m.status === 'PUBLICADA' || m.status === 'active' ? (
+                      <Link
+                        to={`/panel/publicar?edit=${m.id}`}
+                        className="px-3 py-2 text-center text-xs font-bold tracking-wider uppercase rounded-sm border border-amber-500/30 bg-amber-500/5 text-amber-400 hover:bg-amber-500/15 transition-colors flex items-center gap-1.5"
+                        title="Publicación en estado PUBLICADA: Edición bloqueada automáticamente. Contacta a Soporte."
+                      >
+                        <Lock size={12} /> Editar
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/panel/publicar?edit=${m.id}`}
+                        className="px-3 py-2 text-center text-xs font-bold tracking-wider uppercase rounded-sm border border-white/10 text-zinc-300 hover:border-red-brand hover:text-red-brand transition-colors flex items-center gap-1.5"
+                        title="Editar publicación"
+                      >
+                        <Edit3 size={12} /> Editar
+                      </Link>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => initiateDelete(m)}

@@ -12,15 +12,23 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   const style = getStatusStyle(moto.status);
   const fav = isFavorite(moto.id);
 
-  // Status tags are ONLY visible to the owner of the listing or the linked buyer
-  const isOwnerOrLinkedBuyer = Boolean(
+  const isOwner = Boolean(
     user && (
       user.id === moto.owner_id ||
       user.id === moto.ownerId ||
-      user.id === moto.buyer_id ||
-      moto.is_linked_buyer ||
-      showStatus
+      user.id === moto.seller_id ||
+      user.id === moto.sellerId
     )
+  );
+
+  // Requirement 2:
+  // La etiqueta “PUBLICADA” debe verla únicamente el dueño de la publicación dentro de su dashboard.
+  // Nunca mostrar esa etiqueta en el sitio público ni a otros usuarios.
+  // No ocultarla solo con CSS: la condición debe depender del usuario autenticado.
+  const shouldRenderStatusBadge = Boolean(
+    style.label === 'Publicada'
+      ? (showStatus && isOwner)
+      : (user && (isOwner || user.id === moto.buyer_id || moto.is_linked_buyer || showStatus))
   );
 
   // Score is ONLY visible if user is logged in
@@ -78,7 +86,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
               <Wrench size={10} /> DESTACADA
             </div>
           )}
-          {isOwnerOrLinkedBuyer && (
+          {shouldRenderStatusBadge && (
             <div className={`bg-black/80 backdrop-blur px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow ${style.badgeClass}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
               {style.label}

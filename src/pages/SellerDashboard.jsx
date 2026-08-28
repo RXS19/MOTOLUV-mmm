@@ -17,7 +17,9 @@ import {
   Trash2,
   BookmarkCheck,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Edit3,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -433,13 +435,32 @@ const SellerDashboard = () => {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between sm:justify-end gap-3 flex-wrap">
+                          <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
                             <Link
                               to={pub.id ? `/motos/${pub.id}` : '/motos'}
                               className="px-3 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
                             >
                               Ver publicación
                             </Link>
+
+                            {pub.status === 'Publicada' || pub.status === 'PUBLICADA' || pub.status === 'active' ? (
+                              <Link
+                                to={`/panel/publicar?edit=${pub.id}`}
+                                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                                title="Publicación PUBLICADA: Edición bloqueada automáticamente. Contacta a Soporte."
+                              >
+                                <Lock size={12} /> Editar
+                              </Link>
+                            ) : (
+                              <Link
+                                to={`/panel/publicar?edit=${pub.id}`}
+                                className="px-3 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                                title="Editar publicación"
+                              >
+                                <Edit3 size={12} /> Editar
+                              </Link>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => initiateDeleteMoto(pub)}
@@ -599,8 +620,27 @@ const SellerDashboard = () => {
                             to={m.id ? `/motos/${m.id}` : '/motos'}
                             className="flex-1 text-center text-xs font-bold py-2 rounded-lg bg-[#16161c] text-white hover:bg-white/10 transition-colors border border-white/10"
                           >
-                            Ver publicación
+                            Ver
                           </Link>
+
+                          {m.status === 'Publicada' || m.status === 'PUBLICADA' || m.status === 'active' ? (
+                            <Link
+                              to={`/panel/publicar?edit=${m.id}`}
+                              className="px-3 py-2 text-center text-xs font-bold rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors flex items-center gap-1.5"
+                              title="Publicación PUBLICADA: Edición bloqueada automáticamente. Contacta a Soporte."
+                            >
+                              <Lock size={12} /> Editar
+                            </Link>
+                          ) : (
+                            <Link
+                              to={`/panel/publicar?edit=${m.id}`}
+                              className="px-3 py-2 text-center text-xs font-bold rounded-lg border border-white/10 bg-[#16161c] text-zinc-300 hover:bg-white/10 hover:border-red-brand hover:text-red-brand transition-colors flex items-center gap-1.5"
+                              title="Editar publicación"
+                            >
+                              <Edit3 size={12} /> Editar
+                            </Link>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => initiateDeleteMoto(m)}

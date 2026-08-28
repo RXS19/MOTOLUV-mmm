@@ -489,6 +489,7 @@ const MotoDetailPage = () => {
             <div className="flex items-center justify-end gap-2 mb-2">
               {Boolean(user && (user.id === moto.owner_id || user.id === moto.ownerId || user.id === moto.buyer_id || hasApartado)) && (() => {
                 const style = getStatusStyle(moto.status);
+                if (style.label === 'Publicada') return null;
                 return (
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${style.badgeClass}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${style.dotClass}`}></span>
