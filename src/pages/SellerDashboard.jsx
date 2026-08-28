@@ -19,7 +19,12 @@ import {
   FileText,
   AlertCircle,
   Edit3,
-  Lock
+  Lock,
+  CalendarClock,
+  Calendar,
+  MapPin,
+  ChevronRight,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -28,6 +33,7 @@ import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
 import BoostPublicationModal from '../components/dashboard/BoostPublicationModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import { CERTIFIED_WORKSHOPS } from '../data/workshops';
 import { calculateCommission } from '../utils/commission';
 import { getStatusStyle } from '../utils/status';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
@@ -48,6 +54,14 @@ const SellerDashboard = () => {
   const [showInspectionModal, setShowInspectionModal] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Schedule Appointment Modal State
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedApartadoForSchedule, setSelectedApartadoForSchedule] = useState(null);
+  const [selectedWorkshopId, setSelectedWorkshopId] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
 
   // Deletion modal state
   const [motoToDelete, setMotoToDelete] = useState(null);
@@ -127,6 +141,98 @@ const SellerDashboard = () => {
   const acceptedOffers = offers.filter(o => o.status === 'ACEPTADA' || o.status === 'accepted');
   const activeApartados = apartados.filter(a => a.status === 'REALIZADO');
   const inspections = apartados.filter(a => a.certification_status || a.certification_appointment_at);
+  const apartadosPendingAppointment = apartados.filter(
+    (a) => a.status === 'REALIZADO' && (!a.certification_appointment_at || a.certification_appointment_status !== 'PROGRAMADA')
+  );
+
+  const handleOpenScheduleModal = (apartado) => {
+    setSelectedApartadoForSchedule(apartado);
+    // Find matching workshop by city or default to first
+    const targetCity = (apartado?.moto_city || '').toLowerCase();
+    const cityMatch = CERTIFIED_WORKSHOPS.find(
+      (w) => w.city.toLowerCase() === targetCity
+    );
+    setSelectedWorkshopId(cityMatch ? cityMatch.id : CERTIFIED_WORKSHOPS[0].id);
+
+    // Default to tomorrow (or today if early)
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+    setSelectedDate(nextDay.toISOString().split('T')[0]);
+    setScheduleError('');
+    setShowScheduleModal(true);
+  };
+
+  const handleCloseScheduleModal = () => {
+    if (scheduleLoading) return;
+    setShowScheduleModal(false);
+    setSelectedApartadoForSchedule(null);
+    setSelectedWorkshopId('');
+    setSelectedDate('');
+    setScheduleError('');
+  };
+
+  const handleConfirmSchedule = async (e) => {
+    e.preventDefault();
+    if (!selectedApartadoForSchedule) return;
+    if (!selectedWorkshopId) {
+      setScheduleError('Por favor selecciona un taller mecánico certificado.');
+      return;
+    }
+    if (!selectedDate) {
+      setScheduleError('Por favor selecciona el día para la inspección técnica.');
+      return;
+    }
+
+    const chosenWorkshop =
+      CERTIFIED_WORKSHOPS.find((w) => w.id === selectedWorkshopId) || CERTIFIED_WORKSHOPS[0];
+
+    setScheduleLoading(true);
+    setScheduleError('');
+
+    try {
+      await apartadoApi.scheduleAppointment({
+        apartado_id: selectedApartadoForSchedule.id,
+        appointment_at: selectedDate,
+        workshop_name: chosenWorkshop.name,
+        workshop_id: chosenWorkshop.id,
+      });
+
+      const appointmentIso = new Date(selectedDate + 'T12:00:00').toISOString();
+
+      // Immediate state update
+      setApartados((prev) =>
+        prev.map((a) =>
+          a.id === selectedApartadoForSchedule.id
+            ? {
+                ...a,
+                certification_appointment_at: appointmentIso,
+                certification_appointment_status: 'PROGRAMADA',
+                certification_workshop: chosenWorkshop.name,
+              }
+            : a
+        )
+      );
+
+      const formattedDate = new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-MX', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      toast({
+        title: '¡Cita de inspección programada!',
+        description: `Inspección de ${selectedApartadoForSchedule.moto_brand} programada para el ${formattedDate} en ${chosenWorkshop.name}.`,
+      });
+
+      handleCloseScheduleModal();
+    } catch (err) {
+      console.error('Error al agendar cita de inspección:', err);
+      setScheduleError(err?.message || 'Error al guardar la cita en el sistema. Intenta de nuevo.');
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
 
   const handleOpenBoostModal = (moto = null) => {
     setSelectedMotoForBoost(moto || (motos.length > 0 ? motos[0] : null));
@@ -341,6 +447,70 @@ const SellerDashboard = () => {
                 </Link>
               </div>
             </div>
+
+            {/* Apartado Detectado Notification Task Banner */}
+            {apartadosPendingAppointment.length > 0 && (
+              <div className="bg-red-brand/10 border-2 border-red-brand/40 rounded-2xl p-5 sm:p-6 space-y-4 shadow-xl shadow-red-brand/5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-brand/20 border border-red-brand/40 text-red-brand flex items-center justify-center flex-shrink-0">
+                      <CalendarClock size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-base flex items-center gap-2 flex-wrap">
+                        <span>¡Apartado detectado! Requiere agendar inspección</span>
+                        <span className="px-2 py-0.5 rounded-full bg-red-brand text-white text-[10px] uppercase font-bold tracking-wider animate-pulse">
+                          Acción Requerida
+                        </span>
+                      </h3>
+                      <p className="text-xs text-zinc-300 mt-0.5">
+                        Tienes {apartadosPendingAppointment.length} apartado(s) confirmado(s). Por favor selecciona el taller oficial y el día de peritaje para continuar.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {apartadosPendingAppointment.map((ap) => (
+                    <div
+                      key={ap.id}
+                      className="p-3.5 bg-black/40 border border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-white/20 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-lg bg-[#141418] border border-white/10 flex items-center justify-center text-red-brand flex-shrink-0 overflow-hidden">
+                          {ap.moto_image ? (
+                            <img
+                              src={resolveSafeImageUrl(ap.moto_image, 'moto')}
+                              alt={ap.moto_brand}
+                              onError={(e) => handleImageError(e, 'moto')}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Bike size={20} />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-white truncate">
+                            {ap.moto_brand} {ap.moto_model} {ap.moto_year || ''}
+                          </h4>
+                          <p className="text-xs text-zinc-400">
+                            Apartado confirmado • Estado de cita: <span className="text-amber-400 font-semibold">Pendiente de programar</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenScheduleModal(ap)}
+                        className="px-4 py-2.5 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-red-brand/20 whitespace-nowrap cursor-pointer"
+                      >
+                        <CalendarClock size={15} /> Agendar inspección
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 4 KPI Metric Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
@@ -768,40 +938,98 @@ const SellerDashboard = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {apartados.map((ap) => (
-                  <div key={ap.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                      <div>
-                        <h3 className="font-bold text-base text-white">
-                          {ap.moto_brand} {ap.moto_model} {ap.moto_year || ''}
-                        </h3>
-                        <p className="text-xs text-zinc-400">
-                          Fecha: {ap.created_at ? new Date(ap.created_at).toLocaleDateString('es-MX') : 'Reciente'}
-                        </p>
-                      </div>
-                      <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {ap.status}
-                      </span>
-                    </div>
+                {apartados.map((ap) => {
+                  const isScheduled = Boolean(
+                    ap.certification_appointment_at &&
+                    (ap.certification_appointment_status === 'PROGRAMADA' || ap.certification_appointment_status === 'programada')
+                  );
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
-                      <div>
-                        <span className="text-zinc-500 block">Dictamen de Certificación</span>
-                        <span className="text-white font-bold text-sm uppercase">{ap.certification_status || 'PENDIENTE'}</span>
+                  return (
+                    <div key={ap.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-red-brand flex-shrink-0 overflow-hidden">
+                            {ap.moto_image ? (
+                              <img
+                                src={resolveSafeImageUrl(ap.moto_image, 'moto')}
+                                alt={ap.moto_brand}
+                                onError={(e) => handleImageError(e, 'moto')}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Bike size={22} />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-base text-white">
+                              {ap.moto_brand} {ap.moto_model} {ap.moto_year || ''}
+                            </h3>
+                            <p className="text-xs text-zinc-400">
+                              Fecha de apartado: {ap.created_at ? new Date(ap.created_at).toLocaleDateString('es-MX') : 'Reciente'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {ap.status}
+                          </span>
+                          {isScheduled ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              CITA PROGRAMADA
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              PENDIENTE DE CITA
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-zinc-500 block">Cita de Inspección</span>
-                        <span className="text-zinc-200 font-semibold">
-                          {ap.certification_appointment_at ? new Date(ap.certification_appointment_at).toLocaleString('es-MX') : 'Por programar'}
-                        </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
+                        <div>
+                          <span className="text-zinc-500 block">Dictamen de Certificación</span>
+                          <span className="text-white font-bold text-sm uppercase">{ap.certification_status || 'PENDIENTE'}</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block">Cita de Inspección</span>
+                          <span className="text-zinc-200 font-semibold block">
+                            {ap.certification_appointment_at ? new Date(ap.certification_appointment_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Por programar'}
+                          </span>
+                          {ap.certification_workshop && (
+                            <span className="text-[11px] text-zinc-400 block truncate mt-0.5" title={ap.certification_workshop}>
+                              {ap.certification_workshop}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-zinc-500 block">Estado de Cita</span>
+                          <span className="text-zinc-200 font-semibold">{ap.certification_appointment_status || 'Pendiente'}</span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-zinc-500 block">Estado de Cita</span>
-                        <span className="text-zinc-200 font-semibold">{ap.certification_appointment_status || 'Pendiente'}</span>
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        {!isScheduled ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(ap)}
+                            className="px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
+                          >
+                            <CalendarClock size={14} /> Agendar inspección
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(ap)}
+                            className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <CalendarClock size={13} /> Reagendar cita
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -829,38 +1057,93 @@ const SellerDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {inspections.map((insp) => (
-                  <div key={insp.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold uppercase">
-                        {insp.certification_status || 'PENDIENTE'}
-                      </span>
-                    </div>
+                {inspections.map((insp) => {
+                  const isScheduled = Boolean(
+                    insp.certification_appointment_at &&
+                    (insp.certification_appointment_status === 'PROGRAMADA' || insp.certification_appointment_status === 'programada')
+                  );
 
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-red-brand">
-                        <Bike size={24} />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-white">{insp.moto_brand} {insp.moto_model}</h3>
-                        <p className="text-xs text-zinc-400">Inspección de Apartado</p>
-                      </div>
-                    </div>
+                  return (
+                    <div key={insp.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold uppercase">
+                            {insp.certification_status || 'PENDIENTE'}
+                          </span>
+                          {isScheduled ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              PROGRAMADA
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              SIN CITA
+                            </span>
+                          )}
+                        </div>
 
-                    <div className="space-y-2 text-xs text-zinc-300 p-3 bg-[#141418] rounded-xl border border-white/5">
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">Cita:</span>
-                        <span className="font-medium text-white">
-                          {insp.certification_appointment_at ? new Date(insp.certification_appointment_at).toLocaleString('es-MX') : 'Por programar'}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-14 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-red-brand overflow-hidden flex-shrink-0">
+                            {insp.moto_image ? (
+                              <img
+                                src={resolveSafeImageUrl(insp.moto_image, 'moto')}
+                                alt={insp.moto_brand}
+                                onError={(e) => handleImageError(e, 'moto')}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Bike size={24} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-sm text-white truncate">{insp.moto_brand} {insp.moto_model}</h3>
+                            <p className="text-xs text-zinc-400">Inspección de Apartado</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 text-xs text-zinc-300 p-3 bg-[#141418] rounded-xl border border-white/5">
+                          <div className="flex justify-between">
+                            <span className="text-zinc-500">Cita:</span>
+                            <span className="font-medium text-white">
+                              {insp.certification_appointment_at ? new Date(insp.certification_appointment_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Por programar'}
+                            </span>
+                          </div>
+                          {insp.certification_workshop && (
+                            <div className="flex justify-between">
+                              <span className="text-zinc-500">Taller:</span>
+                              <span className="font-medium text-zinc-300 text-right truncate max-w-[180px]">
+                                {insp.certification_workshop}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="text-zinc-500">Dictamen:</span>
+                            <span className="text-emerald-400 font-bold uppercase">{insp.certification_status || 'PENDIENTE'}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-zinc-500">Dictamen:</span>
-                        <span className="text-emerald-400 font-bold uppercase">{insp.certification_status || 'PENDIENTE'}</span>
+
+                      <div className="pt-2 border-t border-white/5 flex items-center justify-end">
+                        {!isScheduled ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(insp)}
+                            className="w-full py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
+                          >
+                            <CalendarClock size={14} /> Agendar inspección
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(insp)}
+                            className="text-xs text-zinc-400 hover:text-white font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <CalendarClock size={13} /> Modificar cita
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1082,6 +1365,146 @@ const SellerDashboard = () => {
                   className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow"
                 >
                   {rejectLoading ? 'Rechazando...' : 'Confirmar Rechazo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Agendar Inspección Técnica Certificada */}
+      {showScheduleModal && selectedApartadoForSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[#121216] border border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-5 text-left relative shadow-2xl overflow-y-auto max-h-[90vh]">
+            <button
+              type="button"
+              onClick={handleCloseScheduleModal}
+              disabled={scheduleLoading}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-white disabled:opacity-50"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-brand/15 border border-red-brand/30 text-red-brand flex items-center justify-center flex-shrink-0">
+                <CalendarClock size={22} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Agendar Inspección Técnica</h3>
+                <p className="text-xs text-zinc-400">
+                  {selectedApartadoForSchedule.moto_brand} {selectedApartadoForSchedule.moto_model} {selectedApartadoForSchedule.moto_year || ''}
+                </p>
+              </div>
+            </div>
+
+            {/* Apartado Overview summary banner */}
+            <div className="p-3.5 bg-[#0a0a0c] border border-white/10 rounded-xl flex items-center justify-between text-xs">
+              <div>
+                <span className="text-zinc-500 block text-[11px]">Estatus de Apartado</span>
+                <span className="text-emerald-400 font-bold">CONFIRMADO EN CUSTODIA</span>
+              </div>
+              <div className="text-right">
+                <span className="text-zinc-500 block text-[11px]">Folio Apartado</span>
+                <span className="text-zinc-300 font-mono font-bold">
+                  {String(selectedApartadoForSchedule.id).substring(0, 8).toUpperCase()}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmSchedule} className="space-y-4">
+              {/* Taller Certificado Selector */}
+              <div>
+                <label className="text-[11px] text-zinc-400 uppercase tracking-wider block mb-1.5 font-bold flex items-center gap-1.5">
+                  <MapPin size={13} className="text-red-brand" />
+                  <span>Seleccionar Taller Mecánico Certificado *</span>
+                </label>
+                <select
+                  value={selectedWorkshopId}
+                  onChange={(e) => setSelectedWorkshopId(e.target.value)}
+                  disabled={scheduleLoading}
+                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors"
+                >
+                  <option value="" disabled>Selecciona un taller certificado...</option>
+                  {CERTIFIED_WORKSHOPS.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name} ({ws.zone}, {ws.city}) — {ws.address}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Selected Workshop Details Card */}
+                {selectedWorkshopId && (() => {
+                  const ws = CERTIFIED_WORKSHOPS.find((w) => w.id === selectedWorkshopId);
+                  if (!ws) return null;
+                  return (
+                    <div className="mt-2.5 p-3 bg-white/[0.03] border border-white/10 rounded-xl space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-xs">{ws.name}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-zinc-300 font-semibold">{ws.city}</span>
+                      </div>
+                      <p className="text-zinc-400 text-[11px] flex items-start gap-1">
+                        <MapPin size={12} className="flex-shrink-0 mt-0.5 text-red-brand" />
+                        <span>{ws.address}</span>
+                      </p>
+                      <p className="text-zinc-500 text-[10px]">
+                        Horario de recepción: Lunes a Sábado 9:00 AM - 6:00 PM
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Día / Fecha Selector (NO seleccionar hora) */}
+              <div>
+                <label className="text-[11px] text-zinc-400 uppercase tracking-wider block mb-1.5 font-bold flex items-center gap-1.5">
+                  <Calendar size={13} className="text-red-brand" />
+                  <span>Día de Inspección (Seleccionar Fecha) *</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  min={new Date().toISOString().split('T')[0]}
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  disabled={scheduleLoading}
+                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors"
+                />
+                <p className="text-[11px] text-zinc-400 mt-1.5">
+                  Nota: Conforme a la política Motoluv, el peritaje se agenda por día. El horario de atención en taller es continuo de 9:00 AM a 6:00 PM.
+                </p>
+              </div>
+
+              {scheduleError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle size={14} className="flex-shrink-0" />
+                  <span>{scheduleError}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={handleCloseScheduleModal}
+                  disabled={scheduleLoading}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={scheduleLoading || !selectedWorkshopId || !selectedDate}
+                  className="px-5 py-2 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  {scheduleLoading ? (
+                    'Guardando cita...'
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      <span>Confirmar Cita Programada</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

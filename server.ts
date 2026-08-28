@@ -183,6 +183,7 @@ interface Moto {
   engine: string;
   category: string;
   city: string;
+  location?: string;
   price: number;
   commission_rate: number;
   commission_amount: number;
@@ -235,6 +236,8 @@ interface PartnerApp {
 const db = {
   motos: new Map<string, Moto>(),
   offers: new Map<string, Offer>(),
+  apartados: new Map<string, any>(),
+  notifications: new Map<string, any>(),
   partners: new Map<string, PartnerApp>(),
 };
 
@@ -958,6 +961,150 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     }
 
     return res.json(offer);
+  });
+
+  // Apartado Routes
+  api.post('/apartados', authenticateToken, async (req, res) => {
+    const user = (req as any).user as User;
+    const { moto_id } = req.body;
+    const moto = db.motos.get(moto_id);
+    if (!moto) return res.status(404).json({ detail: 'Moto no encontrada' });
+    if (moto.owner_id === user.id) {
+      return res.status(400).json({ detail: 'No puedes apartar tu propia moto' });
+    }
+
+    const id = `apartado_${Math.random().toString(36).slice(2, 10)}`;
+    const apartado: any = {
+      id,
+      moto_id,
+      buyer_id: user.id,
+      seller_id: moto.owner_id,
+      status: 'REALIZADO',
+      certification_appointment_at: null,
+      certification_appointment_status: 'Pendiente',
+      created_at: new Date().toISOString(),
+      moto: {
+        id: moto.id,
+        brand: moto.brand,
+        model: moto.model,
+        year: moto.year,
+        price: moto.price,
+        city: moto.city || moto.location,
+        image: moto.image,
+        images: moto.images,
+        owner_id: moto.owner_id,
+        owner_name: moto.owner_name,
+      },
+    };
+
+    db.apartados.set(id, apartado);
+
+    // Add in-memory notification for seller
+    const notifId = `notif_${Math.random().toString(36).slice(2, 10)}`;
+    db.notifications.set(notifId, {
+      id: notifId,
+      recipient_id: moto.owner_id,
+      type: 'APARTADO_RECIBIDO',
+      title: '¡Apartado recibido!',
+      body: `Se ha registrado un apartado para tu ${moto.brand} ${moto.model}. Es momento de agendar la inspección técnica en un taller certificado.`,
+      moto_id,
+      apartado_id: id,
+      created_at: new Date().toISOString(),
+      read_at: null,
+    });
+
+    if (supabaseServer) {
+      try {
+        await supabaseServer.from('apartados').insert([{
+          id: apartado.id,
+          moto_id: apartado.moto_id,
+          buyer_id: apartado.buyer_id,
+          status: 'REALIZADO',
+          created_at: apartado.created_at,
+        }]);
+        await supabaseServer.from('notifications').insert([{
+          id: notifId,
+          recipient_id: moto.owner_id,
+          type: 'APARTADO_RECIBIDO',
+          title: '¡Apartado recibido!',
+          body: `Se ha registrado un apartado para tu ${moto.brand} ${moto.model}. Es momento de agendar la inspección técnica en un taller certificado.`,
+          moto_id,
+          apartado_id: id,
+        }]);
+      } catch (err: any) {
+        console.warn('Supabase apartado sync exception:', err?.message || err);
+      }
+    }
+
+    return res.json(apartado);
+  });
+
+  api.get('/my/apartados', authenticateToken, async (req, res) => {
+    const user = (req as any).user as User;
+    const list = Array.from(db.apartados.values())
+      .filter((a) => a.buyer_id === user.id)
+      .map((a) => {
+        const moto = db.motos.get(a.moto_id);
+        return {
+          ...a,
+          moto_brand: a.moto?.brand || moto?.brand,
+          moto_model: a.moto?.model || moto?.model,
+          moto_year: a.moto?.year || moto?.year,
+          moto_price: a.moto?.price || moto?.price,
+          moto_image: a.moto?.images?.[0] || a.moto?.image || moto?.images?.[0] || moto?.image,
+          seller_name: a.moto?.owner_name || moto?.owner_name || 'Vendedor Verificado',
+        };
+      });
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return res.json(list);
+  });
+
+  api.get('/my/received-apartados', authenticateToken, async (req, res) => {
+    const user = (req as any).user as User;
+    const list = Array.from(db.apartados.values())
+      .filter((a) => {
+        const moto = db.motos.get(a.moto_id);
+        return a.seller_id === user.id || a.moto?.owner_id === user.id || moto?.owner_id === user.id;
+      })
+      .map((a) => {
+        const moto = db.motos.get(a.moto_id);
+        return {
+          ...a,
+          moto_brand: a.moto?.brand || moto?.brand,
+          moto_model: a.moto?.model || moto?.model,
+          moto_year: a.moto?.year || moto?.year,
+          moto_price: a.moto?.price || moto?.price,
+          moto_city: a.moto?.city || moto?.city || moto?.location,
+          moto_image: a.moto?.images?.[0] || a.moto?.image || moto?.images?.[0] || moto?.image,
+          seller_name: a.moto?.owner_name || moto?.owner_name || 'Vendedor',
+        };
+      });
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return res.json(list);
+  });
+
+  api.put('/apartados/:id/appointment', authenticateToken, async (req, res) => {
+    const { appointment_at, workshop_name, workshop_id } = req.body;
+    const apartado = db.apartados.get(req.params.id);
+    if (!apartado) return res.status(404).json({ detail: 'Apartado no encontrado' });
+
+    apartado.certification_appointment_at = appointment_at;
+    apartado.certification_appointment_status = 'PROGRAMADA';
+    apartado.certification_workshop = workshop_name;
+    apartado.certification_workshop_id = workshop_id;
+
+    if (supabaseServer) {
+      try {
+        await supabaseServer.from('apartados').update({
+          certification_appointment_at: appointment_at,
+          certification_appointment_status: 'PROGRAMADA',
+        }).eq('id', apartado.id);
+      } catch (err: any) {
+        console.warn('Supabase update appointment error:', err?.message || err);
+      }
+    }
+
+    return res.json(apartado);
   });
 
   // Upload Route with Supabase Storage & Local Disk Fallback

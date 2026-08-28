@@ -359,7 +359,7 @@ export const apartadoApi = {
         if (!session?.user?.id) throw new Error('Debes iniciar sesión para realizar un apartado.');
 
         // Insert into public.apartados with buyer_id and moto_id
-        // NO nod sent, NO is_apartado used. Status REALIZADO
+        // Status REALIZADO
         const { data, error } = await supabase
           .from('apartados')
           .insert([
@@ -376,6 +376,29 @@ export const apartadoApi = {
           console.error('Error creating apartado in Supabase:', error);
           throw error;
         }
+
+        // Automatic notification to seller
+        try {
+          const sellerId = data?.moto?.owner_id;
+          if (sellerId) {
+            const motoTitle = `${data.moto?.brand || ''} ${data.moto?.model || ''}`.trim() || 'tu motocicleta';
+            await supabase
+              .from('notifications')
+              .insert([
+                {
+                  recipient_id: sellerId,
+                  type: 'APARTADO_RECIBIDO',
+                  title: '¡Apartado recibido!',
+                  body: `Se ha registrado un apartado para ${motoTitle}. Es momento de agendar la inspección técnica en un taller certificado.`,
+                  moto_id: String(moto_id),
+                  apartado_id: String(data.id),
+                },
+              ]);
+          }
+        } catch (notifErr) {
+          console.warn('Could not insert notification into Supabase:', notifErr);
+        }
+
         return data;
       } catch (err) {
         console.warn('Supabase apartado create error:', err);
@@ -466,6 +489,7 @@ export const apartadoApi = {
                 moto_model: a.moto?.model,
                 moto_year: a.moto?.year,
                 moto_price: a.moto?.price,
+                moto_city: a.moto?.city,
                 moto_image: a.moto?.images?.[0] || a.moto?.image,
                 seller_name: a.moto?.owner_name || 'Vendedor',
               }));
@@ -482,6 +506,81 @@ export const apartadoApi = {
     } catch {
       return [];
     }
+  },
+
+  scheduleAppointment: async ({ apartado_id, appointment_at, workshop_name, workshop_id }) => {
+    if (!apartado_id || !appointment_at) {
+      throw new Error('ID de apartado y fecha son obligatorios para agendar la cita.');
+    }
+
+    const appointmentIso = new Date(appointment_at).toISOString();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const updatePayload = {
+          certification_appointment_at: appointmentIso,
+          certification_appointment_status: 'PROGRAMADA',
+        };
+        if (workshop_name) {
+          updatePayload.certification_workshop = workshop_name;
+        }
+
+        const { data, error } = await supabase
+          .from('apartados')
+          .update(updatePayload)
+          .eq('id', apartado_id)
+          .select('*, moto:motos(*)')
+          .single();
+
+        if (error) {
+          // Fallback if custom column certification_workshop does not exist in schema
+          const fallbackPayload = {
+            certification_appointment_at: appointmentIso,
+            certification_appointment_status: 'PROGRAMADA',
+          };
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('apartados')
+            .update(fallbackPayload)
+            .eq('id', apartado_id)
+            .select('*, moto:motos(*)')
+            .single();
+
+          if (fallbackError) {
+            console.error('Error updating appointment in Supabase:', fallbackError);
+            throw fallbackError;
+          }
+          return fallbackData;
+        }
+
+        // Auto mark related notification as attended/read
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id) {
+            await supabase
+              .from('notifications')
+              .update({ read_at: new Date().toISOString() })
+              .eq('recipient_id', session.user.id)
+              .eq('apartado_id', String(apartado_id));
+          }
+        } catch {
+          // ignore notification mark error
+        }
+
+        return data;
+      } catch (err) {
+        console.warn('Supabase schedule appointment error:', err);
+        throw err;
+      }
+    }
+
+    return api
+      .put(`/apartados/${apartado_id}/appointment`, {
+        appointment_at: appointmentIso,
+        workshop_name,
+        workshop_id,
+        status: 'PROGRAMADA',
+      })
+      .then((r) => r.data);
   },
 };
 

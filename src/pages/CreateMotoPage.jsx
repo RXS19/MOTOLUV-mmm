@@ -8,7 +8,7 @@ import { handleImageError } from '../utils/imageFallback';
 
 const BRANDS = ['Honda', 'Yamaha', 'Kawasaki', 'Suzuki', 'Ducati', 'Harley-Davidson', 'BMW', 'KTM', 'Triumph', 'Aprilia', 'Otra'];
 const CATEGORIES = ['Deportiva', 'Naked', 'Cruiser', 'Adventure', 'Scooter', 'Touring', 'Trail', 'Custom'];
-const CITIES = ['Ciudad de México', 'Estado de México', 'Nuevo León', 'Guadalajara', 'Monterrey', 'Puebla', 'Querétaro', 'Tijuana', 'León', 'Mérida', 'Toluca', 'CDMX'];
+const CITIES = ['Ciudad de México', 'Estado de México', 'Nuevo León'];
 const MAX_IMAGES = 6;
 
 const CreateMotoPage = () => {
