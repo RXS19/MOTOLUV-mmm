@@ -4,7 +4,7 @@ import { ArrowRight, ArrowDown, Users, Shield, Wrench, CheckCircle, Eye, FileTex
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import heroBikeImage from '../assets/images/motoluv_hero_bike_1787923976389.jpg';
+import heroBikeImage from '../assets/images/motoluv_hero_studio_bike_1787926260279.jpg';
 import bobberImage from '../assets/images/cinematic_bobber_rider_1787497883792.jpg';
 
 const HomePage = () => {
@@ -45,20 +45,24 @@ const HomePage = () => {
   return (
     <div>
       {/* HERO */}
-      <section className="relative min-h-[85vh] lg:min-h-[90vh] xl:min-h-[92vh] flex items-center bg-black overflow-hidden select-none">
-        {/* Background Motorcycle image positioned on the right (55% width on desktop) */}
+      <section className="relative min-h-[85vh] lg:min-h-[90vh] xl:min-h-[92vh] flex items-center bg-[#070709] overflow-hidden select-none">
+        {/* Subtle studio glow behind bike (Apple/Kavak product showcase style) */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[700px] h-[550px] bg-red-600/5 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute right-[10%] top-1/3 -translate-y-1/2 w-[450px] h-[350px] bg-white/[0.03] rounded-full blur-[100px] pointer-events-none" />
+
+        {/* Background Motorcycle image positioned on the right (55-60% width on desktop) */}
         <div className="absolute inset-0 flex justify-end items-center pointer-events-none">
-          <div className="relative w-full h-full lg:w-[62%] xl:w-[58%] flex items-center justify-end">
+          <div className="relative w-full h-full lg:w-[64%] xl:w-[60%] flex items-center justify-end">
             <img
               src={heroBikeImage}
               alt="Motoluv Motorcycle"
-              className="w-full h-full object-cover object-center lg:object-right opacity-50 lg:opacity-100"
+              className="w-full h-full object-cover object-center lg:object-right opacity-70 lg:opacity-100 brightness-[1.08] contrast-[1.06] saturate-[1.05] drop-shadow-2xl"
               referrerPolicy="no-referrer"
             />
             {/* Gradients to blend motorcycle image seamlessly into the black background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-transparent w-full lg:w-[55%]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-black" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#070709] via-[#070709]/75 to-transparent w-full lg:w-[48%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#070709] via-transparent to-[#070709]/40" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#070709]/50 via-transparent to-[#070709]" />
           </div>
         </div>
 
