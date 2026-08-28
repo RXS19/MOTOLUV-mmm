@@ -183,7 +183,7 @@ const RegisterPage = () => {
               <label className="text-xs text-zinc-500 uppercase tracking-widest mb-2 block">Ciudad</label>
               <select value={form.city} onChange={(e) => update('city', e.target.value)} required className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 focus:border-red-brand text-white text-sm rounded-sm outline-none transition-colors">
                 <option value="">Selecciona una ciudad</option>
-                {['Ciudad de México', 'Guadalajara', 'Monterrey', 'Puebla', 'Querétaro', 'Tijuana', 'León', 'Mérida', 'Toluca'].map((c) => (
+                {['Ciudad de México', 'Estado de México', 'Nuevo León'].map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
