@@ -38,7 +38,7 @@ const CreateMotoPage = () => {
     let isMounted = true;
     setFetchingMoto(true);
 
-    motoApi.getById(editId)
+    motoApi.get(editId)
       .then((data) => {
         if (!isMounted || !data) return;
 

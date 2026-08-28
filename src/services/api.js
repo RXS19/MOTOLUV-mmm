@@ -163,6 +163,8 @@ export const motoApi = {
     return null;
   },
 
+  getById: async (id) => motoApi.get(id),
+
   create: async (data) => {
     let sessionUser = null;
     if (isSupabaseConfigured && supabase) {
