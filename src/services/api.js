@@ -54,7 +54,7 @@ const formatMotoRecord = (m) => {
     rating: m.rating !== undefined && m.rating !== null ? Number(m.rating) : null,
     views: Number(m.views) || 0,
     featured: Boolean(m.featured),
-    status: m.status || 'Publicada',
+    status: m.status || 'PUBLICADA',
     apartado_status: m.apartado_status || (isApartada ? 'APARTADA' : 'DISPONIBLE'),
     is_apartada: isApartada,
     owner_id: m.owner_id || null,
@@ -83,7 +83,7 @@ export const motoApi = {
         if (params.status) {
           query = query.eq('status', params.status);
         } else {
-          query = query.in('status', ['PUBLICADA', 'Publicada']);
+          query = query.eq('status', 'PUBLICADA');
         }
         if (params.featured === true || params.featured === 'true') {
           query = query.eq('featured', true);
@@ -105,7 +105,7 @@ export const motoApi = {
         if (!error && Array.isArray(data)) {
           let list = data
             .map(formatMotoRecord)
-            .filter((m) => m && (params.status ? m.status === params.status : (m.status === 'PUBLICADA' || m.status === 'Publicada')));
+            .filter((m) => m && (params.status ? m.status === params.status : m.status === 'PUBLICADA'));
 
           if (params.q) {
             const qStr = String(params.q).toLowerCase();
@@ -124,7 +124,7 @@ export const motoApi = {
       if (Array.isArray(res.data)) {
         return res.data
           .map(formatMotoRecord)
-          .filter((m) => m && (params.status ? m.status === params.status : (m.status === 'PUBLICADA' || m.status === 'Publicada')));
+          .filter((m) => m && (params.status ? m.status === params.status : m.status === 'PUBLICADA'));
       }
     } catch (err) {
       console.warn('Backend /motos request failed:', err?.message);
@@ -256,7 +256,7 @@ export const motoApi = {
             .single();
 
           const currentStatus = currentMoto?.status;
-          if (currentStatus === 'Publicada' || currentStatus === 'PUBLICADA' || currentStatus === 'active') {
+          if (currentStatus === 'PUBLICADA') {
             const err = new Error('Esta motocicleta ya se encuentra PUBLICADA. La edición directa está bloqueada por seguridad. Por favor, contacta a Soporte Motoluv.');
             err.code = 'MOTO_PUBLISHED_EDIT_LOCKED';
             throw err;

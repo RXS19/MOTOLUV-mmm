@@ -12,10 +12,10 @@ const HomePage = () => {
   const [featured, setFeatured] = useState([]);
 
   useEffect(() => {
-    motoApi.list({ featured: true, limit: 12 }).then((data) => {
+    motoApi.list({ status: 'PUBLICADA', featured: true, limit: 12 }).then((data) => {
       // Exclusively filter and display motorcycles with the featured label and status PUBLICADA
       const onlyFeatured = (Array.isArray(data) ? data : []).filter(
-        (m) => Boolean(m.featured) && (!m.status || m.status === 'PUBLICADA' || m.status === 'Publicada')
+        (m) => Boolean(m.featured) && m.status === 'PUBLICADA'
       );
       setFeatured(onlyFeatured.slice(0, 6));
     }).catch(() => setFeatured([]));
@@ -55,30 +55,19 @@ const HomePage = () => {
         {/* Diagonal Studio Tube Light Bar on the right wall (from reference image) */}
         <div className="absolute right-[-40px] lg:right-[-20px] top-[18%] w-[10px] h-[400px] bg-white/90 rounded-full rotate-[38deg] blur-[2px] opacity-70 shadow-[0_0_40px_#ffffff,0_0_80px_rgba(255,255,255,0.6)] pointer-events-none hidden md:block" />
 
-        {/* Floating Certification Badge (top right over motorcycle area) */}
-        <div className="absolute right-6 sm:right-10 lg:right-16 top-6 sm:top-10 z-20 hidden sm:flex items-center gap-3 px-4 py-2.5 rounded-xl bg-black/75 backdrop-blur-md border border-white/15 shadow-2xl">
-          <div className="w-8 h-8 rounded-lg bg-red-600/15 border border-red-500/30 flex items-center justify-center shrink-0">
-            <ShieldCheck size={18} className="text-[#E10600]" />
-          </div>
-          <div className="text-left">
-            <div className="text-[11px] font-bold tracking-widest text-white uppercase leading-none">CERTIFICADA</div>
-            <div className="text-[10px] text-zinc-400 font-semibold tracking-wider mt-1">POR <span className="text-[#E10600] font-bold">MOTOLUV</span></div>
-          </div>
-        </div>
-
         {/* Background Motorcycle image positioned on the right (perspective, 55-60% width on desktop) */}
         <div className="absolute inset-0 flex justify-end items-center pointer-events-none">
           <div className="relative w-full h-full lg:w-[65%] xl:w-[60%] flex items-center justify-end">
             <img
               src={heroBikeImage}
               alt="Motoluv Motorcycle"
-              className="w-full h-full object-cover object-center lg:object-right opacity-65 sm:opacity-80 lg:opacity-100 brightness-[1.08] contrast-[1.08] saturate-[1.05] drop-shadow-2xl"
+              className="w-full h-full object-cover object-center lg:object-right opacity-90 lg:opacity-100 brightness-[1.15] contrast-[1.05] saturate-[1.05] drop-shadow-2xl"
               referrerPolicy="no-referrer"
             />
-            {/* Gradients to blend motorcycle image seamlessly into the studio background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#060608] via-[#060608]/85 lg:via-[#060608]/75 to-transparent w-full lg:w-[50%]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#060608] via-transparent to-[#060608]/40" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#060608]/50 via-transparent to-[#060608]" />
+            {/* Lightened gradients to blend motorcycle image seamlessly into the studio background while keeping the image clear */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#060608] via-[#060608]/55 lg:via-[#060608]/35 to-transparent w-full lg:w-[45%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#060608]/60 via-transparent to-[#060608]/15" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#060608]/25 via-transparent to-[#060608]/60" />
           </div>
         </div>
 
@@ -90,8 +79,8 @@ const HomePage = () => {
               SUBE. CONECTA. RUEDA.
             </div>
 
-            {/* Headline Principal dominante */}
-            <h1 className="hero-title text-white text-[42px] sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[88px] uppercase tracking-tight leading-[0.92] font-bold">
+            {/* Headline Principal dominante con espacio reducido entre palabras */}
+            <h1 className="hero-title text-white text-[42px] sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[88px] uppercase tracking-[-0.04em] [word-spacing:-0.08em] leading-[0.92] font-bold">
               COMPRA O VENDE
               <br />
               <span className="text-[#E10600]">TU MOTO.</span>
@@ -105,20 +94,11 @@ const HomePage = () => {
             {/* Línea divisoria sutil */}
             <div className="w-full max-w-sm sm:max-w-md h-px bg-white/15 my-5 sm:my-6" />
 
-            {/* Feature de confianza con icono Shield */}
-            <div className="flex items-center gap-3 sm:gap-3.5 max-w-md">
-              <div className="w-8 h-8 rounded-full border border-red-500/40 bg-red-600/10 flex items-center justify-center shrink-0">
-                <ShieldCheck size={18} className="text-[#E10600]" />
-              </div>
-              <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
-                Motos verificadas y operaciones acompañadas de principio a fin.
+            {/* Feature de confianza sin isotipo y en una sola línea */}
+            <div className="max-w-xl">
+              <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed whitespace-nowrap">
+                Motos verificadas, operaciones acompañadas de principio a fin
               </p>
-            </div>
-
-            {/* Mobile Badge version (visible only on small screens) */}
-            <div className="mt-4 inline-flex sm:hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-black/60 border border-white/15">
-              <ShieldCheck size={14} className="text-[#E10600]" />
-              <span className="text-[10px] font-bold text-white uppercase tracking-wider">Certificada por <span className="text-[#E10600]">Motoluv</span></span>
             </div>
 
             {/* Botones de Acción */}

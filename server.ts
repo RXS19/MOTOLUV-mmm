@@ -504,7 +504,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
       list = list.filter((m) => m.status === status);
     } else {
       // By default list only approved published motorcycles (PUBLICADA) in public catalog
-      list = list.filter((m) => m.status === 'PUBLICADA' || m.status === 'Publicada');
+      list = list.filter((m) => m.status === 'PUBLICADA');
     }
 
     if (brand) list = list.filter((m) => m.brand === brand);
@@ -1445,7 +1445,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
 
       // Prepare context of Motoluv
       const activeMotos = Array.from(db.motos.values())
-        .filter((m) => m.status === 'PUBLICADA' || m.status === 'Publicada')
+        .filter((m) => m.status === 'PUBLICADA')
         .map((m) => `• ${m.brand} ${m.model} (${m.year}) | ${m.km.toLocaleString()} km | Score: ${m.score}/10 | Ubicación: ${m.city}`);
 
       const systemPrompt = `Eres "Lu", el asistente virtual oficial de Motoluv.
