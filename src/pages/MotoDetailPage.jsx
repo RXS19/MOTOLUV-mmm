@@ -747,11 +747,10 @@ const MotoDetailPage = () => {
               <div>
                 <div className="text-white text-sm font-medium">{moto.owner_name || 'Vendedor en Motoluv'}</div>
                 <div className="flex items-center gap-1 text-xs text-zinc-400">
-                  {moto.owner_rating ? (
-                    <>
-                      <Star size={11} className="fill-yellow-400 text-yellow-400" />
-                      <span>{moto.owner_rating} ({moto.owner_operations || 0} operaciones)</span>
-                    </>
+                  {(moto.seller_identity_verification_status === 'verified' || moto.identity_verification_status === 'verified') ? (
+                    <span className="text-emerald-400 font-medium flex items-center gap-1">
+                      <ShieldCheck size={12} className="text-emerald-400" /> Vendedor Verificado
+                    </span>
                   ) : (
                     <span>Vendedor Registrado</span>
                   )}

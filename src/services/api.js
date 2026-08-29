@@ -59,6 +59,10 @@ const formatMotoRecord = (m) => {
     is_apartada: isApartada,
     owner_id: m.owner_id || null,
     owner_name: m.owner_name || null,
+    owner_rating: m.owner_rating !== undefined && m.owner_rating !== null ? Number(m.owner_rating) : null,
+    owner_operations: m.owner_operations !== undefined && m.owner_operations !== null ? Number(m.owner_operations) : 0,
+    seller_identity_verification_status: m.seller_identity_verification_status || m.identity_verification_status || null,
+    identity_verification_status: m.identity_verification_status || m.seller_identity_verification_status || null,
     created_at: m.created_at || new Date().toISOString(),
     updated_at: m.updated_at || new Date().toISOString(),
   };
@@ -147,7 +151,33 @@ export const motoApi = {
           .maybeSingle();
 
         if (!error && data) {
-          return formatMotoRecord(data);
+          const record = formatMotoRecord(data);
+          if (data.owner_id) {
+            try {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('identity_verification_status, rating, operations, full_name')
+                .eq('id', String(data.owner_id))
+                .maybeSingle();
+
+              if (profileData) {
+                record.seller_identity_verification_status = profileData.identity_verification_status || 'unverified';
+                record.identity_verification_status = profileData.identity_verification_status || 'unverified';
+                if (profileData.rating !== undefined && profileData.rating !== null) {
+                  record.owner_rating = Number(profileData.rating);
+                }
+                if (profileData.operations !== undefined && profileData.operations !== null) {
+                  record.owner_operations = Number(profileData.operations);
+                }
+                if (profileData.full_name && !record.owner_name) {
+                  record.owner_name = profileData.full_name;
+                }
+              }
+            } catch (pErr) {
+              console.warn('Error fetching seller profile from Supabase:', pErr);
+            }
+          }
+          return record;
         }
       } catch (err) {
         console.warn('Error fetching moto from Supabase:', err);

@@ -535,7 +535,13 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     if (!moto) return res.status(404).json({ detail: 'Motocicleta no encontrada' });
     moto.views += 1;
     const isApartada = moto.apartado_status === 'APARTADA' || Boolean(moto.is_apartada);
-    return res.json({ ...moto, is_apartada: isApartada });
+    const sellerIdentityVerificationStatus = moto.seller_identity_verification_status || moto.identity_verification_status || 'unverified';
+    return res.json({
+      ...moto,
+      is_apartada: isApartada,
+      seller_identity_verification_status: sellerIdentityVerificationStatus,
+      identity_verification_status: sellerIdentityVerificationStatus,
+    });
   });
 
   api.post('/motos', authenticateToken, (req, res) => {
