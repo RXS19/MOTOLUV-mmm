@@ -44,6 +44,7 @@ const CatalogPage = () => {
 
   const filtered = useMemo(() => {
     let list = motos.filter((m) => {
+      if (m.status && m.status !== 'PUBLICADA' && m.status !== 'Publicada') return false;
       const text = `${m.brand || ''} ${m.model || ''}`.toLowerCase();
       if (q && !text.includes(q.toLowerCase())) return false;
       if (brand !== 'all' && m.brand !== brand) return false;

@@ -42,7 +42,7 @@ const CreateMotoPage = () => {
       .then((data) => {
         if (!isMounted || !data) return;
 
-        const status = data.status || 'En revisión';
+        const status = data.status || 'EN REVISIÓN';
         setCurrentStatus(status);
 
         // Rule 1: Una moto es editable mientras NO esté en estado PUBLICADA.
@@ -173,7 +173,7 @@ const CreateMotoPage = () => {
       } else {
         const moto = await motoApi.create({
           ...payload,
-          status: 'En revisión',
+          status: 'EN REVISIÓN',
         });
         toast({
           title: 'Publicación enviada a revisión',

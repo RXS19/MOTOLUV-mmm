@@ -13,8 +13,10 @@ const HomePage = () => {
 
   useEffect(() => {
     motoApi.list({ featured: true, limit: 12 }).then((data) => {
-      // Exclusively filter and display motorcycles with the featured label
-      const onlyFeatured = (Array.isArray(data) ? data : []).filter((m) => Boolean(m.featured));
+      // Exclusively filter and display motorcycles with the featured label and status PUBLICADA
+      const onlyFeatured = (Array.isArray(data) ? data : []).filter(
+        (m) => Boolean(m.featured) && (!m.status || m.status === 'PUBLICADA' || m.status === 'Publicada')
+      );
       setFeatured(onlyFeatured.slice(0, 6));
     }).catch(() => setFeatured([]));
   }, []);

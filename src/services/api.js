@@ -80,6 +80,11 @@ export const motoApi = {
       try {
         let query = supabase.from('motos').select('*');
 
+        if (params.status) {
+          query = query.eq('status', params.status);
+        } else {
+          query = query.in('status', ['PUBLICADA', 'Publicada']);
+        }
         if (params.featured === true || params.featured === 'true') {
           query = query.eq('featured', true);
         }
@@ -100,7 +105,7 @@ export const motoApi = {
         if (!error && Array.isArray(data)) {
           let list = data
             .map(formatMotoRecord)
-            .filter((m) => m && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'rejected' && m.status !== 'Rechazada');
+            .filter((m) => m && (params.status ? m.status === params.status : (m.status === 'PUBLICADA' || m.status === 'Publicada')));
 
           if (params.q) {
             const qStr = String(params.q).toLowerCase();
@@ -119,7 +124,7 @@ export const motoApi = {
       if (Array.isArray(res.data)) {
         return res.data
           .map(formatMotoRecord)
-          .filter((m) => m && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'rejected' && m.status !== 'Rechazada');
+          .filter((m) => m && (params.status ? m.status === params.status : (m.status === 'PUBLICADA' || m.status === 'Publicada')));
       }
     } catch (err) {
       console.warn('Backend /motos request failed:', err?.message);
@@ -200,7 +205,7 @@ export const motoApi = {
       owner_name: sessionUser?.user_metadata?.full_name || sessionUser?.email?.split('@')[0] || 'Vendedor',
       views: 0,
       featured: false,
-      status: 'En revisión',
+      status: 'EN REVISIÓN',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

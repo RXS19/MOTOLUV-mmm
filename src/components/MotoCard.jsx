@@ -26,7 +26,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   // Nunca mostrar esa etiqueta en el sitio público ni a otros usuarios.
   // No ocultarla solo con CSS: la condición debe depender del usuario autenticado.
   const shouldRenderStatusBadge = Boolean(
-    style.label === 'Publicada'
+    (style.label === 'Publicada' || style.label === 'PUBLICADA')
       ? (showStatus && isOwner)
       : (user && (isOwner || user.id === moto.buyer_id || moto.is_linked_buyer || showStatus))
   );

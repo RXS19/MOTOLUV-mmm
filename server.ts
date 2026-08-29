@@ -503,8 +503,8 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     if (status) {
       list = list.filter((m) => m.status === status);
     } else {
-      // By default list only approved active operations (Publicada, active, Apartada, Certificación, Oferta, Proceso de entrega)
-      list = list.filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada' && m.status !== 'En revisión' && m.status !== 'revision' && m.status !== 'pending' && m.status !== 'pending_review');
+      // By default list only approved published motorcycles (PUBLICADA) in public catalog
+      list = list.filter((m) => m.status === 'PUBLICADA' || m.status === 'Publicada');
     }
 
     if (brand) list = list.filter((m) => m.brand === brand);
@@ -581,7 +581,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
       rating: 5,
       views: 0,
       featured: false,
-      status: 'En revisión',
+      status: 'EN REVISIÓN',
       created_at: new Date().toISOString(),
       score_details: {
         Motor: 85,
@@ -631,7 +631,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
     triggerN8nHubspotWebhook('card.status_created', {
       cardId: `card_${id}`,
       title: `${brand} ${model}`,
-      status: 'En revisión',
+      status: 'EN REVISIÓN',
       userId: user.id,
       userEmail: user.email,
       motoId: id,
@@ -785,7 +785,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
               images: imgs,
               image: imgs[0] || 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&q=80',
               description: m.description || '',
-              status: m.status || 'En revisión',
+              status: m.status || 'EN REVISIÓN',
               owner_id: m.owner_id,
               owner_name: m.owner_name || user.name,
               owner_phone: m.owner_phone || user.phone,
@@ -1445,7 +1445,7 @@ api.get('/auth/me', authenticateToken, (req, res) => {
 
       // Prepare context of Motoluv
       const activeMotos = Array.from(db.motos.values())
-        .filter((m) => m.status !== 'Vendida' && m.status !== 'Entregada' && m.status !== 'En revisión')
+        .filter((m) => m.status === 'PUBLICADA' || m.status === 'Publicada')
         .map((m) => `• ${m.brand} ${m.model} (${m.year}) | ${m.km.toLocaleString()} km | Score: ${m.score}/10 | Ubicación: ${m.city}`);
 
       const systemPrompt = `Eres "Lu", el asistente virtual oficial de Motoluv.

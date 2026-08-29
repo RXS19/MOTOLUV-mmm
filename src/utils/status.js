@@ -1,6 +1,6 @@
 export const OPERATION_STATUSES = [
-  'En revisión',
-  'Publicada',
+  'EN REVISIÓN',
+  'PUBLICADA',
   'Apartada',
   'Certificación',
   'Oferta',
@@ -10,26 +10,40 @@ export const OPERATION_STATUSES = [
 ];
 
 export function normalizeStatus(rawStatus) {
-  if (!rawStatus) return 'En revisión';
-  if (rawStatus === 'pending' || rawStatus === 'pending_review' || rawStatus === 'revision' || rawStatus === 'En revision') return 'En revisión';
-  if (rawStatus === 'active') return 'Publicada';
-  if (rawStatus === 'reserved') return 'Apartada';
-  if (rawStatus === 'sold') return 'Vendida';
+  if (!rawStatus) return 'EN REVISIÓN';
+  const s = String(rawStatus).trim();
+  if (
+    s === 'pending' ||
+    s === 'pending_review' ||
+    s === 'revision' ||
+    s === 'En revision' ||
+    s === 'En revisión' ||
+    s === 'EN REVISIÓN' ||
+    s.toLowerCase() === 'en revisión' ||
+    s.toLowerCase() === 'en revision'
+  ) {
+    return 'EN REVISIÓN';
+  }
+  if (s === 'active' || s === 'Publicada' || s === 'PUBLICADA') return 'PUBLICADA';
+  if (s === 'reserved' || s === 'Apartada' || s === 'APARTADA') return 'Apartada';
+  if (s === 'sold' || s === 'Vendida' || s === 'VENDIDA') return 'Vendida';
   return rawStatus;
 }
 
 export function getStatusStyle(rawStatus) {
   const status = normalizeStatus(rawStatus);
   switch (status) {
+    case 'EN REVISIÓN':
     case 'En revisión':
       return {
-        label: 'En revisión',
+        label: 'EN REVISIÓN',
         badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
         dotClass: 'bg-amber-400 animate-pulse',
       };
+    case 'PUBLICADA':
     case 'Publicada':
       return {
-        label: 'Publicada',
+        label: 'PUBLICADA',
         badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
         dotClass: 'bg-emerald-400',
       };
