@@ -4,7 +4,7 @@ import { ArrowRight, ArrowDown, Users, Shield, Wrench, CheckCircle, Eye, FileTex
 import MotoCard from '../components/MotoCard';
 import { motoApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import heroBikeImage from '../assets/images/motoluv_hero_studio_bike_1787926260279.jpg';
+import heroBikeImage from '../assets/images/real_hyperrealistic_moto_1787972654861.jpg';
 import bobberImage from '../assets/images/cinematic_bobber_rider_1787497883792.jpg';
 
 const HomePage = () => {
@@ -47,13 +47,13 @@ const HomePage = () => {
   return (
     <div>
       {/* HERO */}
-      <section className="relative min-h-[88vh] lg:min-h-[92vh] flex items-center bg-[#060608] overflow-hidden select-none">
+      <section className="relative min-h-[88vh] lg:min-h-[92vh] flex items-center bg-[#0a0a0a] overflow-hidden select-none">
         {/* Background Studio Lighting & Atmosphere */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[750px] h-[600px] bg-red-600/5 rounded-full blur-[150px] pointer-events-none" />
-        <div className="absolute right-[12%] top-1/4 -translate-y-1/2 w-[450px] h-[350px] bg-white/[0.04] rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[750px] h-[600px] bg-red-600/10 rounded-full blur-[160px] pointer-events-none" />
+        <div className="absolute right-[15%] top-1/3 -translate-y-1/2 w-[450px] h-[350px] bg-white/[0.03] rounded-full blur-[130px] pointer-events-none" />
 
         {/* Diagonal Studio Tube Light Bar on the right wall (from reference image) */}
-        <div className="absolute right-[-40px] lg:right-[-20px] top-[18%] w-[10px] h-[400px] bg-white/90 rounded-full rotate-[38deg] blur-[2px] opacity-70 shadow-[0_0_40px_#ffffff,0_0_80px_rgba(255,255,255,0.6)] pointer-events-none hidden md:block" />
+        <div className="absolute right-[-40px] lg:right-[-20px] top-[18%] w-[8px] h-[380px] bg-white/90 rounded-full rotate-[38deg] blur-[2px] opacity-60 shadow-[0_0_35px_#ffffff,0_0_70px_rgba(255,255,255,0.5)] pointer-events-none hidden md:block" />
 
         {/* Background Motorcycle image positioned on the right (perspective, 55-60% width on desktop) */}
         <div className="absolute inset-0 flex justify-end items-center pointer-events-none">
@@ -61,13 +61,13 @@ const HomePage = () => {
             <img
               src={heroBikeImage}
               alt="Motoluv Motorcycle"
-              className="w-full h-full object-cover object-center lg:object-right opacity-90 lg:opacity-100 brightness-[1.15] contrast-[1.05] saturate-[1.05] drop-shadow-2xl"
+              className="w-full h-full object-cover object-center lg:object-right opacity-90 lg:opacity-95 brightness-[1.03] contrast-[1.06] saturate-[1.02] drop-shadow-2xl"
               referrerPolicy="no-referrer"
             />
-            {/* Lightened gradients to blend motorcycle image seamlessly into the studio background while keeping the image clear */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#060608] via-[#060608]/55 lg:via-[#060608]/35 to-transparent w-full lg:w-[45%]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#060608]/60 via-transparent to-[#060608]/15" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#060608]/25 via-transparent to-[#060608]/60" />
+            {/* Seamless dark mask to match header #0a0a0a and cleanly frame the hyperrealistic motorcycle */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a]/85 lg:via-[#0a0a0a]/75 to-transparent w-full lg:w-[55%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-[#0a0a0a]/60" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/60 via-transparent to-[#0a0a0a]" />
           </div>
         </div>
 
