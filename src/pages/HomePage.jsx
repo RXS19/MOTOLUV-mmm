@@ -65,9 +65,9 @@ const HomePage = () => {
               referrerPolicy="no-referrer"
             />
             {/* Seamless dark mask matching header #0a0a0a on the left while preserving motorcycle brightness and details */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a]/75 lg:via-[#0a0a0a]/50 to-transparent w-full lg:w-[50%]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/50 via-transparent to-[#0a0a0a]/40" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/35 via-transparent to-[#0a0a0a]/70" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a]/90 lg:via-[#0a0a0a]/75 to-transparent w-full lg:w-[58%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/70 via-transparent to-[#0a0a0a]/50" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/50 via-transparent to-[#0a0a0a]/80" />
           </div>
         </div>
 
@@ -83,11 +83,11 @@ const HomePage = () => {
             <h1 className="hero-title text-white text-[42px] sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[88px] uppercase tracking-[-0.04em] [word-spacing:-0.08em] leading-[0.92] font-bold">
               COMPRA O VENDE
               <br />
-              <span className="text-[#E10600]">TU MOTO.</span>
+              <span className="text-[#E10600]">TU MOTO</span>
             </h1>
 
-            {/* Subtítulo */}
-            <p className="mt-3 sm:mt-4 text-zinc-200 text-lg sm:text-2xl md:text-3xl font-light tracking-tight">
+            {/* Subtítulo con tipografía coordinada */}
+            <p className="mt-3 sm:mt-4 text-zinc-300 text-base sm:text-lg md:text-xl leading-relaxed">
               Nosotros hacemos el resto.
             </p>
 
