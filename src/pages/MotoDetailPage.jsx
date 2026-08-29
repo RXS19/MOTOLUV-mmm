@@ -387,7 +387,15 @@ const MotoDetailPage = () => {
                           {moto?.certification_workshop || apartado?.certification_workshop || 'Taller oficial asignado'}
                         </div>
                         <div className="text-[11px] text-zinc-400 mt-1">
-                          {certDate} • <span className="text-amber-400 font-semibold">{moto?.certification_appointment_status || apartado?.certification_appointment_status || 'PENDIENTE'}</span>
+                          {certDate} • <span className={`font-semibold ${
+                            (moto?.certification_appointment_status || apartado?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA'
+                              ? 'text-emerald-400'
+                              : (moto?.certification_appointment_status || apartado?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA'
+                              ? 'text-blue-400'
+                              : (moto?.certification_appointment_status || apartado?.certification_appointment_status || '').toUpperCase() === 'CANCELADA'
+                              ? 'text-red-400'
+                              : 'text-amber-400'
+                          }`}>{moto?.certification_appointment_status || apartado?.certification_appointment_status || 'SIN CITA'}</span>
                         </div>
                       </div>
 

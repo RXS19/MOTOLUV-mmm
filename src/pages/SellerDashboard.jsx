@@ -140,10 +140,14 @@ const SellerDashboard = () => {
   const pendingOffers = offers.filter(o => o.status === 'ENVIADA' || o.status === 'PENDIENTE' || o.status === 'pending' || !o.status);
   const acceptedOffers = offers.filter(o => o.status === 'ACEPTADA' || o.status === 'accepted');
   const activeApartados = apartados.filter(a => a.status === 'REALIZADO');
-  const inspections = apartados.filter(a => a.certification_status || a.certification_appointment_at);
-  const apartadosPendingAppointment = apartados.filter(
-    (a) => a.status === 'REALIZADO' && (!a.certification_appointment_at || a.certification_appointment_status !== 'PROGRAMADA')
+  const inspections = apartados.filter(
+    (a) => a.certification_status || a.certification_appointment_status || a.certification_appointment_at
   );
+  const apartadosPendingAppointment = apartados.filter((a) => {
+    if (a.status !== 'REALIZADO') return false;
+    const st = (a.certification_appointment_status || '').toUpperCase();
+    return !st || st === 'CANCELADA' || st === 'NO_PRESENTADO';
+  });
 
   const handleOpenScheduleModal = (apartado) => {
     setSelectedApartadoForSchedule(apartado);
@@ -961,10 +965,11 @@ const SellerDashboard = () => {
             ) : (
               <div className="space-y-4">
                 {apartados.map((ap) => {
-                  const isScheduled = Boolean(
-                    ap.certification_appointment_at &&
-                    (ap.certification_appointment_status === 'PROGRAMADA' || ap.certification_appointment_status === 'programada')
-                  );
+                  const rawAppStatus = (ap.certification_appointment_status || '').toUpperCase();
+                  const isCompleted = rawAppStatus === 'COMPLETADA';
+                  const isProgrammed = rawAppStatus === 'PROGRAMADA';
+                  const isCancelled = rawAppStatus === 'CANCELADA';
+                  const isNoShow = rawAppStatus === 'NO_PRESENTADO';
 
                   return (
                     <div key={ap.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
@@ -996,13 +1001,25 @@ const SellerDashboard = () => {
                           <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                             {ap.status}
                           </span>
-                          {isScheduled ? (
+                          {isCompleted ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              COMPLETADA
+                            </span>
+                          ) : isProgrammed ? (
                             <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
                               CITA PROGRAMADA
                             </span>
+                          ) : isCancelled ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                              CANCELADA
+                            </span>
+                          ) : isNoShow ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              NO PRESENTADO
+                            </span>
                           ) : (
                             <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              PENDIENTE DE CITA
+                              SIN CITA
                             </span>
                           )}
                         </div>
@@ -1026,26 +1043,54 @@ const SellerDashboard = () => {
                         </div>
                         <div>
                           <span className="text-zinc-500 block">Estado de Cita</span>
-                          <span className="text-zinc-200 font-semibold">{ap.certification_appointment_status || 'Pendiente'}</span>
+                          <span className={`font-semibold ${
+                            isCompleted
+                              ? 'text-emerald-400'
+                              : isProgrammed
+                              ? 'text-blue-400'
+                              : isCancelled
+                              ? 'text-red-400'
+                              : isNoShow
+                              ? 'text-amber-400'
+                              : 'text-zinc-200'
+                          }`}>
+                            {isCompleted
+                              ? 'COMPLETADA'
+                              : isProgrammed
+                              ? 'CITA PROGRAMADA'
+                              : ap.certification_appointment_status || 'SIN CITA'}
+                          </span>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-end gap-2 pt-1">
-                        {!isScheduled ? (
+                        {isCompleted ? (
+                          <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 py-1">
+                            <Check size={14} /> Inspección completada
+                          </span>
+                        ) : isProgrammed ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(ap)}
+                            className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <CalendarClock size={13} /> Ver cita programada
+                          </button>
+                        ) : isCancelled || isNoShow ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(ap)}
+                            className="px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
+                          >
+                            <CalendarClock size={14} /> Reagendar cita
+                          </button>
+                        ) : (
                           <button
                             type="button"
                             onClick={() => handleOpenScheduleModal(ap)}
                             className="px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
                           >
                             <CalendarClock size={14} /> Agendar inspección
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenScheduleModal(ap)}
-                            className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <CalendarClock size={13} /> Reagendar cita
                           </button>
                         )}
                       </div>
@@ -1080,10 +1125,11 @@ const SellerDashboard = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {inspections.map((insp) => {
-                  const isScheduled = Boolean(
-                    insp.certification_appointment_at &&
-                    (insp.certification_appointment_status === 'PROGRAMADA' || insp.certification_appointment_status === 'programada')
-                  );
+                  const rawAppStatus = (insp.certification_appointment_status || '').toUpperCase();
+                  const isCompleted = rawAppStatus === 'COMPLETADA';
+                  const isProgrammed = rawAppStatus === 'PROGRAMADA';
+                  const isCancelled = rawAppStatus === 'CANCELADA';
+                  const isNoShow = rawAppStatus === 'NO_PRESENTADO';
 
                   return (
                     <div key={insp.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4 flex flex-col justify-between">
@@ -1092,9 +1138,21 @@ const SellerDashboard = () => {
                           <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold uppercase">
                             {insp.certification_status || 'PENDIENTE'}
                           </span>
-                          {isScheduled ? (
+                          {isCompleted ? (
                             <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                              PROGRAMADA
+                              COMPLETADA
+                            </span>
+                          ) : isProgrammed ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              CITA PROGRAMADA
+                            </span>
+                          ) : isCancelled ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                              CANCELADA
+                            </span>
+                          ) : isNoShow ? (
+                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              NO PRESENTADO
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -1138,6 +1196,26 @@ const SellerDashboard = () => {
                             </div>
                           )}
                           <div className="flex justify-between">
+                            <span className="text-zinc-500">Estado de Cita:</span>
+                            <span className={`font-semibold ${
+                              isCompleted
+                                ? 'text-emerald-400'
+                                : isProgrammed
+                                ? 'text-blue-400'
+                                : isCancelled
+                                ? 'text-red-400'
+                                : isNoShow
+                                ? 'text-amber-400'
+                                : 'text-zinc-200'
+                            }`}>
+                              {isCompleted
+                                ? 'COMPLETADA'
+                                : isProgrammed
+                                ? 'CITA PROGRAMADA'
+                                : insp.certification_appointment_status || 'SIN CITA'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
                             <span className="text-zinc-500">Dictamen:</span>
                             <span className="text-emerald-400 font-bold uppercase">{insp.certification_status || 'PENDIENTE'}</span>
                           </div>
@@ -1145,21 +1223,33 @@ const SellerDashboard = () => {
                       </div>
 
                       <div className="pt-2 border-t border-white/5 flex items-center justify-end">
-                        {!isScheduled ? (
+                        {isCompleted ? (
+                          <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 py-1">
+                            <Check size={14} /> Inspección técnica concluida
+                          </span>
+                        ) : isProgrammed ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(insp)}
+                            className="text-xs text-zinc-400 hover:text-white font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <CalendarClock size={13} /> Ver cita programada
+                          </button>
+                        ) : isCancelled || isNoShow ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenScheduleModal(insp)}
+                            className="w-full py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
+                          >
+                            <CalendarClock size={14} /> Reagendar cita
+                          </button>
+                        ) : (
                           <button
                             type="button"
                             onClick={() => handleOpenScheduleModal(insp)}
                             className="w-full py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
                           >
                             <CalendarClock size={14} /> Agendar inspección
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenScheduleModal(insp)}
-                            className="text-xs text-zinc-400 hover:text-white font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                          >
-                            <CalendarClock size={13} /> Modificar cita
                           </button>
                         )}
                       </div>
@@ -1436,9 +1526,24 @@ const SellerDashboard = () => {
 
             {/* Status specific notices */}
             {(() => {
-              const appStatus = selectedApartadoForSchedule?.certification_appointment_status;
+              const appStatus = (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase();
+              const isCompleted = appStatus === 'COMPLETADA';
               const isProgrammed = appStatus === 'PROGRAMADA';
               const isCancelledOrNoShow = appStatus === 'CANCELADA' || appStatus === 'NO_PRESENTADO';
+
+              if (isCompleted) {
+                return (
+                  <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs space-y-1.5 text-emerald-200">
+                    <div className="flex items-center gap-2 font-bold text-emerald-400">
+                      <Check size={15} />
+                      <span>Cita en estatus COMPLETADA</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-zinc-300">
+                      La inspección técnica en taller oficial fue completada con éxito. El dictamen oficial está registrado en el expediente.
+                    </p>
+                  </div>
+                );
+              }
 
               if (isProgrammed) {
                 return (
@@ -1481,7 +1586,11 @@ const SellerDashboard = () => {
                 <select
                   value={selectedWorkshopId}
                   onChange={(e) => setSelectedWorkshopId(e.target.value)}
-                  disabled={scheduleLoading || selectedApartadoForSchedule?.certification_appointment_status === 'PROGRAMADA'}
+                  disabled={
+                    scheduleLoading ||
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA' ||
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA'
+                  }
                   className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <option value="" disabled>Selecciona un taller certificado...</option>
@@ -1526,7 +1635,11 @@ const SellerDashboard = () => {
                   min={new Date().toISOString().split('T')[0]}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  disabled={scheduleLoading || selectedApartadoForSchedule?.certification_appointment_status === 'PROGRAMADA'}
+                  disabled={
+                    scheduleLoading ||
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA' ||
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA'
+                  }
                   className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <p className="text-[11px] text-zinc-400 mt-1.5">
@@ -1562,7 +1675,8 @@ const SellerDashboard = () => {
                   >
                     Cerrar
                   </button>
-                  {selectedApartadoForSchedule?.certification_appointment_status !== 'PROGRAMADA' && (
+                  {(selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() !== 'PROGRAMADA' &&
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() !== 'COMPLETADA' && (
                     <button
                       type="submit"
                       disabled={scheduleLoading || !selectedWorkshopId || !selectedDate}
@@ -1574,7 +1688,8 @@ const SellerDashboard = () => {
                         <>
                           <Check size={14} />
                           <span>
-                            {selectedApartadoForSchedule?.certification_appointment_status === 'CANCELADA' || selectedApartadoForSchedule?.certification_appointment_status === 'NO_PRESENTADO'
+                            {(selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'CANCELADA' ||
+                            (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'NO_PRESENTADO'
                               ? 'Reprogramar Cita'
                               : 'Confirmar Cita Programada'}
                           </span>
