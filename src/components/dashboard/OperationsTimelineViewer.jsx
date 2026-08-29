@@ -9,19 +9,17 @@ import {
   ChevronRight,
   Info,
   ChevronLeft,
-  Calendar,
-  Clock,
   ShieldCheck,
   Eye,
-  AlertCircle,
-  ExternalLink,
   MessageCircle,
-  X
+  X,
+  CalendarClock,
+  Clock
 } from 'lucide-react';
 import { resolveSafeImageUrl } from '../../utils/imageFallback';
 
 /**
- * Stages definition for Motoluv Operations Timeline
+ * 5-Stage Definitions for Motoluv Operations Timeline
  * 1. Apartado
  * 2. Contrato
  * 3. Pago
@@ -37,7 +35,8 @@ const TIMELINE_STAGES = [
 ];
 
 /**
- * Resolves the operational progress and status for an apartado item
+ * Resolves the operational progress and status for an apartado item from real Supabase data.
+ * Adheres strictly to the requirement: NO dates or hours shown anywhere.
  */
 export const resolveOperationTimeline = (item) => {
   if (!item) return null;
@@ -50,47 +49,11 @@ export const resolveOperationTimeline = (item) => {
   const rawTransferStatus = String(item.transfer_status || '').toUpperCase();
   const rawDeliveryStatus = String(item.delivery_status || '').toUpperCase();
 
-  // Helper date formatters
-  const formatDate = (d) => {
-    if (!d) return null;
-    try {
-      return new Date(d).toLocaleDateString('es-MX', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return null;
-    }
-  };
-
-  const formatDateTime = (d) => {
-    if (!d) return 'Fecha no disponible';
-    try {
-      const date = new Date(d);
-      const datePart = date.toLocaleDateString('es-MX', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-      const timePart = date.toLocaleTimeString('es-MX', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      });
-      return `${datePart}, ${timePart}`;
-    } catch {
-      return 'Fecha no disponible';
-    }
-  };
-
   // 1. Stage: Apartado
-  // Since it exists as an apartado record, it's completed
-  const apartadoDate = formatDate(item.created_at || item.apartado_at);
-  const apartadoDateTime = formatDateTime(item.created_at || item.apartado_at);
+  // It exists in database -> completed
+  const isApartadoCompleted = true;
 
   // 2. Stage: Contrato
-  // Contrato is completed if contract is completed/signed or inspection completed with certified status
   const isContractCompleted =
     rawContractStatus === 'COMPLETADO' ||
     rawContractStatus === 'FIRMADO' ||
@@ -108,8 +71,6 @@ export const resolveOperationTimeline = (item) => {
       rawAppStatus === 'PROGRAMADA' ||
       Boolean(item.certification_appointment_at));
 
-  const contractDate = formatDate(item.contract_signed_at || item.contract_at || (isContractCompleted ? item.created_at : null));
-
   // 3. Stage: Pago
   const isPagoCompleted =
     rawPaymentStatus === 'COMPLETADO' ||
@@ -124,8 +85,6 @@ export const resolveOperationTimeline = (item) => {
     (rawPaymentStatus === 'EN_PROCESO' ||
       (isContractCompleted && !isPagoCompleted));
 
-  const pagoDate = formatDate(item.paid_at || item.payment_at);
-
   // 4. Stage: Transferencia
   const isTransferCompleted =
     rawTransferStatus === 'COMPLETADO' ||
@@ -135,8 +94,6 @@ export const resolveOperationTimeline = (item) => {
   const isTransferInProgress =
     !isTransferCompleted &&
     (rawTransferStatus === 'EN_PROCESO' || (isPagoCompleted && !isTransferCompleted));
-
-  const transferDate = formatDate(item.transferred_at || item.transfer_at);
 
   // 5. Stage: Entrega
   const isDeliveryCompleted =
@@ -150,43 +107,36 @@ export const resolveOperationTimeline = (item) => {
     !isDeliveryCompleted &&
     (rawDeliveryStatus === 'EN_PROCESO' || (isTransferCompleted && !isDeliveryCompleted));
 
-  const deliveryDate = formatDate(item.delivered_at || item.delivery_at);
-
-  // Build the 5 step status objects
+  // Build the 5 step status objects (strictly NO dates or hours)
   const steps = [
     {
       id: 'apartado',
       label: 'Apartado',
       status: 'completed', // 'completed' | 'in_progress' | 'pending'
-      date: apartadoDate,
       substatus: 'Completado',
     },
     {
       id: 'contrato',
       label: 'Contrato',
       status: isContractCompleted ? 'completed' : isContractInProgress ? 'in_progress' : 'pending',
-      date: isContractCompleted ? (contractDate || apartadoDate) : null,
       substatus: isContractCompleted ? 'Completado' : isContractInProgress ? 'En proceso' : 'Pendiente',
     },
     {
       id: 'pago',
       label: 'Pago',
       status: isPagoCompleted ? 'completed' : isPagoInProgress ? 'in_progress' : 'pending',
-      date: isPagoCompleted ? pagoDate : null,
       substatus: isPagoCompleted ? 'Completado' : isPagoInProgress ? 'En proceso' : 'Pendiente',
     },
     {
       id: 'transferencia',
       label: 'Transferencia',
       status: isTransferCompleted ? 'completed' : isTransferInProgress ? 'in_progress' : 'pending',
-      date: isTransferCompleted ? transferDate : null,
       substatus: isTransferCompleted ? 'Completado' : isTransferInProgress ? 'En proceso' : 'Pendiente',
     },
     {
       id: 'entrega',
       label: 'Entrega',
       status: isDeliveryCompleted ? 'completed' : isDeliveryInProgress ? 'in_progress' : 'pending',
-      date: isDeliveryCompleted ? deliveryDate : null,
       substatus: isDeliveryCompleted ? 'Completado' : isDeliveryInProgress ? 'En proceso' : 'Pendiente',
     },
   ];
@@ -222,10 +172,13 @@ export const resolveOperationTimeline = (item) => {
     badgeColor = 'amber';
   }
 
-  // Derive folio
-  const folio = item.folio || (item.id ? `ML-${String(item.id).replace(/\D/g, '').slice(0, 5).padStart(5, '0')}` : 'ML-00100');
+  // Real NOD taken from apartados.nod (fallback formatted cleanly if missing)
+  const nod =
+    item.nod ||
+    item.folio ||
+    (item.id ? `NOD-${String(item.id).replace(/\D/g, '').slice(0, 6).padStart(6, '0')}` : 'NOD-000100');
 
-  // Format counterparty initials and name
+  // Format buyer initials
   const getInitials = (name) => {
     if (!name) return 'U';
     const parts = name.trim().split(' ');
@@ -233,10 +186,26 @@ export const resolveOperationTimeline = (item) => {
     return name.slice(0, 2).toUpperCase();
   };
 
+  // Seller verification boolean
+  const sellerIsVerified = Boolean(
+    item.seller_is_verified ||
+    item.moto?.seller_identity_verification_status === 'verified' ||
+    item.moto?.identity_verification_status === 'verified' ||
+    item.moto?.is_verified
+  );
+
+  // Normalized certification status
+  let certificationDisplay = 'PENDIENTE';
+  if (rawCertStatus === 'CERTIFICADA' || rawCertStatus === 'APROBADA') {
+    certificationDisplay = 'CERTIFICADA';
+  } else if (rawCertStatus === 'RECHAZADA' || rawCertStatus === 'NO_APROBADA') {
+    certificationDisplay = 'RECHAZADA';
+  }
+
   return {
     raw: item,
     id: item.id,
-    folio,
+    nod,
     moto_id: item.moto_id || item.moto?.id,
     brand: item.moto_brand || item.moto?.brand || 'Motocicleta',
     model: item.moto_model || item.moto?.model || '',
@@ -245,9 +214,10 @@ export const resolveOperationTimeline = (item) => {
     image: item.moto_image || item.moto?.images?.[0] || item.moto?.image,
     buyerName: item.buyer_name || item.buyer_email || 'Comprador Motoluv',
     buyerInitials: getInitials(item.buyer_name || item.buyer_email || 'Comprador'),
-    sellerName: item.seller_name || item.moto?.owner_name || 'Vendedor Motoluv',
-    sellerInitials: getInitials(item.seller_name || item.moto?.owner_name || 'Vendedor'),
-    apartadoDateTime,
+    sellerIsVerified,
+    certificationStatus: certificationDisplay,
+    appointmentStatus: rawAppStatus || 'SIN CITA',
+    workshop: item.certification_workshop || '',
     steps,
     activeStageKey,
     badgeLabel,
@@ -315,7 +285,7 @@ const OperationsTimelineViewer = ({
 
   return (
     <div className="space-y-6">
-      {/* Header Area matching attached reference */}
+      {/* Header Area */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
           {isSeller ? 'Ventas en proceso' : 'Mis compras'}
@@ -387,16 +357,18 @@ const OperationsTimelineViewer = ({
       ) : (
         <div className="space-y-4">
           {paginatedItems.map((op) => {
-            const counterpartyName = isSeller ? op.buyerName : op.sellerName;
-            const counterpartyInitials = isSeller ? op.buyerInitials : op.sellerInitials;
-            const counterpartyRole = isSeller ? 'Comprador' : 'Vendedor';
+            const rawAppStatus = op.appointmentStatus;
+            const isAppCompleted = rawAppStatus === 'COMPLETADA' || op.certificationStatus === 'CERTIFICADA';
+            const isAppProgrammed = rawAppStatus === 'PROGRAMADA';
+            const isAppCancelled = rawAppStatus === 'CANCELADA';
+            const isAppNoShow = rawAppStatus === 'NO_PRESENTADO';
 
             return (
               <div
                 key={op.id}
                 className="p-5 sm:p-6 bg-[#101013] border border-white/5 rounded-2xl hover:border-white/10 transition-colors flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-6"
               >
-                {/* 1. LEFT COLUMN: Vehicle Thumbnail, Title, Folio, Price & Counterparty */}
+                {/* 1. LEFT COLUMN: Vehicle Thumbnail, Title, NOD, Price & Counterparty Info */}
                 <div className="flex items-center gap-4 min-w-[280px] sm:min-w-[320px]">
                   {/* Motorcycle Image */}
                   <div className="w-24 h-20 sm:w-28 sm:h-22 rounded-xl bg-black/50 border border-white/10 overflow-hidden flex-shrink-0 relative">
@@ -406,7 +378,8 @@ const OperationsTimelineViewer = ({
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.target.onerror = null;
-                        e.target.src = 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80';
+                        e.target.src =
+                          'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80';
                       }}
                     />
                   </div>
@@ -417,36 +390,53 @@ const OperationsTimelineViewer = ({
                       {op.brand} {op.model} {op.year}
                     </h3>
                     <div className="text-xs font-mono text-zinc-400">
-                      {op.folio}
+                      NOD: <span className="text-zinc-200 font-semibold">{op.nod}</span>
                     </div>
                     <div className="text-sm sm:text-base font-bold text-white">
                       ${op.price.toLocaleString('es-MX')} MXN
                     </div>
 
-                    {/* Counterparty avatar and name */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <div className="w-6 h-6 rounded-full bg-[#1e1e24] border border-white/10 text-zinc-300 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                        {counterpartyInitials}
+                    {/* Counterparty identification depending on role */}
+                    {isSeller ? (
+                      /* Vendedor sees Buyer's name & initials */
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="w-6 h-6 rounded-full bg-[#1e1e24] border border-white/10 text-zinc-300 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                          {op.buyerInitials}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-zinc-500 block leading-tight">
+                            Comprador
+                          </span>
+                          <span className="text-xs font-medium text-zinc-200 block leading-tight truncate">
+                            {op.buyerName}
+                          </span>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-zinc-500 block leading-tight">
-                          {counterpartyRole}
-                        </span>
-                        <span className="text-xs font-medium text-zinc-200 block leading-tight truncate">
-                          {counterpartyName}
+                    ) : (
+                      /* Comprador NEVER sees seller name/avatar, only verification badge */
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <ShieldCheck
+                          size={14}
+                          className={op.sellerIsVerified ? 'text-emerald-400' : 'text-zinc-500'}
+                        />
+                        <span
+                          className={`text-xs font-semibold ${
+                            op.sellerIsVerified ? 'text-emerald-400' : 'text-zinc-400'
+                          }`}
+                        >
+                          {op.sellerIsVerified ? 'Vendedor verificado' : 'Vendedor no verificado'}
                         </span>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                {/* 2. CENTER COLUMN: 5-Stage Timeline */}
+                {/* 2. CENTER COLUMN: 5-Stage Timeline (STRICTLY NO DATES OR HOURS) */}
                 <div className="flex-1 w-full py-2 px-1 sm:px-4">
                   <div className="relative flex items-center justify-between">
                     {/* Connecting background track lines */}
                     <div className="absolute top-3.5 left-6 right-6 h-[2px] -translate-y-1/2 flex">
                       {op.steps.slice(0, -1).map((st, idx) => {
-                        const nextStep = op.steps[idx + 1];
                         const isLineGreen = st.status === 'completed';
                         return (
                           <div
@@ -486,8 +476,8 @@ const OperationsTimelineViewer = ({
                             </div>
                           )}
 
-                          {/* Step Label & Substatus */}
-                          <div className="mt-2 space-y-0.5 min-h-[36px]">
+                          {/* Step Label & Substatus (No Dates) */}
+                          <div className="mt-2 space-y-0.5 min-h-[32px]">
                             <span
                               className={`text-xs block font-semibold leading-tight ${
                                 isCompleted || isInProgress ? 'text-white' : 'text-zinc-400'
@@ -495,11 +485,6 @@ const OperationsTimelineViewer = ({
                             >
                               {st.label}
                             </span>
-                            {st.date && (
-                              <span className="text-[10px] text-zinc-400 block leading-tight">
-                                {st.date}
-                              </span>
-                            )}
                             <span
                               className={`text-[10px] block font-medium leading-tight ${
                                 isCompleted
@@ -518,15 +503,9 @@ const OperationsTimelineViewer = ({
                   </div>
                 </div>
 
-                {/* 3. RIGHT COLUMN: Fecha de apartado, Status Badge & Ver Detalle button */}
-                <div className="flex flex-row xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-3 pt-3 xl:pt-0 border-t xl:border-t-0 border-white/5 min-w-[170px]">
-                  <div className="text-left xl:text-right space-y-0.5">
-                    <span className="text-[11px] text-zinc-500 block">Fecha de apartado</span>
-                    <span className="text-xs text-zinc-300 font-medium block">
-                      {op.apartadoDateTime}
-                    </span>
-                  </div>
-
+                {/* 3. RIGHT COLUMN: Actions, Inspection and Status (NO DATES OR HOURS) */}
+                <div className="flex flex-row xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-3 pt-3 xl:pt-0 border-t xl:border-t-0 border-white/5 min-w-[190px]">
+                  {/* Status Badge */}
                   <div className="flex items-center gap-2">
                     <span
                       className={`px-3 py-1 text-xs font-semibold rounded-full border ${
@@ -541,9 +520,68 @@ const OperationsTimelineViewer = ({
                     </span>
                   </div>
 
+                  {/* Operational Information & Buttons */}
+                  {isSeller ? (
+                    /* Seller Appointment Management */
+                    <div className="flex flex-col items-end gap-1.5">
+                      {isAppCompleted ? (
+                        <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                          <Check size={13} /> Inspección completada
+                        </span>
+                      ) : isAppProgrammed ? (
+                        <div className="text-right">
+                          <span className="text-[11px] text-blue-400 font-semibold block">
+                            Cita programada
+                          </span>
+                          {op.workshop && (
+                            <span className="text-[10px] text-zinc-400 block truncate max-w-[170px]" title={op.workshop}>
+                              {op.workshop}
+                            </span>
+                          )}
+                          <span className="text-[9px] text-zinc-500 block">
+                            Cita confirmada (no editable)
+                          </span>
+                        </div>
+                      ) : isAppCancelled || isAppNoShow ? (
+                        <button
+                          type="button"
+                          onClick={() => onScheduleAppointment?.(op.raw)}
+                          className="px-3 py-1.5 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                        >
+                          <CalendarClock size={13} /> Reagendar cita
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onScheduleAppointment?.(op.raw)}
+                          className="px-3 py-1.5 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                        >
+                          <CalendarClock size={13} /> Agendar inspección
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    /* Buyer Certification Summary (NO workshop, NO appointment) */
+                    <div className="text-right">
+                      <span className="text-[10px] text-zinc-500 block">Certificación Técnica</span>
+                      <span
+                        className={`text-xs font-bold uppercase ${
+                          op.certificationStatus === 'CERTIFICADA'
+                            ? 'text-emerald-400'
+                            : op.certificationStatus === 'RECHAZADA'
+                            ? 'text-red-400'
+                            : 'text-amber-400'
+                        }`}
+                      >
+                        {op.certificationStatus}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Detail Modal Trigger */}
                   <button
                     onClick={() => setSelectedOperation(op)}
-                    className="px-4 py-2 bg-[#17171c] hover:bg-[#22222a] text-zinc-300 hover:text-white border border-white/10 text-xs font-semibold rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                    className="px-3.5 py-1.5 bg-[#17171c] hover:bg-[#22222a] text-zinc-300 hover:text-white border border-white/10 text-xs font-semibold rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-sm"
                   >
                     <span>Ver detalle</span>
                     <ChevronRight size={14} />
@@ -561,7 +599,7 @@ const OperationsTimelineViewer = ({
           <div className="flex items-center gap-2">
             <Info size={14} className="text-zinc-500 flex-shrink-0" />
             <span>
-              Los tiempos pueden variar dependiendo de la disponibilidad del comprador y los procesos de verificación.
+              Los tiempos pueden variar dependiendo de la disponibilidad de las partes y los procesos de peritaje.
             </span>
           </div>
 
@@ -597,7 +635,7 @@ const OperationsTimelineViewer = ({
         </div>
       )}
 
-      {/* ================= DETAIL MODAL ================= */}
+      {/* ================= DETAIL MODAL (NO DATES OR HOURS) ================= */}
       {selectedOperation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in duration-150">
           <div className="bg-[#121216] border border-white/10 rounded-2xl max-w-xl w-full p-6 space-y-6 text-left relative shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -616,7 +654,7 @@ const OperationsTimelineViewer = ({
                     {selectedOperation.brand} {selectedOperation.model} {selectedOperation.year}
                   </h3>
                   <p className="text-xs font-mono text-zinc-400">
-                    Folio de Operación: <span className="text-white font-semibold">{selectedOperation.folio}</span>
+                    NOD de Operación: <span className="text-white font-semibold">{selectedOperation.nod}</span>
                   </p>
                   <p className="text-sm font-bold text-red-brand mt-0.5">
                     ${selectedOperation.price.toLocaleString('es-MX')} MXN
@@ -664,47 +702,84 @@ const OperationsTimelineViewer = ({
               </div>
             </div>
 
-            {/* Detailed Key-Values */}
+            {/* Detailed Key-Values (STRICTLY NO DATES OR HOURS) */}
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-2 border-b border-white/5">
-                <span className="text-zinc-400">Fecha y Hora de Apartado:</span>
-                <span className="text-zinc-200 font-medium">{selectedOperation.apartadoDateTime}</span>
+                <span className="text-zinc-400">NOD:</span>
+                <span className="text-zinc-200 font-mono font-semibold">{selectedOperation.nod}</span>
               </div>
 
+              {/* Counterparty details */}
               <div className="flex justify-between py-2 border-b border-white/5">
                 <span className="text-zinc-400">{isSeller ? 'Comprador' : 'Vendedor'}:</span>
                 <span className="text-zinc-200 font-medium">
-                  {isSeller ? selectedOperation.buyerName : selectedOperation.sellerName}
+                  {isSeller ? (
+                    selectedOperation.buyerName
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck
+                        size={13}
+                        className={selectedOperation.sellerIsVerified ? 'text-emerald-400' : 'text-zinc-400'}
+                      />
+                      <span className={selectedOperation.sellerIsVerified ? 'text-emerald-400 font-semibold' : 'text-zinc-300'}>
+                        {selectedOperation.sellerIsVerified ? 'Vendedor verificado' : 'Vendedor no verificado'}
+                      </span>
+                    </span>
+                  )}
                 </span>
               </div>
 
+              {/* Certification status */}
               <div className="flex justify-between py-2 border-b border-white/5">
-                <span className="text-zinc-400">Dictamen de Inspección Técnica:</span>
-                <span className="font-bold text-emerald-400 uppercase">
-                  {selectedOperation.raw?.certification_status || 'PENDIENTE'}
+                <span className="text-zinc-400">Dictamen de Certificación:</span>
+                <span
+                  className={`font-bold uppercase ${
+                    selectedOperation.certificationStatus === 'CERTIFICADA'
+                      ? 'text-emerald-400'
+                      : selectedOperation.certificationStatus === 'RECHAZADA'
+                      ? 'text-red-400'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  {selectedOperation.certificationStatus}
                 </span>
               </div>
 
-              {isSeller && selectedOperation.raw?.certification_workshop && (
+              {/* Seller-only inspection details (NO dates/hours) */}
+              {isSeller && selectedOperation.workshop && (
                 <div className="flex justify-between py-2 border-b border-white/5">
                   <span className="text-zinc-400">Taller Oficial Asignado:</span>
                   <span className="text-zinc-200 font-medium">
-                    {selectedOperation.raw.certification_workshop}
+                    {selectedOperation.workshop}
                   </span>
                 </div>
               )}
 
-              {isSeller && selectedOperation.raw?.certification_appointment_at && (
+              {isSeller && (
                 <div className="flex justify-between py-2 border-b border-white/5">
-                  <span className="text-zinc-400">Cita de Peritaje:</span>
-                  <span className="text-zinc-200 font-medium">
-                    {new Date(selectedOperation.raw.certification_appointment_at).toLocaleString('es-MX')}
+                  <span className="text-zinc-400">Estado de Cita Técnica:</span>
+                  <span
+                    className={`font-semibold ${
+                      selectedOperation.appointmentStatus === 'COMPLETADA'
+                        ? 'text-emerald-400'
+                        : selectedOperation.appointmentStatus === 'PROGRAMADA'
+                        ? 'text-blue-400'
+                        : selectedOperation.appointmentStatus === 'CANCELADA'
+                        ? 'text-red-400'
+                        : 'text-zinc-300'
+                    }`}
+                  >
+                    {selectedOperation.appointmentStatus === 'COMPLETADA'
+                      ? 'COMPLETADA'
+                      : selectedOperation.appointmentStatus === 'PROGRAMADA'
+                      ? 'PROGRAMADA (CONFIRMADA)'
+                      : selectedOperation.appointmentStatus}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Actions */}
+            {/* Actions & WhatsApp Support 5643048865 */}
             <div className="flex items-center gap-3 pt-2">
               <a
                 href="https://wa.me/525643048865"

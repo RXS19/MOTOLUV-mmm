@@ -393,23 +393,67 @@ export const apartadoApi = {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user?.id) throw new Error('Debes iniciar sesión para realizar un apartado.');
 
-        // Insert into public.apartados with buyer_id and moto_id
-        // Status REALIZADO
-        const { data, error } = await supabase
-          .from('apartados')
-          .insert([
-            {
-              buyer_id: session.user.id,
-              moto_id: String(moto_id),
-              status: 'REALIZADO',
-            },
-          ])
-          .select('*, moto:motos(*)')
-          .single();
+        const generatedNod = `NOD-${Math.floor(100000 + Math.random() * 900000)}`;
+
+        // Insert into public.apartados with buyer_id, moto_id, status and nod
+        let data = null;
+        let error = null;
+
+        try {
+          const res = await supabase
+            .from('apartados')
+            .insert([
+              {
+                buyer_id: session.user.id,
+                moto_id: String(moto_id),
+                status: 'REALIZADO',
+                nod: generatedNod,
+              },
+            ])
+            .select('*, moto:motos(*)')
+            .single();
+          data = res.data;
+          error = res.error;
+        } catch (insertErr) {
+          // If inserting with nod fails (e.g. column not in schema), retry without nod
+          const fallbackRes = await supabase
+            .from('apartados')
+            .insert([
+              {
+                buyer_id: session.user.id,
+                moto_id: String(moto_id),
+                status: 'REALIZADO',
+              },
+            ])
+            .select('*, moto:motos(*)')
+            .single();
+          data = fallbackRes.data;
+          error = fallbackRes.error;
+        }
+
+        if (error && error.message?.includes('nod')) {
+          const fallbackRes = await supabase
+            .from('apartados')
+            .insert([
+              {
+                buyer_id: session.user.id,
+                moto_id: String(moto_id),
+                status: 'REALIZADO',
+              },
+            ])
+            .select('*, moto:motos(*)')
+            .single();
+          data = fallbackRes.data;
+          error = fallbackRes.error;
+        }
 
         if (error) {
           console.error('Error creating apartado in Supabase:', error);
           throw error;
+        }
+
+        if (data && !data.nod) {
+          data.nod = generatedNod;
         }
 
         // Automatic notification to seller
@@ -462,11 +506,14 @@ export const apartadoApi = {
               try {
                 const { data: profs } = await supabase
                   .from('profiles')
-                  .select('id, name, full_name, email')
+                  .select('id, name, full_name, email, identity_verification_status')
                   .in('id', sellerIds);
                 if (Array.isArray(profs)) {
                   profs.forEach((p) => {
-                    profilesMap[p.id] = p.full_name || p.name || (p.email ? p.email.split('@')[0] : null);
+                    profilesMap[p.id] = {
+                      name: p.full_name || p.name || (p.email ? p.email.split('@')[0] : null),
+                      is_verified: p.identity_verification_status === 'verified',
+                    };
                   });
                 }
               } catch (e) {
@@ -474,16 +521,28 @@ export const apartadoApi = {
               }
             }
 
-            return data.map((a) => ({
-              ...a,
-              moto_brand: a.moto?.brand,
-              moto_model: a.moto?.model,
-              moto_year: a.moto?.year,
-              moto_price: a.moto?.price,
-              moto_image: a.moto?.images?.[0] || a.moto?.image,
-              seller_name: profilesMap[a.moto?.owner_id] || a.moto?.owner_name || 'Vendedor Motoluv',
-              buyer_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Comprador',
-            }));
+            return data.map((a) => {
+              const profileInfo = profilesMap[a.moto?.owner_id];
+              const isVerified = Boolean(
+                profileInfo?.is_verified ||
+                a.moto?.seller_identity_verification_status === 'verified' ||
+                a.moto?.identity_verification_status === 'verified' ||
+                a.moto?.is_verified
+              );
+
+              return {
+                ...a,
+                nod: a.nod || (a.id ? `NOD-${String(a.id).replace(/\D/g, '').slice(0, 6).padStart(6, '0')}` : 'NOD-000100'),
+                moto_brand: a.moto?.brand,
+                moto_model: a.moto?.model,
+                moto_year: a.moto?.year,
+                moto_price: a.moto?.price,
+                moto_image: a.moto?.images?.[0] || a.moto?.image,
+                seller_name: profileInfo?.name || a.moto?.owner_name || 'Vendedor Motoluv',
+                seller_is_verified: isVerified,
+                buyer_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Comprador',
+              };
+            });
           }
         }
       } catch (err) {
@@ -556,6 +615,7 @@ export const apartadoApi = {
 
             return filtered.map((a) => ({
               ...a,
+              nod: a.nod || (a.id ? `NOD-${String(a.id).replace(/\D/g, '').slice(0, 6).padStart(6, '0')}` : 'NOD-000100'),
               moto_brand: a.moto?.brand,
               moto_model: a.moto?.model,
               moto_year: a.moto?.year,
