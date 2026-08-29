@@ -591,20 +591,24 @@ const BuyerDashboard = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
                         <div>
                           <span className="text-zinc-500 block">Dictamen Certificación</span>
-                          <span className="text-white font-bold text-sm uppercase">{ap.certification_status || 'PENDIENTE'}</span>
+                          {(() => {
+                            const raw = String(ap.certification_status || '').toUpperCase();
+                            const buyerSt = (raw === 'APROBADA' || raw === 'CERTIFICADA') ? 'CERTIFICADA' : (raw === 'RECHAZADA' ? 'RECHAZADA' : 'PENDIENTE');
+                            return (
+                              <span className={`font-bold text-sm uppercase ${
+                                buyerSt === 'CERTIFICADA' ? 'text-emerald-400' : buyerSt === 'RECHAZADA' ? 'text-red-400' : 'text-amber-400'
+                              }`}>
+                                {buyerSt}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div>
-                          <span className="text-zinc-500 block">Cita de Inspección</span>
-                          <span className="text-zinc-200 font-semibold">
-                            {ap.certification_appointment_at ? new Date(ap.certification_appointment_at).toLocaleString('es-MX') : 'Por programar'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 block">Estado de Cita</span>
-                          <span className="text-zinc-200 font-semibold">{ap.certification_appointment_status || 'Pendiente'}</span>
+                          <span className="text-zinc-500 block">Inspección Oficial</span>
+                          <span className="text-zinc-300 font-semibold">Protocolo Motoluv de 100 Puntos</span>
                         </div>
                       </div>
 
@@ -760,30 +764,46 @@ const BuyerDashboard = () => {
                           <h3 className="font-bold text-base text-white">{ap.moto_brand} {ap.moto_model} {ap.moto_year || ''}</h3>
                         </div>
                       </div>
-                      <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
-                        ap.certification_status === 'APROBADA'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                      }`}>
-                        {ap.certification_status || 'PENDIENTE'}
+                    {(() => {
+                      const raw = String(ap.certification_status || '').toUpperCase();
+                      const buyerSt = (raw === 'APROBADA' || raw === 'CERTIFICADA') ? 'CERTIFICADA' : (raw === 'RECHAZADA' ? 'RECHAZADA' : 'PENDIENTE');
+                      return (
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full border ${
+                          buyerSt === 'CERTIFICADA'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : buyerSt === 'RECHAZADA'
+                            ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        }`}>
+                          {buyerSt}
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
+                      <span className="text-zinc-500 block">Dictamen de Certificación</span>
+                      {(() => {
+                        const raw = String(ap.certification_status || '').toUpperCase();
+                        const buyerSt = (raw === 'APROBADA' || raw === 'CERTIFICADA') ? 'CERTIFICADA' : (raw === 'RECHAZADA' ? 'RECHAZADA' : 'PENDIENTE');
+                        return (
+                          <span className={`font-bold uppercase ${
+                            buyerSt === 'CERTIFICADA' ? 'text-emerald-400' : buyerSt === 'RECHAZADA' ? 'text-red-400' : 'text-amber-400'
+                          }`}>
+                            {buyerSt}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
+                      <span className="text-zinc-500 block">Protocolo de Revisión</span>
+                      <span className="text-zinc-300 font-bold">
+                        Inspección Técnica Motoluv (100 Puntos)
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
-                        <span className="text-zinc-500 block">Cita Programada</span>
-                        <span className="text-white font-bold">
-                          {ap.certification_appointment_at ? new Date(ap.certification_appointment_at).toLocaleString('es-MX') : 'Pendiente de asignación'}
-                        </span>
-                      </div>
-                      <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
-                        <span className="text-zinc-500 block">Estado de la Cita</span>
-                        <span className="text-zinc-200 font-bold">
-                          {ap.certification_appointment_status || 'Pendiente'}
-                        </span>
-                      </div>
-                    </div>
                   </div>
+                </div>
                 ))}
               </div>
             )}
@@ -941,20 +961,22 @@ const BuyerDashboard = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Dictamen de Certificación:</span>
-                <span className="text-white font-bold uppercase">{selectedApartado.certification_status || 'PENDIENTE'}</span>
+                {(() => {
+                  const raw = String(selectedApartado.certification_status || '').toUpperCase();
+                  const buyerSt = (raw === 'APROBADA' || raw === 'CERTIFICADA') ? 'CERTIFICADA' : (raw === 'RECHAZADA' ? 'RECHAZADA' : 'PENDIENTE');
+                  return (
+                    <span className={`font-bold uppercase ${
+                      buyerSt === 'CERTIFICADA' ? 'text-emerald-400' : buyerSt === 'RECHAZADA' ? 'text-red-400' : 'text-amber-400'
+                    }`}>
+                      {buyerSt}
+                    </span>
+                  );
+                })()}
               </div>
-              {selectedApartado.certification_appointment_at && (
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Cita Programada:</span>
-                  <span className="text-zinc-200">{new Date(selectedApartado.certification_appointment_at).toLocaleString('es-MX')}</span>
-                </div>
-              )}
-              {selectedApartado.certification_appointment_status && (
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Estado de Cita:</span>
-                  <span className="text-zinc-200">{selectedApartado.certification_appointment_status}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Inspección de Seguridad:</span>
+                <span className="text-zinc-200">Protocolo Oficial Motoluv</span>
+              </div>
             </div>
 
             <button

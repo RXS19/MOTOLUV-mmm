@@ -192,7 +192,19 @@ const MotoDetailPage = () => {
     'Ubicación': moto.city || moto.location || 'No disponible',
   };
 
-  const certStatus = apartado?.certification_status || moto?.certification_status || 'PENDIENTE';
+  const isOwner = Boolean(user?.id && moto?.owner_id && String(user.id) === String(moto.owner_id));
+
+  // Determine certification status for display:
+  // For Comprador / Non-owner: ONLY 'PENDIENTE', 'CERTIFICADA' or 'RECHAZADA'
+  const rawCertStatus = String(apartado?.certification_status || moto?.certification_status || '').toUpperCase();
+  const buyerCertStatus = (rawCertStatus === 'APROBADA' || rawCertStatus === 'CERTIFICADA')
+    ? 'CERTIFICADA'
+    : (rawCertStatus === 'RECHAZADA' ? 'RECHAZADA' : 'PENDIENTE');
+
+  const certStatus = isOwner
+    ? (apartado?.certification_status || moto?.certification_status || 'PENDIENTE')
+    : buyerCertStatus;
+
   const certFolio = apartado?.id 
     ? `FOL-${String(apartado.id).slice(0, 8).toUpperCase()}` 
     : (moto?.id ? `FOL-${String(moto.id).slice(0, 8).toUpperCase()}` : 'FOL-PENDIENTE');
@@ -362,21 +374,44 @@ const MotoDetailPage = () => {
                     <div>
                       <div className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Score Mecánico</div>
                       <div className="text-white font-bold text-sm flex items-center gap-1 mt-0.5">
-                        <CheckCheck size={15} className="text-emerald-400" /> {certStatus}
+                        <CheckCheck size={15} className={buyerCertStatus === 'RECHAZADA' ? 'text-red-400' : 'text-emerald-400'} /> {certStatus}
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Folio de Inspección</div>
-                    <div className="text-white font-mono font-bold text-sm mt-0.5">{certFolio}</div>
-                    <div className="text-[11px] text-zinc-400 mt-1">Fecha: {certDate}</div>
-                  </div>
+                  {isOwner ? (
+                    <>
+                      <div className="border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
+                        <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Taller y Cita</div>
+                        <div className="text-white font-bold text-xs mt-0.5 truncate" title={moto?.certification_workshop || apartado?.certification_workshop || 'Taller oficial'}>
+                          {moto?.certification_workshop || apartado?.certification_workshop || 'Taller oficial asignado'}
+                        </div>
+                        <div className="text-[11px] text-zinc-400 mt-1">
+                          {certDate} • <span className="text-amber-400 font-semibold">{moto?.certification_appointment_status || apartado?.certification_appointment_status || 'PENDIENTE'}</span>
+                        </div>
+                      </div>
 
-                  <div className="border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
-                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Perito Dictaminador</div>
-                    <div className="text-zinc-300 text-xs font-medium mt-0.5 line-clamp-2">{certInspector}</div>
-                  </div>
+                      <div className="border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
+                        <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Folio de Inspección</div>
+                        <div className="text-white font-mono font-bold text-sm mt-0.5">{certFolio}</div>
+                        <div className="text-[11px] text-zinc-400 mt-1 truncate">{certInspector}</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
+                        <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Estado Certificación</div>
+                        <div className="text-white font-bold text-sm mt-0.5">{buyerCertStatus}</div>
+                        <div className="text-[11px] text-zinc-400 mt-1">Inspección oficial Motoluv</div>
+                      </div>
+
+                      <div className="border-t md:border-t-0 md:border-l border-white/5 pt-3 md:pt-0 md:pl-4">
+                        <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Garantía Técnica</div>
+                        <div className="text-zinc-300 text-xs font-medium mt-0.5">Certificación Oficial Motoluv</div>
+                        <div className="text-[11px] text-zinc-500 mt-1">Dictamen avalado por peritaje</div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Grid of Mechanical Systems */}
@@ -586,24 +621,36 @@ const MotoDetailPage = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-white font-medium">Dictamen:</span>
                     <span className={`font-bold px-2 py-0.5 rounded text-[10px] uppercase ${
-                      isCertificationApproved 
+                      buyerCertStatus === 'CERTIFICADA'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : buyerCertStatus === 'RECHAZADA'
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                         : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                     }`}>
-                      {apartado.certification_status || 'PENDIENTE'}
+                      {certStatus}
                     </span>
                   </div>
-                  {apartado.certification_appointment_at && (
-                    <div className="flex items-center justify-between text-zinc-400 text-[11px]">
-                      <span>Cita programada:</span>
-                      <span className="text-zinc-200">{new Date(apartado.certification_appointment_at).toLocaleString('es-MX')}</span>
-                    </div>
-                  )}
-                  {apartado.certification_appointment_status && (
-                    <div className="flex items-center justify-between text-zinc-400 text-[11px]">
-                      <span>Estado de cita:</span>
-                      <span className="text-zinc-200">{apartado.certification_appointment_status}</span>
-                    </div>
+                  {isOwner && (
+                    <>
+                      {(apartado.certification_workshop || moto?.certification_workshop) && (
+                        <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                          <span>Taller:</span>
+                          <span className="text-zinc-200 truncate max-w-[180px]">{apartado.certification_workshop || moto?.certification_workshop}</span>
+                        </div>
+                      )}
+                      {(apartado.certification_appointment_at || moto?.certification_appointment_at) && (
+                        <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                          <span>Cita programada:</span>
+                          <span className="text-zinc-200">{new Date(apartado.certification_appointment_at || moto?.certification_appointment_at).toLocaleString('es-MX')}</span>
+                        </div>
+                      )}
+                      {(apartado.certification_appointment_status || moto?.certification_appointment_status) && (
+                        <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                          <span>Estado de cita:</span>
+                          <span className="text-zinc-200">{apartado.certification_appointment_status || moto?.certification_appointment_status}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -616,7 +663,7 @@ const MotoDetailPage = () => {
                 {user ? (
                   <button
                     onClick={() => setShowApartadoModal(true)}
-                    className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm shadow-lg"
+                    className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm shadow-lg cursor-pointer"
                   >
                     <BookmarkCheck size={14} /> APARTAR
                   </button>
@@ -627,7 +674,7 @@ const MotoDetailPage = () => {
                         toast({ title: 'Registro requerido', description: 'Crea tu cuenta o inicia sesión para realizar un apartado.' });
                         navigate('/iniciar-sesion');
                       }}
-                      className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm"
+                      className="btn-red w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm cursor-pointer"
                     >
                       <User size={14} /> APARTAR
                     </button>
@@ -715,7 +762,7 @@ const MotoDetailPage = () => {
                   <button 
                     onClick={handleOffer} 
                     disabled={offerLoading}
-                    className="btn-red mt-2 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm disabled:opacity-70"
+                    className="btn-red mt-2 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3.5 rounded-sm disabled:opacity-70 cursor-pointer"
                   >
                     {offerLoading ? 'Enviando...' : 'Enviar Oferta'}
                   </button>
@@ -731,9 +778,14 @@ const MotoDetailPage = () => {
                 </div>
               )}
 
-              <button className="btn-outline mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm">
+              <a
+                href="https://wa.me/525643048865"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-outline mt-3 w-full inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm cursor-pointer"
+              >
                 <MessageCircle size={13} /> Contactar asesor Motoluv
-              </button>
+              </a>
             </div>
           )}
 

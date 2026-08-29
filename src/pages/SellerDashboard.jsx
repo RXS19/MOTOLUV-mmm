@@ -147,17 +147,39 @@ const SellerDashboard = () => {
 
   const handleOpenScheduleModal = (apartado) => {
     setSelectedApartadoForSchedule(apartado);
-    // Find matching workshop by city or default to first
-    const targetCity = (apartado?.moto_city || '').toLowerCase();
-    const cityMatch = CERTIFIED_WORKSHOPS.find(
-      (w) => w.city.toLowerCase() === targetCity
-    );
-    setSelectedWorkshopId(cityMatch ? cityMatch.id : CERTIFIED_WORKSHOPS[0].id);
 
-    // Default to tomorrow (or today if early)
-    const nextDay = new Date();
-    nextDay.setDate(nextDay.getDate() + 1);
-    setSelectedDate(nextDay.toISOString().split('T')[0]);
+    // If workshop already exists in apartado, use it
+    if (apartado?.certification_workshop_id) {
+      setSelectedWorkshopId(apartado.certification_workshop_id);
+    } else if (apartado?.certification_workshop) {
+      const match = CERTIFIED_WORKSHOPS.find(
+        (w) => w.name.toLowerCase() === apartado.certification_workshop.toLowerCase()
+      );
+      setSelectedWorkshopId(match ? match.id : CERTIFIED_WORKSHOPS[0].id);
+    } else {
+      const targetCity = (apartado?.moto_city || '').toLowerCase();
+      const cityMatch = CERTIFIED_WORKSHOPS.find(
+        (w) => w.city.toLowerCase() === targetCity
+      );
+      setSelectedWorkshopId(cityMatch ? cityMatch.id : CERTIFIED_WORKSHOPS[0].id);
+    }
+
+    // If appointment date already exists, use it
+    if (apartado?.certification_appointment_at) {
+      try {
+        const dateStr = new Date(apartado.certification_appointment_at).toISOString().split('T')[0];
+        setSelectedDate(dateStr);
+      } catch {
+        const nextDay = new Date();
+        nextDay.setDate(nextDay.getDate() + 1);
+        setSelectedDate(nextDay.toISOString().split('T')[0]);
+      }
+    } else {
+      const nextDay = new Date();
+      nextDay.setDate(nextDay.getDate() + 1);
+      setSelectedDate(nextDay.toISOString().split('T')[0]);
+    }
+
     setScheduleError('');
     setShowScheduleModal(true);
   };
@@ -1412,6 +1434,43 @@ const SellerDashboard = () => {
               </div>
             </div>
 
+            {/* Status specific notices */}
+            {(() => {
+              const appStatus = selectedApartadoForSchedule?.certification_appointment_status;
+              const isProgrammed = appStatus === 'PROGRAMADA';
+              const isCancelledOrNoShow = appStatus === 'CANCELADA' || appStatus === 'NO_PRESENTADO';
+
+              if (isProgrammed) {
+                return (
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs space-y-1.5 text-blue-200">
+                    <div className="flex items-center gap-2 font-bold text-blue-400">
+                      <AlertCircle size={15} />
+                      <span>Cita en estatus PROGRAMADA (Edición bloqueada)</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-zinc-300">
+                      Conforme al protocolo de certificación, la edición de fecha y taller está deshabilitada mientras la cita esté programada. Para cualquier cambio, contacta a tu asesor Motoluv.
+                    </p>
+                  </div>
+                );
+              }
+
+              if (isCancelledOrNoShow) {
+                return (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs space-y-1 text-amber-200">
+                    <div className="flex items-center gap-2 font-bold text-amber-400">
+                      <AlertCircle size={15} />
+                      <span>Estatus previo: {appStatus}</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-zinc-300">
+                      Puedes seleccionar una nueva fecha y taller para reprogramar la inspección técnica.
+                    </p>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
+
             <form onSubmit={handleConfirmSchedule} className="space-y-4">
               {/* Taller Certificado Selector */}
               <div>
@@ -1422,8 +1481,8 @@ const SellerDashboard = () => {
                 <select
                   value={selectedWorkshopId}
                   onChange={(e) => setSelectedWorkshopId(e.target.value)}
-                  disabled={scheduleLoading}
-                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors"
+                  disabled={scheduleLoading || selectedApartadoForSchedule?.certification_appointment_status === 'PROGRAMADA'}
+                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <option value="" disabled>Selecciona un taller certificado...</option>
                   {CERTIFIED_WORKSHOPS.map((ws) => (
@@ -1467,8 +1526,8 @@ const SellerDashboard = () => {
                   min={new Date().toISOString().split('T')[0]}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  disabled={scheduleLoading}
-                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors"
+                  disabled={scheduleLoading || selectedApartadoForSchedule?.certification_appointment_status === 'PROGRAMADA'}
+                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <p className="text-[11px] text-zinc-400 mt-1.5">
                   Nota: Conforme a la política Motoluv, el peritaje se agenda por día. El horario de atención en taller es continuo de 9:00 AM a 6:00 PM.
@@ -1483,29 +1542,47 @@ const SellerDashboard = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={handleCloseScheduleModal}
-                  disabled={scheduleLoading}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+              <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-white/5">
+                <a
+                  href="https://wa.me/525643048865"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={scheduleLoading || !selectedWorkshopId || !selectedDate}
-                  className="px-5 py-2 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow cursor-pointer"
-                >
-                  {scheduleLoading ? (
-                    'Guardando cita...'
-                  ) : (
-                    <>
-                      <Check size={14} />
-                      <span>Confirmar Cita Programada</span>
-                    </>
+                  <MessageCircle size={14} />
+                  <span>Contactar asesor Motoluv</span>
+                </a>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseScheduleModal}
+                    disabled={scheduleLoading}
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                  {selectedApartadoForSchedule?.certification_appointment_status !== 'PROGRAMADA' && (
+                    <button
+                      type="submit"
+                      disabled={scheduleLoading || !selectedWorkshopId || !selectedDate}
+                      className="px-5 py-2 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow cursor-pointer"
+                    >
+                      {scheduleLoading ? (
+                        'Guardando cita...'
+                      ) : (
+                        <>
+                          <Check size={14} />
+                          <span>
+                            {selectedApartadoForSchedule?.certification_appointment_status === 'CANCELADA' || selectedApartadoForSchedule?.certification_appointment_status === 'NO_PRESENTADO'
+                              ? 'Reprogramar Cita'
+                              : 'Confirmar Cita Programada'}
+                          </span>
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
             </form>
           </div>

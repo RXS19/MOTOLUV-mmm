@@ -9,13 +9,62 @@ import {
   logAuthDiagnostic,
 } from '../lib/supabase';
 
+const STORAGE_ACTIVE_VIEW_KEY = 'motoluv_active_view';
+
+const getStoredActiveView = () => {
+  try {
+    const val = localStorage.getItem(STORAGE_ACTIVE_VIEW_KEY);
+    if (val === 'comprador' || val === 'vendedor') {
+      return val;
+    }
+  } catch {
+    // localStorage not accessible
+  }
+  return null;
+};
+
+const resolveValidActiveView = (desiredView, userRole) => {
+  if (userRole === 'comprador') return 'comprador';
+  if (userRole === 'vendedor') return 'vendedor';
+  if (desiredView === 'comprador' || desiredView === 'vendedor') {
+    return desiredView;
+  }
+  return 'vendedor';
+};
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('vendedor'); // 'comprador' or 'vendedor'
+  const [activeView, setActiveViewState] = useState(() => {
+    const stored = getStoredActiveView();
+    return stored || 'vendedor';
+  });
+
+  const setActiveView = useCallback((nextView) => {
+    const valid = nextView === 'comprador' ? 'comprador' : 'vendedor';
+    const resolved = resolveValidActiveView(valid, user?.role);
+    setActiveViewState(resolved);
+    try {
+      localStorage.setItem(STORAGE_ACTIVE_VIEW_KEY, resolved);
+    } catch (e) {
+      console.warn('Error guardando motoluv_active_view:', e);
+    }
+  }, [user?.role]);
+
+  // Sincronizar vista activa entre pestañas y ventanas
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_ACTIVE_VIEW_KEY && (e.newValue === 'comprador' || e.newValue === 'vendedor')) {
+        const resolved = resolveValidActiveView(e.newValue, user?.role);
+        setActiveViewState(resolved);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [user?.role]);
 
   // Helper para construir el objeto de usuario estandarizado para toda la app
   const buildUserObject = useCallback(async (authUser, currentSession = null) => {
@@ -115,8 +164,14 @@ export const AuthProvider = ({ children }) => {
             setSession(initialSession);
             const userObj = await buildUserObject(initialSession.user, initialSession);
             setUser(userObj);
-            if (userObj?.role === 'comprador') setActiveView('comprador');
-            else setActiveView('vendedor');
+            const currentStored = getStoredActiveView();
+            const resolved = resolveValidActiveView(currentStored, userObj?.role);
+            setActiveViewState(resolved);
+            try {
+              localStorage.setItem(STORAGE_ACTIVE_VIEW_KEY, resolved);
+            } catch {
+              // ignore
+            }
           } else {
             setSession(null);
             setUser(null);
@@ -148,8 +203,14 @@ export const AuthProvider = ({ children }) => {
           const userObj = await buildUserObject(currentSession.user, currentSession);
           if (mounted) {
             setUser(userObj);
-            if (userObj?.role === 'comprador') setActiveView('comprador');
-            else setActiveView('vendedor');
+            const currentStored = getStoredActiveView();
+            const resolved = resolveValidActiveView(currentStored, userObj?.role);
+            setActiveViewState(resolved);
+            try {
+              localStorage.setItem(STORAGE_ACTIVE_VIEW_KEY, resolved);
+            } catch {
+              // ignore
+            }
             setLoading(false);
           }
           if (event === 'SIGNED_IN') {
@@ -216,8 +277,14 @@ export const AuthProvider = ({ children }) => {
 
     const userObj = await buildUserObject(data.user, data.session);
     setUser(userObj);
-    if (userObj?.role === 'comprador') setActiveView('comprador');
-    else setActiveView('vendedor');
+    const currentStored = getStoredActiveView();
+    const resolved = resolveValidActiveView(currentStored, userObj?.role);
+    setActiveViewState(resolved);
+    try {
+      localStorage.setItem(STORAGE_ACTIVE_VIEW_KEY, resolved);
+    } catch {
+      // ignore
+    }
     return userObj;
   };
 
