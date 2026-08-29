@@ -410,16 +410,16 @@ const BuyerDashboard = () => {
                 </div>
 
                 <div className="bg-[#101013] border border-white/5 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[190px] group">
-                  {/* Motorcycle visual asset with luxury gradient blend */}
-                  <div className="absolute right-0 top-0 bottom-0 w-[55%] sm:w-[50%] overflow-hidden pointer-events-none">
+                  {/* Motorcycle visual asset with soft gradient blend for high visibility */}
+                  <div className="absolute right-0 top-0 bottom-0 w-[58%] sm:w-[55%] overflow-hidden pointer-events-none">
                     <img
                       src={buyerBannerMoto}
                       alt="Motocicletas Motoluv"
-                      className="w-full h-full object-cover object-center opacity-70 group-hover:opacity-85 group-hover:scale-105 transition-all duration-500"
+                      className="w-full h-full object-cover object-center opacity-95 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#101013] via-[#101013]/70 to-transparent w-full" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#101013] via-transparent to-[#101013]/40" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#101013] via-[#101013]/40 to-transparent w-[50%]" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#101013]/30 via-transparent to-transparent" />
                   </div>
 
                   <div className="relative z-10 space-y-3 max-w-[65%] sm:max-w-[60%]">
