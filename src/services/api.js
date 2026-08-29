@@ -456,6 +456,24 @@ export const apartadoApi = {
             .order('created_at', { ascending: false });
 
           if (!error && Array.isArray(data)) {
+            const sellerIds = [...new Set(data.map((a) => a.moto?.owner_id).filter(Boolean))];
+            const profilesMap = {};
+            if (sellerIds.length > 0) {
+              try {
+                const { data: profs } = await supabase
+                  .from('profiles')
+                  .select('id, name, full_name, email')
+                  .in('id', sellerIds);
+                if (Array.isArray(profs)) {
+                  profs.forEach((p) => {
+                    profilesMap[p.id] = p.full_name || p.name || (p.email ? p.email.split('@')[0] : null);
+                  });
+                }
+              } catch (e) {
+                console.warn('Error fetching seller profiles:', e);
+              }
+            }
+
             return data.map((a) => ({
               ...a,
               moto_brand: a.moto?.brand,
@@ -463,7 +481,8 @@ export const apartadoApi = {
               moto_year: a.moto?.year,
               moto_price: a.moto?.price,
               moto_image: a.moto?.images?.[0] || a.moto?.image,
-              seller_name: a.moto?.owner_name || 'Vendedor Verificado',
+              seller_name: profilesMap[a.moto?.owner_id] || a.moto?.owner_name || 'Vendedor Motoluv',
+              buyer_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Comprador',
             }));
           }
         }
@@ -516,18 +535,36 @@ export const apartadoApi = {
             .order('created_at', { ascending: false });
 
           if (!error && Array.isArray(data)) {
-            return data
-              .filter((a) => a.moto?.owner_id === session.user.id)
-              .map((a) => ({
-                ...a,
-                moto_brand: a.moto?.brand,
-                moto_model: a.moto?.model,
-                moto_year: a.moto?.year,
-                moto_price: a.moto?.price,
-                moto_city: a.moto?.city,
-                moto_image: a.moto?.images?.[0] || a.moto?.image,
-                seller_name: a.moto?.owner_name || 'Vendedor',
-              }));
+            const filtered = data.filter((a) => a.moto?.owner_id === session.user.id);
+            const buyerIds = [...new Set(filtered.map((a) => a.buyer_id).filter(Boolean))];
+            const profilesMap = {};
+            if (buyerIds.length > 0) {
+              try {
+                const { data: profs } = await supabase
+                  .from('profiles')
+                  .select('id, name, full_name, email')
+                  .in('id', buyerIds);
+                if (Array.isArray(profs)) {
+                  profs.forEach((p) => {
+                    profilesMap[p.id] = p.full_name || p.name || (p.email ? p.email.split('@')[0] : null);
+                  });
+                }
+              } catch (e) {
+                console.warn('Error fetching buyer profiles:', e);
+              }
+            }
+
+            return filtered.map((a) => ({
+              ...a,
+              moto_brand: a.moto?.brand,
+              moto_model: a.moto?.model,
+              moto_year: a.moto?.year,
+              moto_price: a.moto?.price,
+              moto_city: a.moto?.city,
+              moto_image: a.moto?.images?.[0] || a.moto?.image,
+              seller_name: a.moto?.owner_name || session.user.user_metadata?.full_name || 'Vendedor',
+              buyer_name: profilesMap[a.buyer_id] || a.buyer_name || 'Comprador Motoluv',
+            }));
           }
         }
       } catch (err) {

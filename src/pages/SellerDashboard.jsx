@@ -32,6 +32,7 @@ import { motoApi, offerApi, apartadoApi } from '../services/api';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
 import BoostPublicationModal from '../components/dashboard/BoostPublicationModal';
+import OperationsTimelineViewer from '../components/dashboard/OperationsTimelineViewer';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import { CERTIFIED_WORKSHOPS } from '../data/workshops';
 import { calculateCommission } from '../utils/commission';
@@ -944,162 +945,13 @@ const SellerDashboard = () => {
           </div>
         )}
 
-        {/* ================= TAB: APARTADOS RECIBIDOS ================= */}
-        {activeTab === 'apartados' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Apartados Recibidos</h1>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Registros de motocicletas apartadas en custodia por compradores.
-              </p>
-            </div>
-
-            {apartados.length === 0 ? (
-              <div className="p-16 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-3">
-                <BookmarkCheck size={32} className="text-zinc-600 mx-auto" />
-                <h3 className="text-base font-bold text-white">Aún no tienes actividad.</h3>
-                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  Cuando un comprador aparte una de tus motocicletas, aparecerá en esta sección.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {apartados.map((ap) => {
-                  const rawAppStatus = (ap.certification_appointment_status || '').toUpperCase();
-                  const isCompleted = rawAppStatus === 'COMPLETADA';
-                  const isProgrammed = rawAppStatus === 'PROGRAMADA';
-                  const isCancelled = rawAppStatus === 'CANCELADA';
-                  const isNoShow = rawAppStatus === 'NO_PRESENTADO';
-
-                  return (
-                    <div key={ap.id} className="p-5 bg-[#101013] border border-white/5 rounded-2xl space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-red-brand flex-shrink-0 overflow-hidden">
-                            {ap.moto_image ? (
-                              <img
-                                src={resolveSafeImageUrl(ap.moto_image, 'moto')}
-                                alt={ap.moto_brand}
-                                onError={(e) => handleImageError(e, 'moto')}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Bike size={22} />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-base text-white">
-                              {ap.moto_brand} {ap.moto_model} {ap.moto_year || ''}
-                            </h3>
-                            <p className="text-xs text-zinc-400">
-                              Fecha de apartado: {ap.created_at ? new Date(ap.created_at).toLocaleDateString('es-MX') : 'Reciente'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            {ap.status}
-                          </span>
-                          {isCompleted ? (
-                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                              COMPLETADA
-                            </span>
-                          ) : isProgrammed ? (
-                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                              CITA PROGRAMADA
-                            </span>
-                          ) : isCancelled ? (
-                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
-                              CANCELADA
-                            </span>
-                          ) : isNoShow ? (
-                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              NO PRESENTADO
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              SIN CITA
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#141418] rounded-xl text-xs">
-                        <div>
-                          <span className="text-zinc-500 block">Dictamen de Certificación</span>
-                          <span className="text-white font-bold text-sm uppercase">{ap.certification_status || 'PENDIENTE'}</span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 block">Cita de Inspección</span>
-                          <span className="text-zinc-200 font-semibold block">
-                            {ap.certification_appointment_at ? new Date(ap.certification_appointment_at).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Por programar'}
-                          </span>
-                          {ap.certification_workshop && (
-                            <span className="text-[11px] text-zinc-400 block truncate mt-0.5" title={ap.certification_workshop}>
-                              {ap.certification_workshop}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 block">Estado de Cita</span>
-                          <span className={`font-semibold ${
-                            isCompleted
-                              ? 'text-emerald-400'
-                              : isProgrammed
-                              ? 'text-blue-400'
-                              : isCancelled
-                              ? 'text-red-400'
-                              : isNoShow
-                              ? 'text-amber-400'
-                              : 'text-zinc-200'
-                          }`}>
-                            {isCompleted
-                              ? 'COMPLETADA'
-                              : isProgrammed
-                              ? 'CITA PROGRAMADA'
-                              : ap.certification_appointment_status || 'SIN CITA'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-1">
-                        {isCompleted ? (
-                          <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 py-1">
-                            <Check size={14} /> Inspección completada
-                          </span>
-                        ) : isProgrammed ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenScheduleModal(ap)}
-                            className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <CalendarClock size={13} /> Ver cita programada
-                          </button>
-                        ) : isCancelled || isNoShow ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenScheduleModal(ap)}
-                            className="px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
-                          >
-                            <CalendarClock size={14} /> Reagendar cita
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenScheduleModal(ap)}
-                            className="px-4 py-2 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-red-brand/20 cursor-pointer"
-                          >
-                            <CalendarClock size={14} /> Agendar inspección
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+        {/* ================= TAB: VENTAS EN PROCESO (OPERATIONS TIMELINE) ================= */}
+        {(activeTab === 'apartados' || activeTab === 'proceso') && (
+          <OperationsTimelineViewer
+            items={apartados}
+            mode="vendedor"
+            onScheduleAppointment={handleOpenScheduleModal}
+          />
         )}
 
         {/* ================= TAB 4: INSPECCIONES ================= */}

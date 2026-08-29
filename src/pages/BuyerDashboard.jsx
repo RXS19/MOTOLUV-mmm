@@ -20,6 +20,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import { apartadoApi, offerApi } from '../services/api';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
+import OperationsTimelineViewer from '../components/dashboard/OperationsTimelineViewer';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
 import { toast } from '../hooks/use-toast';
 import buyerBannerMoto from '../assets/images/buyer_banner_moto_1788022096918.jpg';
@@ -810,37 +811,12 @@ const BuyerDashboard = () => {
           </div>
         )}
 
-        {/* ================= TAB 5: COMPRAS ================= */}
+        {/* ================= TAB 5: MIS COMPRAS (OPERATIONS TIMELINE) ================= */}
         {activeTab === 'compras' && (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Mis Compras</h1>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Historial de motocicletas adquiridas en plataforma.
-              </p>
-            </div>
-
-            <div className="p-12 bg-[#101013] border border-white/5 rounded-2xl text-center space-y-4 max-w-lg mx-auto">
-              <div className="w-16 h-16 rounded-full bg-white/5 text-zinc-400 flex items-center justify-center mx-auto shadow-inner">
-                <ShoppingBag size={32} />
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-bold text-white">Aún no tienes actividad.</h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Tus transacciones concluidas se mostrarán en esta sección.
-                </p>
-              </div>
-              <div className="pt-2">
-                <Link
-                  to="/motos"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-red-brand hover:bg-red-600 text-white text-xs font-bold rounded-xl transition-all shadow-lg"
-                >
-                  <Bike size={16} />
-                  <span>Ver catálogo disponible</span>
-                </Link>
-              </div>
-            </div>
-          </div>
+          <OperationsTimelineViewer
+            items={apartados}
+            mode="comprador"
+          />
         )}
 
         {/* ================= TAB 6: PAGOS ================= */}
