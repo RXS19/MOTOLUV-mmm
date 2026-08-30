@@ -74,13 +74,13 @@ const HomePage = () => {
         {/* Hero Content Container (left 45% on desktop, fully responsive on mobile) */}
         <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 w-full py-12 sm:py-16 lg:py-20">
           <div className="max-w-xl lg:max-w-2xl text-left">
-            {/* Slogan superior pequeño en rojo */}
-            <div className="text-[#E10600] font-bold text-xs sm:text-sm tracking-[0.24em] uppercase mb-3 sm:mb-5">
-              SUBE. CONECTA. RUEDA.
-            </div>
+            {/* Etiqueta / Slogan superior con el mismo formato visual de 'El proceso' */}
+            <span className="inline-block text-red-brand text-[11px] tracking-widest uppercase border border-red-brand/60 rounded-full px-3 py-1.5 mb-4 sm:mb-5">
+              Sube · Conecta · Rueda
+            </span>
 
-            {/* Headline Principal dominante con espacio reducido entre palabras */}
-            <h1 className="hero-title text-white text-[42px] sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[88px] uppercase tracking-[-0.04em] [word-spacing:-0.08em] leading-[0.92] font-bold">
+            {/* Headline Principal dominante con tipografía Oswald (font-display) */}
+            <h1 className="font-display text-white text-[42px] sm:text-6xl md:text-7xl lg:text-[80px] xl:text-[88px] uppercase tracking-[-0.04em] [word-spacing:-0.08em] leading-[0.92] font-bold">
               COMPRA O VENDE
               <br />
               <span className="text-[#E10600]">TU MOTO</span>
