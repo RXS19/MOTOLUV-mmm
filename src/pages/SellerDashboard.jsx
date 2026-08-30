@@ -329,6 +329,7 @@ const getApartadoScheduleRange = (createdAt) => {
         try {
           generateAndDownloadInspectionIcs({
             nod: selectedApartadoForSchedule.nod,
+            apartadoId: selectedApartadoForSchedule.id,
             brand: selectedApartadoForSchedule.moto_brand || selectedApartadoForSchedule.moto?.brand,
             model: selectedApartadoForSchedule.moto_model || selectedApartadoForSchedule.moto?.model,
             year: selectedApartadoForSchedule.moto_year || selectedApartadoForSchedule.moto?.year,
