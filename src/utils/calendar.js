@@ -43,16 +43,21 @@ export function generateAndDownloadInspectionIcs({
   workshopAddress = '',
   dateStr,
 }) {
+  if (!nod || typeof nod !== 'string' || !nod.trim()) {
+    console.error('generateAndDownloadInspectionIcs: El folio NOD es obligatorio.');
+    throw new Error('No se puede generar el evento de calendario sin un folio NOD válido.');
+  }
+
   if (!dateStr) {
-    console.warn('generateAndDownloadInspectionIcs: dateStr is required');
-    return;
+    console.error('generateAndDownloadInspectionIcs: dateStr es requerido');
+    throw new Error('Fecha no especificada para la cita.');
   }
 
   // Parse dateStr (expected format: 'YYYY-MM-DD')
   const [yearPart, monthPart, dayPart] = dateStr.split('-').map(Number);
   if (!yearPart || !monthPart || !dayPart) {
-    console.warn('generateAndDownloadInspectionIcs: invalid dateStr', dateStr);
-    return;
+    console.error('generateAndDownloadInspectionIcs: invalid dateStr', dateStr);
+    throw new Error('Formato de fecha inválido.');
   }
 
   const startDate = new Date(yearPart, monthPart - 1, dayPart);
@@ -64,31 +69,21 @@ export function generateAndDownloadInspectionIcs({
   const dtStartStr = formatIcsDate(startDate);
   const dtEndStr = formatIcsDate(endDate);
 
-  const cleanNod = String(nod || 'NOD-000100').trim();
-  const vehicleName = `${brand} ${model}`.trim() + (year ? ` ${year}` : '');
+  const cleanNod = nod.trim();
+  const vehicleName = `${brand} ${model}`.trim();
 
   // SUMMARY: Inspección de certificación Motoluv — [marca] [modelo]
   const summary = `Inspección de certificación Motoluv — ${brand} ${model}`.trim();
 
-  // DESCRIPTION: NOD, moto, año, taller y proceso de certificación.
+  // DESCRIPTION: NOD, motocicleta, año, taller, dirección y “Proceso de inspección/certificación Motoluv”
   const descriptionLines = [
-    `DETALLES DE LA OPERACIÓN MOTOLUV`,
-    `----------------------------------------`,
-    `Folio / NOD: ${cleanNod}`,
+    `NOD: ${cleanNod}`,
     `Motocicleta: ${vehicleName}`,
     year ? `Año: ${year}` : null,
-    `Taller Asignado: ${workshopName}`,
-    workshopAddress ? `Dirección del Taller: ${workshopAddress}` : null,
-    `Horario de recepción en taller: 9:00 AM - 6:00 PM`,
-    ``,
-    `PROCESO DE CERTIFICACIÓN TÉCNICA MOTOLUV:`,
-    `1. Presenta la motocicleta limpia con combustible en reserva y llaves originales.`,
-    `2. Lleva la documentación original (factura/título, tarjeta de circulación, identificación oficial).`,
-    `3. El perito certificado realizará el diagnóstico integral de 100 puntos (mecánica, eléctrica, estética, compresión de motor y verificación legal).`,
-    `4. El dictamen digital se cargará en la plataforma Motoluv para continuar con el contrato, pago en custodia y entrega final.`,
-    ``,
-    `Soporte y atención inmediata por WhatsApp: +52 56 4304 8865`,
-  ].filter((line) => line !== null);
+    `Taller: ${workshopName}`,
+    workshopAddress ? `Dirección: ${workshopAddress}` : null,
+    `Proceso de inspección/certificación Motoluv`,
+  ].filter(Boolean);
 
   const descriptionRaw = descriptionLines.join('\n');
   const locationRaw = workshopAddress || workshopName || 'Taller Certificado Motoluv';
@@ -143,5 +138,7 @@ export function generateAndDownloadInspectionIcs({
     }, 1000);
   } catch (err) {
     console.error('Error generating .ics download:', err);
+    throw err;
   }
 }
+

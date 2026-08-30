@@ -609,7 +609,7 @@ const BuyerDashboard = () => {
                         </div>
                         <div>
                           <span className="text-zinc-500 block">Inspección Oficial</span>
-                          <span className="text-zinc-300 font-semibold">Protocolo Motoluv de 100 Puntos</span>
+                          <span className="text-zinc-300 font-semibold">Inspección Técnica Oficial</span>
                         </div>
                       </div>
 
@@ -800,7 +800,7 @@ const BuyerDashboard = () => {
                     <div className="p-3 bg-[#141418] rounded-xl border border-white/5">
                       <span className="text-zinc-500 block">Protocolo de Revisión</span>
                       <span className="text-zinc-300 font-bold">
-                        Inspección Técnica Motoluv (100 Puntos)
+                        Inspección Técnica Motoluv
                       </span>
                     </div>
                   </div>
@@ -1050,7 +1050,7 @@ const BuyerDashboard = () => {
             <div className="space-y-2.5 text-xs text-zinc-300">
               <div className="flex items-center gap-2 p-2.5 bg-white/[0.02] rounded-lg">
                 <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />
-                <span>Inspección técnica de puntos clave de seguridad.</span>
+                <span>Inspección técnica de seguridad integral.</span>
               </div>
               <div className="flex items-center gap-2 p-2.5 bg-white/[0.02] rounded-lg">
                 <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0" />

@@ -191,7 +191,7 @@ const LuChatbot = () => {
       return '¡Hola! 🐾 Soy Lu, el asistente oficial de Motoluv. ¿En qué te puedo asesorar hoy? Puedo ayudarte a explorar motocicletas verificadas, conocer los paquetes de inspección, equiparte en la tienda oficial o registrarte en nuestra red de aliados. 🏍️';
     }
     if (lower.includes('moto') || lower.includes('comprar') || lower.includes('catalogo') || lower.includes('catálogo') || lower.includes('inventario') || lower.includes('vender')) {
-      return 'En Motoluv contamos con un inventario verificado con Score de 100 puntos y certificación mecánica completa 🏁.\n\n• Puedes explorar todas las marcas y modelos disponibles en el catálogo de motocicletas.\n• Si quieres vender, activa tu perfil de vendedor y publica tu moto con fotos y especificaciones.';
+      return 'En Motoluv contamos con un inventario verificado con Inspección Técnica y certificación mecánica completa 🏁.\n\n• Puedes explorar todas las marcas y modelos disponibles en el catálogo de motocicletas.\n• Si quieres vender, activa tu perfil de vendedor y publica tu moto con fotos y especificaciones.';
     }
     if (lower.includes('tienda') || lower.includes('casco') || lower.includes('accesorio') || lower.includes('chaqueta') || lower.includes('guantes') || lower.includes('intercom')) {
       return '¡Claro! En nuestra Tienda Oficial de equipamiento encontrarás cascos de marcas líderes, chaquetas con armadura de protección, guantes tácticos y accesorios con envío a todo México 🛡️.';
@@ -200,7 +200,7 @@ const LuChatbot = () => {
       return '¡Únete a nuestra Red de Socios! 🤝 Si tienes un taller mecánico certificado, tienda de accesorios, agencia de motocicletas, financiera o eres organizador de rodadas, ingresa a la sección de aliados para registrar tu negocio.';
     }
     if (lower.includes('paquete') || lower.includes('inspeccion') || lower.includes('inspección') || lower.includes('seguridad') || lower.includes('precio') || lower.includes('costo') || lower.includes('cuanto') || lower.includes('cuánto') || lower.includes('tarifa') || lower.includes('comision') || lower.includes('comisión')) {
-      return 'En Motoluv protegemos cada transacción con procesos certificados 🔒. Nuestros paquetes de servicio:\n\n• Básico: Inspección mecánica de 100 puntos y contrato digital.\n• Plus: Inspección técnica + custodia segura de fondos y validación documental.\n• Total: Cobertura Plus + gestión integral de trámites y traslado logístico entre centros autorizados.\n\nPuedes revisar todos los detalles de cada servicio directamente en la plataforma al gestionar tu compra o venta.';
+      return 'En Motoluv protegemos cada transacción con procesos certificados 🔒. Nuestros paquetes de servicio:\n\n• Básico: Inspección técnica mecánica y contrato digital.\n• Plus: Inspección técnica + custodia segura de fondos y validación documental.\n• Total: Cobertura Plus + gestión integral de trámites y traslado logístico entre centros autorizados.\n\nPuedes revisar todos los detalles de cada servicio directamente en la plataforma al gestionar tu compra o venta.';
     }
     if (lower.includes('telefono') || lower.includes('teléfono') || lower.includes('contacto') || lower.includes('whatsapp') || lower.includes('celular')) {
       return 'El teléfono / WhatsApp es un dato obligatorio en tu cuenta para coordinar inspecciones mecánicas y entregas seguras. Puedes verificarlo y editarlo en tu perfil.';
