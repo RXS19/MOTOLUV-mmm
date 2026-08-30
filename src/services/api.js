@@ -337,23 +337,44 @@ export const motoApi = {
 
   remove: async (id) => {
     if (isSupabaseConfigured && supabase) {
-      try {
-        const { error } = await supabase.from('motos').delete().eq('id', String(id));
-        if (error) throw error;
-        return { ok: true };
-      } catch (err) {
-        console.warn('Error deleting moto from Supabase:', err);
+      const { error } = await supabase.from('motos').delete().eq('id', String(id));
+      if (error) {
+        console.warn('Error deleting moto from Supabase:', error);
+        const fullErrStr = `${error.message || ''} ${error.details || ''} ${error.hint || ''} ${error.code || ''}`.toLowerCase();
+        if (
+          fullErrStr.includes('apartad') ||
+          fullErrStr.includes('vigente') ||
+          fullErrStr.includes('foreign key') ||
+          fullErrStr.includes('23503') ||
+          fullErrStr.includes('violates foreign key') ||
+          error.code === '23503' ||
+          error.code === 'P0001'
+        ) {
+          throw new Error('No se puede eliminar esta publicación. Esta motocicleta tiene un apartado vigente y no puede eliminarse mientras esté activo.');
+        }
+        throw new Error(error.message || 'No se puede eliminar esta publicación.');
       }
+      return { ok: true };
     }
 
     try {
       const res = await api.delete(`/motos/${id}`);
       return res.data;
     } catch (err) {
-      if (err?.response?.status === 400 || err?.response?.data?.detail) {
-        throw new Error(err.response.data.detail || 'No se puede eliminar la publicación');
+      const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message || '';
+      const detailLower = detail.toLowerCase();
+      if (
+        detailLower.includes('apartad') ||
+        detailLower.includes('vigente') ||
+        detailLower.includes('foreign key') ||
+        detailLower.includes('23503')
+      ) {
+        throw new Error('No se puede eliminar esta publicación. Esta motocicleta tiene un apartado vigente y no puede eliminarse mientras esté activo.');
       }
-      return { ok: true };
+      if (err?.response?.status === 400 || err?.response?.data?.detail) {
+        throw new Error(err.response?.data?.detail || 'No se puede eliminar la publicación');
+      }
+      throw err;
     }
   },
 

@@ -42,7 +42,7 @@ const MyMotosPage = () => {
     if (status === 'Apartada' || status === 'reserved' || status === 'Proceso de entrega') {
       toast({
         title: 'Acción no permitida',
-        description: 'No puedes eliminar una publicación apartada. Se encuentra en proceso activo de compraventa.',
+        description: 'No se puede eliminar esta publicación. Esta motocicleta tiene un apartado vigente y no puede eliminarse mientras esté activo.',
         variant: 'destructive',
       });
       return;

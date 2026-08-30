@@ -304,7 +304,7 @@ const SellerDashboard = () => {
     if (status === 'Apartada' || status === 'reserved' || status === 'Proceso de entrega') {
       toast({
         title: 'Acción no permitida',
-        description: 'No puedes eliminar una publicación autorizada y apartada. Se encuentra en proceso activo.',
+        description: 'No se puede eliminar esta publicación. Esta motocicleta tiene un apartado vigente y no puede eliminarse mientras esté activo.',
         variant: 'destructive',
       });
       return;
