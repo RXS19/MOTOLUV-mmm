@@ -100,8 +100,6 @@ export const AuthProvider = ({ children }) => {
     const bankName = profile?.bank_name || metadata.bank_name || '';
     const bankHolder = profile?.bank_holder || metadata.bank_holder || fullName;
     const bankUpdatedAt = profile?.bank_updated_at || metadata.bank_updated_at || null;
-    const bankAccountVerified = Boolean(profile?.bank_account_verified ?? metadata.bank_account_verified ?? false);
-    const stripeConnectedAccountId = profile?.stripe_connected_account_id || metadata.stripe_connected_account_id || null;
     const avatarUrl = profile?.avatar_url || metadata.avatar_url || metadata.picture || '';
     const identityVerificationStatus = profile?.identity_verification_status || 'unverified';
     const rating = profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating) : null;
@@ -125,8 +123,6 @@ export const AuthProvider = ({ children }) => {
       bank_name: bankName,
       bank_holder: bankHolder,
       bank_updated_at: bankUpdatedAt,
-      bank_account_verified: bankAccountVerified,
-      stripe_connected_account_id: stripeConnectedAccountId,
       created_at: profile?.created_at || authUser.created_at || new Date().toISOString(),
       updated_at: profile?.updated_at || new Date().toISOString(),
       raw: authUser,
@@ -487,20 +483,6 @@ export const AuthProvider = ({ children }) => {
     return updated;
   };
 
-  // Refrescar perfil del usuario desde Supabase
-  const refreshProfile = async () => {
-    if (!session?.user && !user?.id) return null;
-    try {
-      const authUser = session?.user || user.raw || { id: user.id, email: user.email };
-      const synced = await buildUserFromAuth(authUser);
-      setUser(synced);
-      return synced;
-    } catch (err) {
-      console.warn('Error al refrescar perfil de usuario:', err);
-      return user;
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -514,7 +496,6 @@ export const AuthProvider = ({ children }) => {
         updateProfile,
         updateRole,
         updateBank,
-        refreshProfile,
         setUser,
         activeView,
         setActiveView,

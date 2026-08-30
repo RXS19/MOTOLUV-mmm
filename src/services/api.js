@@ -75,8 +75,6 @@ export const authApi = {
   me: () => api.get('/auth/me').then((r) => r.data),
   updateRole: (role) => api.patch('/auth/role', { role }).then((r) => r.data),
   updateBank: (data) => api.patch('/auth/bank', data).then((r) => r.data),
-  startBankVerification: () => api.post('/auth/bank/verify-onboarding').then((r) => r.data),
-  checkBankVerificationStatus: () => api.post('/auth/bank/verify-status').then((r) => r.data),
 };
 
 export const motoApi = {

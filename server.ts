@@ -146,8 +146,6 @@ export interface AuthenticatedUser {
   bank_clabe?: string;
   bank_name?: string;
   bank_holder?: string;
-  bank_account_verified?: boolean;
-  stripe_connected_account_id?: string;
   rating?: number;
   operations?: number;
 }
@@ -367,31 +365,14 @@ async function authenticateToken(req: Request, res: Response, next: NextFunction
     try {
       const { data: { user: supaUser }, error } = await supabaseServer.auth.getUser(token);
       if (!error && supaUser) {
-        let profileData: any = null;
-        try {
-          const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('*')
-            .eq('id', supaUser.id)
-            .maybeSingle();
-          profileData = profile;
-        } catch (pErr) {
-          // ignore
-        }
-
         const metadata = supaUser.user_metadata || {};
         (req as any).user = {
           id: supaUser.id,
           email: supaUser.email || '',
-          name: profileData?.full_name || metadata.full_name || metadata.name || supaUser.email?.split('@')[0] || 'Usuario',
-          phone: profileData?.phone || metadata.phone || '',
-          city: profileData?.city || metadata.city || 'Ciudad de México',
-          role: profileData?.role || metadata.role || 'both',
-          bank_clabe: profileData?.bank_clabe || metadata.bank_clabe || '',
-          bank_name: profileData?.bank_name || metadata.bank_name || '',
-          bank_holder: profileData?.bank_holder || metadata.bank_holder || '',
-          bank_account_verified: Boolean(profileData?.bank_account_verified ?? metadata.bank_account_verified ?? false),
-          stripe_connected_account_id: profileData?.stripe_connected_account_id || metadata.stripe_connected_account_id || null,
+          name: metadata.full_name || metadata.name || supaUser.email?.split('@')[0] || 'Usuario',
+          phone: metadata.phone || '',
+          city: metadata.city || 'Ciudad de México',
+          role: metadata.role || 'both',
         };
         return next();
       }
@@ -513,209 +494,6 @@ api.get('/auth/me', authenticateToken, (req, res) => {
   api.patch('/auth/bank', authenticateToken, handleBankUpdate);
   api.put('/auth/bank-account', authenticateToken, handleBankUpdate);
   api.patch('/auth/bank-account', authenticateToken, handleBankUpdate);
-
-  // Bank Account Onboarding & Verification Routes
-  api.post('/auth/bank/verify-onboarding', authenticateToken, async (req: Request, res: Response) => {
-    try {
-      const user = (req as any).user;
-      if (!user?.id) {
-        return res.status(401).json({ detail: 'No autenticado' });
-      }
-
-      let connectedAccountId = user.stripe_connected_account_id;
-
-      // Check existing connected account in Supabase profiles
-      if (supabaseServer) {
-        try {
-          const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('stripe_connected_account_id, bank_account_verified, bank_clabe')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profile?.stripe_connected_account_id) {
-            connectedAccountId = profile.stripe_connected_account_id;
-          }
-        } catch (dbErr: any) {
-          console.warn('Error fetching profile in bank onboarding:', dbErr?.message || dbErr);
-        }
-      }
-
-      const stripe = getStripe();
-      const rawOrigin = req.headers.origin || req.headers.referer || 'http://localhost:3000';
-      const origin = typeof rawOrigin === 'string' ? rawOrigin.replace(/\/$/, '') : 'http://localhost:3000';
-
-      if (stripe) {
-        let accountValid = false;
-        if (connectedAccountId && !connectedAccountId.startsWith('acct_sim_')) {
-          try {
-            const existing: any = await stripe.accounts.retrieve(connectedAccountId);
-            if (existing && existing.id && !existing.deleted) {
-              accountValid = true;
-            }
-          } catch (retrieveErr: any) {
-            console.warn('Existing connected account retrieval check failed, creating fresh account:', retrieveErr?.message);
-            connectedAccountId = null;
-          }
-        }
-
-        if (!connectedAccountId || !accountValid) {
-          const account = await stripe.accounts.create({
-            type: 'express',
-            country: 'MX',
-            email: user.email || undefined,
-            capabilities: {
-              transfers: { requested: true },
-              card_payments: { requested: true },
-            },
-            business_type: 'individual',
-            metadata: {
-              user_id: user.id,
-              app: 'motoluv',
-            },
-          });
-          connectedAccountId = account.id;
-
-          // Save stripe_connected_account_id to Supabase profiles
-          if (supabaseServer) {
-            try {
-              await supabaseServer.from('profiles').update({
-                stripe_connected_account_id: connectedAccountId,
-                updated_at: new Date().toISOString(),
-              }).eq('id', user.id);
-            } catch (saveErr: any) {
-              console.warn('Error persisting stripe_connected_account_id:', saveErr?.message);
-            }
-          }
-        }
-
-        user.stripe_connected_account_id = connectedAccountId;
-
-        const accountLink = await stripe.accountLinks.create({
-          account: connectedAccountId,
-          refresh_url: `${origin}/panel/cuenta-bancaria?verify_refresh=true`,
-          return_url: `${origin}/panel/cuenta-bancaria?verify_return=true`,
-          type: 'account_onboarding',
-        });
-
-        return res.json({
-          url: accountLink.url,
-          account_id: connectedAccountId,
-          is_live: true,
-        });
-      }
-
-      // Simulated fallback mode when direct key is not configured in local development
-      const mockAccountId = connectedAccountId || `acct_sim_${user.id.replace(/-/g, '').slice(0, 12)}`;
-      if (supabaseServer && !connectedAccountId) {
-        try {
-          await supabaseServer.from('profiles').update({
-            stripe_connected_account_id: mockAccountId,
-            updated_at: new Date().toISOString(),
-          }).eq('id', user.id);
-        } catch (saveMockErr: any) {
-          console.warn('Error persisting simulated connected account ID:', saveMockErr?.message);
-        }
-      }
-      user.stripe_connected_account_id = mockAccountId;
-
-      return res.json({
-        url: `${origin}/panel/cuenta-bancaria?verify_return=true&simulated=true`,
-        account_id: mockAccountId,
-        is_live: false,
-        message: 'Modo de validación activo',
-      });
-    } catch (err: any) {
-      console.error('Error initiating bank account onboarding:', err);
-      return res.status(500).json({ detail: err.message || 'Error al iniciar la verificación de la cuenta bancaria.' });
-    }
-  });
-
-  api.post('/auth/bank/verify-status', authenticateToken, async (req: Request, res: Response) => {
-    try {
-      const user = (req as any).user;
-      if (!user?.id) {
-        return res.status(401).json({ detail: 'No autenticado' });
-      }
-
-      let connectedAccountId = user.stripe_connected_account_id;
-
-      if (supabaseServer) {
-        try {
-          const { data: profile } = await supabaseServer
-            .from('profiles')
-            .select('stripe_connected_account_id, bank_account_verified')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profile?.stripe_connected_account_id) {
-            connectedAccountId = profile.stripe_connected_account_id;
-          }
-        } catch (dbErr: any) {
-          console.warn('Error fetching profile for verification status check:', dbErr?.message);
-        }
-      }
-
-      if (!connectedAccountId) {
-        return res.json({
-          bank_account_verified: false,
-          status: 'unlinked',
-          detail: 'No existe cuenta vinculada para verificación.',
-        });
-      }
-
-      const stripe = getStripe();
-      let isVerified = false;
-      let detailsSubmitted = false;
-      let payoutsEnabled = false;
-
-      if (stripe && !connectedAccountId.startsWith('acct_sim_')) {
-        try {
-          const account = await stripe.accounts.retrieve(connectedAccountId);
-          detailsSubmitted = Boolean(account.details_submitted);
-          payoutsEnabled = Boolean(account.payouts_enabled);
-          isVerified = Boolean(
-            account.payouts_enabled || 
-            account.charges_enabled || 
-            (account.details_submitted && account.capabilities?.transfers === 'active')
-          );
-        } catch (stripeErr: any) {
-          console.error('Error querying account status:', stripeErr?.message || stripeErr);
-        }
-      } else {
-        // Fallback simulation
-        isVerified = true;
-        detailsSubmitted = true;
-        payoutsEnabled = true;
-      }
-
-      // Actualizar estado real en Supabase directamente desde backend
-      if (supabaseServer) {
-        try {
-          await supabaseServer.from('profiles').update({
-            bank_account_verified: isVerified,
-            stripe_connected_account_id: connectedAccountId,
-            updated_at: new Date().toISOString(),
-          }).eq('id', user.id);
-        } catch (supaUpdateErr: any) {
-          console.warn('Error updating bank_account_verified in Supabase:', supaUpdateErr?.message);
-        }
-      }
-
-      user.bank_account_verified = isVerified;
-      user.stripe_connected_account_id = connectedAccountId;
-
-      return res.json({
-        bank_account_verified: isVerified,
-        stripe_connected_account_id: connectedAccountId,
-        details_submitted: detailsSubmitted,
-        payouts_enabled: payoutsEnabled,
-      });
-    } catch (err: any) {
-      console.error('Error verifying bank account status:', err);
-      return res.status(500).json({ detail: err.message || 'Error al consultar estado de verificación.' });
-    }
-  });
 
   // Moto Routes
   api.get('/motos', (req, res) => {

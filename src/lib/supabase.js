@@ -192,14 +192,6 @@ export async function fetchUserProfile(userId, userMetadata = null) {
     || meta.bank_updated_at 
     || null;
 
-  const bankAccountVerified = Boolean(
-    profile?.bank_account_verified ?? meta.bank_account_verified ?? false
-  );
-
-  const stripeConnectedAccountId = profile?.stripe_connected_account_id 
-    || meta.stripe_connected_account_id 
-    || null;
-
   const identityVerificationStatus = profile?.identity_verification_status || 'unverified';
   const rating = profile?.rating !== undefined && profile?.rating !== null ? Number(profile.rating) : null;
   const operations = profile?.operations !== undefined && profile?.operations !== null ? Number(profile.operations) : 0;
@@ -220,8 +212,6 @@ export async function fetchUserProfile(userId, userMetadata = null) {
     bank_name: bankName,
     bank_holder: bankHolder,
     bank_updated_at: bankUpdatedAt,
-    bank_account_verified: bankAccountVerified,
-    stripe_connected_account_id: stripeConnectedAccountId,
     identity_verification_status: identityVerificationStatus,
     rating,
     operations,
@@ -298,12 +288,6 @@ export async function updateUserProfile(userId, updates) {
   }
   if (updates.bank_updated_at !== undefined) {
     cleanData.bank_updated_at = updates.bank_updated_at;
-  }
-  if (updates.bank_account_verified !== undefined) {
-    cleanData.bank_account_verified = Boolean(updates.bank_account_verified);
-  }
-  if (updates.stripe_connected_account_id !== undefined) {
-    cleanData.stripe_connected_account_id = updates.stripe_connected_account_id ? String(updates.stripe_connected_account_id).trim() : null;
   }
 
   // Manejo estricto de bank_clabe como NUMERIC

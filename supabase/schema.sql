@@ -33,8 +33,6 @@ CREATE TABLE IF NOT EXISTS public.users (
   bank_name TEXT,
   bank_holder TEXT,
   bank_updated_at TIMESTAMPTZ,
-  bank_account_verified BOOLEAN DEFAULT false,
-  stripe_connected_account_id TEXT,
   status TEXT DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -53,8 +51,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   bank_name TEXT,
   bank_holder TEXT,
   bank_updated_at TIMESTAMPTZ,
-  bank_account_verified BOOLEAN DEFAULT false,
-  stripe_connected_account_id TEXT,
   rating NUMERIC(3,2) DEFAULT 5.0,
   operations INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
