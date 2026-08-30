@@ -107,6 +107,7 @@ export const AuthProvider = ({ children }) => {
 
     return {
       id: authUser.id,
+      nid: profile?.nid ?? metadata.nid ?? authUser?.nid ?? null,
       email: authUser.email,
       name: fullName,
       full_name: fullName,

@@ -45,6 +45,7 @@ const ProfilePage = () => {
   // Perfil unificado en memoria
   const [profileData, setProfileData] = useState(() => ({
     id: authContextUser?.id || '',
+    nid: authContextUser?.nid || '',
     email: authContextUser?.email || '',
     full_name: authContextUser?.full_name || authContextUser?.name || '',
     name: authContextUser?.full_name || authContextUser?.name || '',
@@ -201,6 +202,7 @@ const ProfilePage = () => {
 
     const builtProfile = {
       id: userId,
+      nid: profile?.nid ?? userMetadata?.nid ?? authContextUser?.nid ?? null,
       email: userEmail,
       full_name: resolvedFullName,
       name: resolvedFullName,
@@ -479,7 +481,7 @@ const ProfilePage = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-zinc-500 font-mono">
-              ID: {profileData.id ? String(profileData.id).slice(0, 8) : 'MLV-USER'}
+              NID: {profileData.nid || authContextUser?.nid || (profileData.id ? String(profileData.id).slice(0, 8) : 'MLV-USER')}
             </span>
           </div>
         </div>
