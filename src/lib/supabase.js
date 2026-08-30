@@ -200,6 +200,7 @@ export async function fetchUserProfile(userId, userMetadata = null) {
 
   const merged = {
     id: userId,
+    nid: profile?.nid ?? meta?.nid ?? null,
     full_name: fullName,
     name: fullName, // Compatibilidad total con vistas que usen user.name
     phone,

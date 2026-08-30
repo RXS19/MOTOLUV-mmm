@@ -513,10 +513,10 @@ const ProfilePage = () => {
                   <span>Rol de cuenta:</span>
                   <span className="text-zinc-300 font-medium">
                     {profileData.role === 'vendedor' 
-                      ? '🏍️ Vendedor Oficial' 
+                      ? 'Vendedor Oficial' 
                       : profileData.role === 'comprador' 
-                      ? '🛒 Comprador' 
-                      : '⭐ Vendedor y Comprador'}
+                      ? 'Comprador' 
+                      : 'Vendedor y Comprador'}
                   </span>
                 </div>
               </div>
