@@ -25,6 +25,7 @@ import {
   MapPin,
   ChevronRight,
   Wrench,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -109,10 +110,12 @@ const SellerDashboard = () => {
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     setSearchParams({ tab: tabId });
+    // Reconsult data when switching tabs to guarantee fresh state
+    loadData(true);
   };
 
-  const loadData = () => {
-    setLoading(true);
+  const loadData = (silent = false) => {
+    if (!silent) setLoading(true);
     const p1 = motoApi.mine().then((data) => {
       if (Array.isArray(data)) setMotos(data);
       else setMotos([]);
@@ -129,13 +132,46 @@ const SellerDashboard = () => {
     }).catch(() => setApartados([]));
 
     Promise.all([p1, p2, p3]).finally(() => {
-      setLoading(false);
+      if (!silent) setLoading(false);
     });
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+
+    // Reconsult on window focus / tab visibility change to avoid stale state
+    const handleFocus = () => {
+      loadData(true);
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // Supabase Realtime for instant operations updates
+    let channel = null;
+    if (isSupabaseConfigured && supabase && user?.id) {
+      channel = supabase
+        .channel(`public:seller:operations:${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'apartados', filter: `seller_id=eq.${user.id}` },
+          () => loadData(true)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'offers', filter: `seller_id=eq.${user.id}` },
+          () => loadData(true)
+        )
+        .subscribe();
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user?.id]);
 
   const firstName = user?.name ? user.name.split(' ')[0] : (user?.email ? user.email.split('@')[0] : 'Vendedor');
   const currentCalc = calculateCommission(calcPrice || 0);
@@ -984,6 +1020,8 @@ const SellerDashboard = () => {
             items={apartados}
             mode="vendedor"
             onScheduleAppointment={handleOpenScheduleModal}
+            onRefresh={() => loadData(false)}
+            isRefreshing={loading}
           />
         )}
 

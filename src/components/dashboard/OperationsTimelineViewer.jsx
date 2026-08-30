@@ -2,42 +2,44 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check,
+  BookmarkCheck,
   FileText,
   CreditCard,
+  ShieldCheck,
   Repeat,
   Bike,
   ChevronRight,
   Info,
   ChevronLeft,
-  ShieldCheck,
   Eye,
   MessageCircle,
   X,
   CalendarClock,
-  Clock
+  Clock,
+  RotateCw
 } from 'lucide-react';
 import { resolveSafeImageUrl } from '../../utils/imageFallback';
 import { handleMotoLinkClick } from '../../utils/motoNavigation';
 
 /**
- * 5-Stage Definitions for Motoluv Operations Timeline
- * 1. Apartado
- * 2. Contrato
- * 3. Pago
- * 4. Transferencia
- * 5. Entrega
+ * 6-Stage Definitions for Motoluv Operations Timeline:
+ * Apartado → Contrato → Pago → Autorización → Transferencia → Entrega
  */
-const TIMELINE_STAGES = [
-  { id: 'apartado', label: 'Apartado', icon: Check },
+export const TIMELINE_STAGES = [
+  { id: 'apartado', label: 'Apartado', icon: BookmarkCheck },
   { id: 'contrato', label: 'Contrato', icon: FileText },
   { id: 'pago', label: 'Pago', icon: CreditCard },
+  { id: 'autorizacion', label: 'Autorización', icon: ShieldCheck },
   { id: 'transferencia', label: 'Transferencia', icon: Repeat },
   { id: 'entrega', label: 'Entrega', icon: Bike },
 ];
 
 /**
  * Resolves the operational progress and status for an apartado item from real Supabase data.
- * Adheres strictly to the requirement: NO dates or hours shown anywhere.
+ * Adheres strictly to the requirement:
+ * - 6 stages: Apartado → Contrato → Pago → Autorización → Transferencia → Entrega
+ * - NO dates or hours shown anywhere.
+ * - DO NOT use paid_at of the initial $600 apartado for Contrato/Pago/Transferencia.
  */
 export const resolveOperationTimeline = (item) => {
   if (!item) return null;
@@ -47,98 +49,134 @@ export const resolveOperationTimeline = (item) => {
   const rawItemStatus = String(item.status || '').toUpperCase();
   const rawContractStatus = String(item.contract_status || '').toUpperCase();
   const rawPaymentStatus = String(item.payment_status || '').toUpperCase();
+  const rawAuthStatus = String(item.authorization_status || item.auth_status || '').toUpperCase();
   const rawTransferStatus = String(item.transfer_status || '').toUpperCase();
   const rawDeliveryStatus = String(item.delivery_status || '').toUpperCase();
 
   // 1. Stage: Apartado
-  // It exists in database -> completed
+  // The apartado record exists in database -> completed
   const isApartadoCompleted = true;
+
+  // 6. Stage: Entrega
+  const isDeliveryCompleted =
+    rawDeliveryStatus === 'COMPLETADO' ||
+    rawDeliveryStatus === 'ENTREGADO' ||
+    rawDeliveryStatus === 'DELIVERED' ||
+    rawItemStatus === 'ENTREGADO' ||
+    Boolean(item.delivered_at) ||
+    (rawItemStatus === 'COMPLETADO' && (rawTransferStatus === 'COMPLETADO' || Boolean(item.transferred_at)));
+
+  // 5. Stage: Transferencia
+  const isTransferCompleted =
+    isDeliveryCompleted ||
+    rawTransferStatus === 'COMPLETADO' ||
+    rawTransferStatus === 'TRANSFERIDO' ||
+    Boolean(item.transferred_at) ||
+    Boolean(item.transfer_completed_at);
+
+  // 4. Stage: Autorización
+  const isAuthCompleted =
+    isTransferCompleted ||
+    isDeliveryCompleted ||
+    rawAuthStatus === 'COMPLETADO' ||
+    rawAuthStatus === 'AUTORIZADO' ||
+    rawAuthStatus === 'APPROVED' ||
+    Boolean(item.authorized_at) ||
+    Boolean(item.authorization_completed_at);
+
+  // 3. Stage: Pago (Vehicle full payment in escrow / custody - DO NOT use item.paid_at of $600 apartado!)
+  const isPagoCompleted =
+    isAuthCompleted ||
+    isTransferCompleted ||
+    isDeliveryCompleted ||
+    rawPaymentStatus === 'COMPLETADO' ||
+    rawPaymentStatus === 'PAGADO' ||
+    rawPaymentStatus === 'EN_CUSTODIA' ||
+    Boolean(item.vehicle_paid_at) ||
+    Boolean(item.full_payment_at) ||
+    Boolean(item.paid_full_at) ||
+    Boolean(item.custody_paid_at);
 
   // 2. Stage: Contrato
   const isContractCompleted =
+    isPagoCompleted ||
+    isAuthCompleted ||
+    isTransferCompleted ||
+    isDeliveryCompleted ||
     rawContractStatus === 'COMPLETADO' ||
     rawContractStatus === 'FIRMADO' ||
+    rawContractStatus === 'SIGNED' ||
     Boolean(item.contract_signed_at) ||
-    Boolean(item.paid_at) ||
-    rawPaymentStatus === 'COMPLETADO' ||
-    rawPaymentStatus === 'EN_PROCESO';
+    Boolean(item.contract_completed_at);
 
+  // In-progress flags for each stage
   const isContractInProgress =
     !isContractCompleted &&
     (rawContractStatus === 'EN_PROCESO' ||
+      rawContractStatus === 'GENERADO' ||
+      rawContractStatus === 'PENDIENTE_FIRMA' ||
       rawCertStatus === 'CERTIFICADA' ||
-      rawCertStatus === 'APROBADA' ||
-      rawAppStatus === 'COMPLETADA' ||
-      rawAppStatus === 'PROGRAMADA' ||
-      Boolean(item.certification_appointment_at));
-
-  // 3. Stage: Pago
-  const isPagoCompleted =
-    rawPaymentStatus === 'COMPLETADO' ||
-    rawPaymentStatus === 'PAGADO' ||
-    Boolean(item.paid_at) ||
-    rawTransferStatus === 'COMPLETADO' ||
-    rawTransferStatus === 'EN_PROCESO' ||
-    rawDeliveryStatus === 'COMPLETADO';
+      rawCertStatus === 'APROBADA');
 
   const isPagoInProgress =
     !isPagoCompleted &&
     (rawPaymentStatus === 'EN_PROCESO' ||
+      rawPaymentStatus === 'PENDIENTE_PAGO' ||
       (isContractCompleted && !isPagoCompleted));
 
-  // 4. Stage: Transferencia
-  const isTransferCompleted =
-    rawTransferStatus === 'COMPLETADO' ||
-    Boolean(item.transferred_at) ||
-    rawDeliveryStatus === 'COMPLETADO';
+  const isAuthInProgress =
+    !isAuthCompleted &&
+    (rawAuthStatus === 'EN_PROCESO' ||
+      rawAuthStatus === 'EN_REVISION' ||
+      (isPagoCompleted && !isAuthCompleted));
 
   const isTransferInProgress =
     !isTransferCompleted &&
-    (rawTransferStatus === 'EN_PROCESO' || (isPagoCompleted && !isTransferCompleted));
-
-  // 5. Stage: Entrega
-  const isDeliveryCompleted =
-    rawDeliveryStatus === 'COMPLETADO' ||
-    rawDeliveryStatus === 'ENTREGADO' ||
-    rawItemStatus === 'COMPLETADO' ||
-    rawItemStatus === 'ENTREGADO' ||
-    Boolean(item.delivered_at);
+    (rawTransferStatus === 'EN_PROCESO' ||
+      (isAuthCompleted && !isTransferCompleted));
 
   const isDeliveryInProgress =
     !isDeliveryCompleted &&
-    (rawDeliveryStatus === 'EN_PROCESO' || (isTransferCompleted && !isDeliveryCompleted));
+    (rawDeliveryStatus === 'EN_PROCESO' ||
+      (isTransferCompleted && !isDeliveryCompleted));
 
-  // Build the 5 step status objects (strictly NO dates or hours)
+  // Build the 6 step status objects (strictly NO dates or hours)
   const steps = [
     {
       id: 'apartado',
       label: 'Apartado',
-      status: 'completed', // 'completed' | 'in_progress' | 'pending'
-      substatus: 'Completado',
+      status: 'completed',
+      substatus: rawItemStatus === 'CANCELADO' ? 'Cancelado' : rawItemStatus === 'EXPIRADO' ? 'Expirado' : 'Confirmado',
     },
     {
       id: 'contrato',
       label: 'Contrato',
       status: isContractCompleted ? 'completed' : isContractInProgress ? 'in_progress' : 'pending',
-      substatus: isContractCompleted ? 'Completado' : isContractInProgress ? 'En proceso' : 'Pendiente',
+      substatus: isContractCompleted ? 'Firmado' : isContractInProgress ? 'En proceso' : 'Pendiente',
     },
     {
       id: 'pago',
       label: 'Pago',
       status: isPagoCompleted ? 'completed' : isPagoInProgress ? 'in_progress' : 'pending',
-      substatus: isPagoCompleted ? 'Completado' : isPagoInProgress ? 'En proceso' : 'Pendiente',
+      substatus: isPagoCompleted ? 'En custodia' : isPagoInProgress ? 'En proceso' : 'Pendiente',
+    },
+    {
+      id: 'autorizacion',
+      label: 'Autorización',
+      status: isAuthCompleted ? 'completed' : isAuthInProgress ? 'in_progress' : 'pending',
+      substatus: isAuthCompleted ? 'Autorizado' : isAuthInProgress ? 'En revisión' : 'Pendiente',
     },
     {
       id: 'transferencia',
       label: 'Transferencia',
       status: isTransferCompleted ? 'completed' : isTransferInProgress ? 'in_progress' : 'pending',
-      substatus: isTransferCompleted ? 'Completado' : isTransferInProgress ? 'En proceso' : 'Pendiente',
+      substatus: isTransferCompleted ? 'Transferido' : isTransferInProgress ? 'En proceso' : 'Pendiente',
     },
     {
       id: 'entrega',
       label: 'Entrega',
       status: isDeliveryCompleted ? 'completed' : isDeliveryInProgress ? 'in_progress' : 'pending',
-      substatus: isDeliveryCompleted ? 'Completado' : isDeliveryInProgress ? 'En proceso' : 'Pendiente',
+      substatus: isDeliveryCompleted ? 'Entregada' : isDeliveryInProgress ? 'En proceso' : 'Pendiente',
     },
   ];
 
@@ -149,20 +187,24 @@ export const resolveOperationTimeline = (item) => {
 
   if (isDeliveryCompleted) {
     activeStageKey = 'entrega';
-    badgeLabel = 'Completada';
+    badgeLabel = 'Entregada';
     badgeColor = 'emerald';
   } else if (isDeliveryInProgress) {
     activeStageKey = 'entrega';
     badgeLabel = 'Entrega';
     badgeColor = 'blue';
-  } else if (isTransferInProgress) {
+  } else if (isTransferInProgress || (isAuthCompleted && !isTransferCompleted)) {
     activeStageKey = 'transferencia';
     badgeLabel = 'Transferencia';
     badgeColor = 'blue';
-  } else if (isPagoInProgress) {
+  } else if (isAuthInProgress || (isPagoCompleted && !isAuthCompleted)) {
+    activeStageKey = 'autorizacion';
+    badgeLabel = 'Autorización';
+    badgeColor = 'blue';
+  } else if (isPagoInProgress || (isContractCompleted && !isPagoCompleted)) {
     activeStageKey = 'pago';
-    badgeLabel = 'En proceso';
-    badgeColor = 'emerald';
+    badgeLabel = 'Pago';
+    badgeColor = 'blue';
   } else if (isContractInProgress) {
     activeStageKey = 'contrato';
     badgeLabel = 'Contrato';
@@ -230,6 +272,8 @@ const OperationsTimelineViewer = ({
   items = [],
   mode = 'vendedor', // 'vendedor' | 'comprador'
   onScheduleAppointment,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   const [activeFilter, setActiveFilter] = useState('todas');
   const [selectedOperation, setSelectedOperation] = useState(null);
@@ -244,13 +288,14 @@ const OperationsTimelineViewer = ({
     return items.map(resolveOperationTimeline).filter(Boolean);
   }, [items]);
 
-  // Dynamic counts for filter pills
+  // Dynamic counts for filter pills (6 stages + todas)
   const counts = useMemo(() => {
     const res = {
       todas: processedItems.length,
       apartado: 0,
       contrato: 0,
       pago: 0,
+      autorizacion: 0,
       transferencia: 0,
       entrega: 0,
     };
@@ -280,6 +325,7 @@ const OperationsTimelineViewer = ({
     { id: 'apartado', label: 'Apartado', count: counts.apartado },
     { id: 'contrato', label: 'Contrato', count: counts.contrato },
     { id: 'pago', label: 'Pago', count: counts.pago },
+    { id: 'autorizacion', label: 'Autorización', count: counts.autorizacion },
     { id: 'transferencia', label: 'Transferencia', count: counts.transferencia },
     { id: 'entrega', label: 'Entrega', count: counts.entrega },
   ];
@@ -287,15 +333,30 @@ const OperationsTimelineViewer = ({
   return (
     <div className="space-y-6">
       {/* Header Area */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-          {isSeller ? 'Ventas en proceso' : 'Mis compras'}
-        </h1>
-        <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-          {isSeller
-            ? 'Aquí puedes consultar el avance de todas las operaciones que ya tienen apartado.'
-            : 'Aquí puedes consultar el avance de todas tus compras que ya tienen apartado.'}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            {isSeller ? 'Ventas en proceso' : 'Mis compras'}
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+            {isSeller
+              ? 'Aquí puedes consultar el avance de todas las operaciones que ya tienen apartado.'
+              : 'Aquí puedes consultar el avance de todas tus compras que ya tienen apartado.'}
+          </p>
+        </div>
+
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="self-start sm:self-auto px-3.5 py-1.5 bg-[#141418] hover:bg-[#1c1c22] border border-white/10 text-zinc-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            title="Actualizar estado de operaciones"
+            type="button"
+          >
+            <RotateCw size={13} className={isRefreshing ? 'animate-spin text-red-brand' : ''} />
+            <span>{isRefreshing ? 'Actualizando...' : 'Actualizar'}</span>
+          </button>
+        )}
       </div>
 
       {/* Filter Pills Row */}
@@ -674,7 +735,7 @@ const OperationsTimelineViewer = ({
             {/* Summary Progress bar inside modal */}
             <div className="p-4 bg-[#18181f] border border-white/5 rounded-xl space-y-3">
               <span className="text-xs font-bold text-zinc-300 block">Etapas de la Operación</span>
-              <div className="grid grid-cols-5 gap-2 text-center text-[11px]">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center text-[11px]">
                 {selectedOperation.steps.map((st) => (
                   <div key={st.id} className="space-y-1">
                     <div

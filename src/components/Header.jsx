@@ -4,6 +4,7 @@ import { Bike, Store, Menu, X, LayoutDashboard, Tag, LogOut, Repeat, ShoppingCar
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { MotoluvLogo } from './MotoluvLogo';
+import NotificationBell from './NotificationBell';
 
 const Header = () => {
   const location = useLocation();
@@ -73,10 +74,10 @@ const Header = () => {
         </nav>
 
         {/* Right Actions */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-3">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="relative p-2 rounded-full border border-white/10 hover:border-red-brand/50 text-zinc-300 hover:text-white transition-colors"
+            className="relative p-2 rounded-full border border-white/10 hover:border-red-brand/50 text-zinc-300 hover:text-white transition-colors cursor-pointer"
             title="Ver carrito de compra"
           >
             <ShoppingCart size={18} />
@@ -86,6 +87,10 @@ const Header = () => {
               </span>
             )}
           </button>
+
+          {user && (
+            <NotificationBell />
+          )}
 
           {user ? (
             <div className="relative" ref={dropdownRef}>

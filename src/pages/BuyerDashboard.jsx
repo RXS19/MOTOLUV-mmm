@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { apartadoApi, offerApi } from '../services/api';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
@@ -51,10 +52,12 @@ const BuyerDashboard = () => {
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     setSearchParams({ tab: tabId });
+    // Reconsult data when switching tabs to guarantee fresh state
+    loadData(true);
   };
 
-  const loadData = () => {
-    setLoading(true);
+  const loadData = (silent = false) => {
+    if (!silent) setLoading(true);
     const p1 = apartadoApi.mine().then((data) => {
       if (Array.isArray(data)) setApartados(data);
       else setApartados([]);
@@ -66,13 +69,46 @@ const BuyerDashboard = () => {
     }).catch(() => setOffers([]));
 
     Promise.all([p1, p2]).finally(() => {
-      setLoading(false);
+      if (!silent) setLoading(false);
     });
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+
+    // Reconsult on window focus / tab visibility change to avoid stale state
+    const handleFocus = () => {
+      loadData(true);
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // Supabase Realtime for instant operations updates
+    let channel = null;
+    if (isSupabaseConfigured && supabase && user?.id) {
+      channel = supabase
+        .channel(`public:buyer:operations:${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'apartados', filter: `buyer_id=eq.${user.id}` },
+          () => loadData(true)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'offers', filter: `buyer_id=eq.${user.id}` },
+          () => loadData(true)
+        )
+        .subscribe();
+    }
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user?.id]);
 
   const firstName = user?.name
     ? user.name.split(' ')[0]
@@ -828,6 +864,8 @@ const BuyerDashboard = () => {
           <OperationsTimelineViewer
             items={apartados}
             mode="comprador"
+            onRefresh={() => loadData(false)}
+            isRefreshing={loading}
           />
         )}
 
