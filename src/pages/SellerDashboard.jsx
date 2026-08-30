@@ -40,6 +40,7 @@ import { calculateCommission } from '../utils/commission';
 import { getStatusStyle } from '../utils/status';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
 import { generateAndDownloadInspectionIcs } from '../utils/calendar';
+import ScheduleDropdownDatePicker from '../components/dashboard/ScheduleDropdownDatePicker';
 import { toast } from '../hooks/use-toast';
 import { handleMotoLinkClick } from '../utils/motoNavigation';
 
@@ -1602,7 +1603,7 @@ const getApartadoScheduleRange = (createdAt) => {
                 })()}
               </div>
 
-              {/* Día / Fecha Selector (NO seleccionar hora) */}
+              {/* Día / Fecha Selector (Calendario Desplegable) */}
               <div>
                 <label className="text-[11px] text-zinc-400 uppercase tracking-wider block mb-1.5 font-bold flex items-center gap-1.5">
                   <Calendar size={13} className="text-red-brand" />
@@ -1610,21 +1611,22 @@ const getApartadoScheduleRange = (createdAt) => {
                 </label>
                 {(() => {
                   const { minDate, maxDate } = getApartadoScheduleRange(selectedApartadoForSchedule?.created_at);
+                  const isAppointmentLocked =
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA' ||
+                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA';
+
                   return (
                     <>
-                      <input
-                        type="date"
-                        required
-                        min={minDate}
-                        max={maxDate}
+                      <ScheduleDropdownDatePicker
                         value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        disabled={
-                          scheduleLoading ||
-                          (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA' ||
-                          (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA'
-                        }
-                        className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        onChange={(newDate) => {
+                          setSelectedDate(newDate);
+                          setScheduleError('');
+                        }}
+                        minDate={minDate}
+                        maxDate={maxDate}
+                        disabled={scheduleLoading || isAppointmentLocked}
+                        createdAt={selectedApartadoForSchedule?.created_at}
                       />
                       <p className="text-[11px] text-zinc-400 mt-1.5">
                         Nota: La inspección debe agendarse dentro de los 3 días posteriores al apartado. El horario de atención en taller es continuo de 9:00 AM a 6:00 PM.
