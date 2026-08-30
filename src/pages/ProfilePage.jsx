@@ -481,7 +481,7 @@ const ProfilePage = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-zinc-500 font-mono">
-              NID: {profileData.nid || authContextUser?.nid || (profileData.id ? String(profileData.id).slice(0, 8) : 'MLV-USER')}
+              NID: {profileData.nid}
             </span>
           </div>
         </div>
