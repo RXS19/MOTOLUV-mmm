@@ -394,21 +394,13 @@ export const motoApi = {
       try {
         const { data, error } = await supabase.rpc('increment_moto_views', {
           p_moto_id: motoId,
-          p_step: 2,
         });
 
         if (!error && typeof data === 'number') {
           return data;
         }
-
-        // Parámetros alternativos en caso de firma simplificada
-        const { data: altData, error: altErr } = await supabase.rpc('increment_moto_views', {
-          moto_id: motoId,
-          step: 2,
-        });
-
-        if (!altErr && typeof altData === 'number') {
-          return altData;
+        if (error) {
+          console.warn('Error en llamada Supabase RPC increment_moto_views:', error);
         }
       } catch (err) {
         console.warn('Error en llamada Supabase RPC increment_moto_views:', err);
