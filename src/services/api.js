@@ -708,10 +708,9 @@ export const apartadoApi = {
         const updatePayload = {
           certification_appointment_at: appointmentIso,
           certification_appointment_status: 'PROGRAMADA',
+          certification_workshop: workshop_name || null,
+          certification_workshop_id: workshop_id || null,
         };
-        if (workshop_name) {
-          updatePayload.certification_workshop = workshop_name;
-        }
 
         const { data, error } = await supabase
           .from('apartados')
@@ -721,23 +720,8 @@ export const apartadoApi = {
           .single();
 
         if (error) {
-          // Fallback if custom column certification_workshop does not exist in schema
-          const fallbackPayload = {
-            certification_appointment_at: appointmentIso,
-            certification_appointment_status: 'PROGRAMADA',
-          };
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('apartados')
-            .update(fallbackPayload)
-            .eq('id', apartado_id)
-            .select('*, moto:motos(*)')
-            .single();
-
-          if (fallbackError) {
-            console.error('Error updating appointment in Supabase:', fallbackError);
-            throw fallbackError;
-          }
-          return fallbackData;
+          console.error('Error updating appointment in Supabase:', error);
+          throw error;
         }
 
         // Auto mark related notification as attended/read
