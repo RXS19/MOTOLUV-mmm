@@ -5,6 +5,7 @@ import { getStatusStyle } from '../utils/status';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
+import { handleMotoLinkClick } from '../utils/motoNavigation';
 
 const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
   return (
     <Link
       to={`/motos/${moto.id}`}
+      onClick={(e) => handleMotoLinkClick(e, moto.id)}
       className="moto-card group block bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#242428] hover:to-[#141416] border border-black rounded-md overflow-hidden transition-all duration-300 shadow-md hover:shadow-xl relative"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">

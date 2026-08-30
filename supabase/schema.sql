@@ -236,6 +236,27 @@ CREATE TABLE IF NOT EXISTS public.motos (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 4.1 FUNCIÓN RPC: Incremento atómico de vistas (+2 por click)
+CREATE OR REPLACE FUNCTION public.increment_moto_views(p_moto_id text, p_step int DEFAULT 2)
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_new_views int;
+BEGIN
+  UPDATE public.motos
+  SET views = COALESCE(views, 0) + COALESCE(p_step, 2)
+  WHERE id = p_moto_id
+  RETURNING views INTO v_new_views;
+
+  RETURN COALESCE(v_new_views, 0);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.increment_moto_views(text, int) TO anon, authenticated, service_role;
+
 -- 5. TABLA DE OFERTAS Y APARTADOS
 CREATE TABLE IF NOT EXISTS public.offers (
   id TEXT PRIMARY KEY,

@@ -384,6 +384,49 @@ export const motoApi = {
       return [];
     }
   },
+
+  incrementViews: async (id) => {
+    if (!id) return null;
+    const motoId = String(id);
+
+    // 1. Supabase RPC incremento atómico (views = COALESCE(views, 0) + 2)
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.rpc('increment_moto_views', {
+          p_moto_id: motoId,
+          p_step: 2,
+        });
+
+        if (!error && typeof data === 'number') {
+          return data;
+        }
+
+        // Parámetros alternativos en caso de firma simplificada
+        const { data: altData, error: altErr } = await supabase.rpc('increment_moto_views', {
+          moto_id: motoId,
+          step: 2,
+        });
+
+        if (!altErr && typeof altData === 'number') {
+          return altData;
+        }
+      } catch (err) {
+        console.warn('Error en llamada Supabase RPC increment_moto_views:', err);
+      }
+    }
+
+    // 2. Endpoint backend /api/motos/:id/views
+    try {
+      const res = await api.post(`/motos/${motoId}/views`);
+      if (res?.data && typeof res.data.views === 'number') {
+        return res.data.views;
+      }
+    } catch (backendErr) {
+      console.warn('Backend views increment failed:', backendErr?.message);
+    }
+
+    return null;
+  },
 };
 
 export const apartadoApi = {

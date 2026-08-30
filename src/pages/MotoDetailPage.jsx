@@ -8,6 +8,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import { toast } from '../hooks/use-toast';
 import { getStatusStyle } from '../utils/status';
 import { handleImageError, resolveSafeImageUrl, FALLBACK_MOTO_IMAGE } from '../utils/imageFallback';
+import { getCachedMotoViews, setCachedMotoViews } from '../utils/motoNavigation';
 
 const PKG_PRICES = { basico: 0, plus: 1800, total: 3500 };
 
@@ -61,6 +62,14 @@ const MotoDetailPage = () => {
   useEffect(() => {
     setLoading(true);
     motoApi.get(id).then((m) => {
+      if (m) {
+        const cachedViews = getCachedMotoViews(id);
+        if (cachedViews !== null && cachedViews > (m.views || 0)) {
+          m.views = cachedViews;
+        } else if (typeof m.views === 'number') {
+          setCachedMotoViews(id, m.views);
+        }
+      }
       setMoto(m);
       if (m && m.price !== null && m.price !== undefined) {
         setOfferAmount(String(m.price));

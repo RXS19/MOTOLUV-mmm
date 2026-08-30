@@ -533,7 +533,6 @@ api.get('/auth/me', authenticateToken, (req, res) => {
   api.get('/motos/:id', (req, res) => {
     const moto = db.motos.get(req.params.id) as any;
     if (!moto) return res.status(404).json({ detail: 'Motocicleta no encontrada' });
-    moto.views += 1;
     const isApartada = moto.apartado_status === 'APARTADA' || Boolean(moto.is_apartada);
     const sellerIdentityVerificationStatus = moto.seller_identity_verification_status || moto.identity_verification_status || 'unverified';
     return res.json({
@@ -542,6 +541,13 @@ api.get('/auth/me', authenticateToken, (req, res) => {
       seller_identity_verification_status: sellerIdentityVerificationStatus,
       identity_verification_status: sellerIdentityVerificationStatus,
     });
+  });
+
+  api.post('/motos/:id/views', (req, res) => {
+    const moto = db.motos.get(req.params.id) as any;
+    if (!moto) return res.status(404).json({ detail: 'Motocicleta no encontrada' });
+    moto.views = (Number(moto.views) || 0) + 2;
+    return res.json({ id: moto.id, views: moto.views });
   });
 
   api.post('/motos', authenticateToken, (req, res) => {

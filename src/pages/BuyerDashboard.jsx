@@ -23,6 +23,7 @@ import DashboardHeaderBar from '../components/dashboard/DashboardHeaderBar';
 import OperationsTimelineViewer from '../components/dashboard/OperationsTimelineViewer';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
 import { toast } from '../hooks/use-toast';
+import { handleMotoLinkClick } from '../utils/motoNavigation';
 import buyerBannerMoto from '../assets/images/buyer_banner_moto_1788022096918.jpg';
 
 const BuyerDashboard = () => {
@@ -349,7 +350,11 @@ const BuyerDashboard = () => {
                           key={moto.id}
                           className="group bg-[#141418] border border-white/5 hover:border-white/15 rounded-xl p-2.5 transition-all flex flex-col justify-between"
                         >
-                          <Link to={`/motos/${moto.id}`} className="block">
+                          <Link
+                            to={`/motos/${moto.id}`}
+                            onClick={(e) => moto.id && handleMotoLinkClick(e, moto.id)}
+                            className="block"
+                          >
                             <div className="aspect-[4/3] rounded-lg overflow-hidden bg-black/40 mb-2 relative">
                               <img
                                 src={resolveSafeImageUrl(moto.image || moto.images?.[0], 'moto')}
@@ -511,7 +516,11 @@ const BuyerDashboard = () => {
                         </button>
                       </div>
                       <div className="p-4">
-                        <Link to={`/motos/${m.id}`} className="block group-hover:text-red-brand transition-colors">
+                        <Link
+                          to={`/motos/${m.id}`}
+                          onClick={(e) => m.id && handleMotoLinkClick(e, m.id)}
+                          className="block group-hover:text-red-brand transition-colors"
+                        >
                           <h3 className="font-bold text-sm text-white truncate">
                             {m.brand} {m.model}
                           </h3>
@@ -526,6 +535,7 @@ const BuyerDashboard = () => {
                     <div className="p-4 pt-0">
                       <Link
                         to={`/motos/${m.id}`}
+                        onClick={(e) => m.id && handleMotoLinkClick(e, m.id)}
                         className="w-full block text-center py-2.5 bg-red-brand hover:bg-red-600 text-white font-bold text-xs rounded-xl transition-all shadow-md"
                       >
                         Ver detalles
@@ -617,6 +627,7 @@ const BuyerDashboard = () => {
                         {ap.moto_id && (
                           <Link
                             to={`/motos/${ap.moto_id}`}
+                            onClick={(e) => handleMotoLinkClick(e, ap.moto_id)}
                             className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition-colors"
                           >
                             Ver Publicación
@@ -695,6 +706,7 @@ const BuyerDashboard = () => {
                         {off.moto_id && (
                           <Link
                             to={`/motos/${off.moto_id}`}
+                            onClick={(e) => handleMotoLinkClick(e, off.moto_id)}
                             className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition-colors"
                           >
                             Ver Publicación

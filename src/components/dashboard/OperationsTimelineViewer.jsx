@@ -17,6 +17,7 @@ import {
   Clock
 } from 'lucide-react';
 import { resolveSafeImageUrl } from '../../utils/imageFallback';
+import { handleMotoLinkClick } from '../../utils/motoNavigation';
 
 /**
  * 5-Stage Definitions for Motoluv Operations Timeline
@@ -794,6 +795,7 @@ const OperationsTimelineViewer = ({
               {selectedOperation.moto_id && (
                 <Link
                   to={`/motos/${selectedOperation.moto_id}`}
+                  onClick={(e) => handleMotoLinkClick(e, selectedOperation.moto_id)}
                   className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center gap-1.5 transition-colors"
                 >
                   <Eye size={14} />

@@ -40,6 +40,7 @@ import { getStatusStyle } from '../utils/status';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
 import { generateAndDownloadInspectionIcs } from '../utils/calendar';
 import { toast } from '../hooks/use-toast';
+import { handleMotoLinkClick } from '../utils/motoNavigation';
 
 const SellerDashboard = () => {
   const { user } = useAuth();
@@ -665,6 +666,7 @@ const SellerDashboard = () => {
                           <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
                             <Link
                               to={pub.id ? `/motos/${pub.id}` : '/motos'}
+                              onClick={(e) => pub.id && handleMotoLinkClick(e, pub.id)}
                               className="px-3 py-1.5 bg-[#1b1b20] hover:bg-white/10 text-zinc-200 hover:text-white border border-white/10 text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
                             >
                               Ver publicación
@@ -845,6 +847,7 @@ const SellerDashboard = () => {
                         <div className="flex gap-2 pt-3 border-t border-white/5">
                           <Link
                             to={m.id ? `/motos/${m.id}` : '/motos'}
+                            onClick={(e) => m.id && handleMotoLinkClick(e, m.id)}
                             className="flex-1 text-center text-xs font-bold py-2 rounded-lg bg-[#16161c] text-white hover:bg-white/10 transition-colors border border-white/10"
                           >
                             Ver

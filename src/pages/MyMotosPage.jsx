@@ -7,6 +7,7 @@ import { OPERATION_STATUSES, getStatusStyle } from '../utils/status';
 import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
 import BoostPublicationModal from '../components/dashboard/BoostPublicationModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import { handleMotoLinkClick } from '../utils/motoNavigation';
 
 const MyMotosPage = () => {
   const [motos, setMotos] = useState([]);
@@ -211,6 +212,7 @@ const MyMotosPage = () => {
                   <div className="flex gap-2 pt-2 border-t border-white/5">
                     <Link
                       to={m.id ? `/motos/${m.id}` : '/motos'}
+                      onClick={(e) => m.id && handleMotoLinkClick(e, m.id)}
                       className="flex-1 text-center text-xs font-bold tracking-wider uppercase py-2 rounded-sm border border-white/10 text-white hover:border-red-brand hover:text-red-brand transition-colors"
                     >
                       Ver Ficha
