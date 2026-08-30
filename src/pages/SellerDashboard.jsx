@@ -188,6 +188,48 @@ const SellerDashboard = () => {
     return !st || st === 'CANCELADA' || st === 'NO_PRESENTADO';
   });
 
+// Helper to calculate the 4-day inspection window [Day 0: created_at .. Day 3: created_at + 3 days]
+const getApartadoScheduleRange = (createdAt) => {
+  let startYear, startMonth, startDay;
+
+  if (typeof createdAt === 'string') {
+    const match = createdAt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      startYear = parseInt(match[1], 10);
+      startMonth = parseInt(match[2], 10) - 1;
+      startDay = parseInt(match[3], 10);
+    }
+  }
+
+  let startDate;
+  if (startYear !== undefined && startMonth !== undefined && startDay !== undefined) {
+    startDate = new Date(startYear, startMonth, startDay);
+  } else if (createdAt) {
+    startDate = new Date(createdAt);
+  } else {
+    startDate = new Date();
+  }
+
+  if (isNaN(startDate.getTime())) {
+    startDate = new Date();
+  }
+
+  const y = startDate.getFullYear();
+  const m = String(startDate.getMonth() + 1).padStart(2, '0');
+  const d = String(startDate.getDate()).padStart(2, '0');
+  const minDate = `${y}-${m}-${d}`;
+
+  const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  endDate.setDate(endDate.getDate() + 3);
+
+  const endY = endDate.getFullYear();
+  const endM = String(endDate.getMonth() + 1).padStart(2, '0');
+  const endD = String(endDate.getDate()).padStart(2, '0');
+  const maxDate = `${endY}-${endM}-${endD}`;
+
+  return { minDate, maxDate };
+};
+
   const handleOpenScheduleModal = (apartado) => {
     setSelectedApartadoForSchedule(apartado);
 
@@ -207,20 +249,26 @@ const SellerDashboard = () => {
       setSelectedWorkshopId(cityMatch ? cityMatch.id : CERTIFIED_WORKSHOPS[0].id);
     }
 
+    const { minDate, maxDate } = getApartadoScheduleRange(apartado?.created_at);
+
     // If appointment date already exists, use it
     if (apartado?.certification_appointment_at) {
       try {
-        const dateStr = new Date(apartado.certification_appointment_at).toISOString().split('T')[0];
+        let dateStr = '';
+        if (typeof apartado.certification_appointment_at === 'string') {
+          const match = apartado.certification_appointment_at.match(/^(\d{4}-\d{2}-\d{2})/);
+          if (match) dateStr = match[1];
+        }
+        if (!dateStr) {
+          dateStr = new Date(apartado.certification_appointment_at).toISOString().split('T')[0];
+        }
         setSelectedDate(dateStr);
       } catch {
-        const nextDay = new Date();
-        nextDay.setDate(nextDay.getDate() + 1);
-        setSelectedDate(nextDay.toISOString().split('T')[0]);
+        setSelectedDate(minDate);
       }
     } else {
-      const nextDay = new Date();
-      nextDay.setDate(nextDay.getDate() + 1);
-      setSelectedDate(nextDay.toISOString().split('T')[0]);
+      // Automatically select the first valid date within [created_at, created_at + 3 days]
+      setSelectedDate(minDate);
     }
 
     setScheduleError('');
@@ -245,6 +293,13 @@ const SellerDashboard = () => {
     }
     if (!selectedDate) {
       setScheduleError('Por favor selecciona el día para la inspección técnica.');
+      return;
+    }
+
+    // Frontend validation: must be within [created_at, created_at + 3 days]
+    const { minDate, maxDate } = getApartadoScheduleRange(selectedApartadoForSchedule.created_at);
+    if (selectedDate < minDate || selectedDate > maxDate) {
+      setScheduleError('La inspección debe agendarse dentro de los 3 días posteriores al apartado.');
       return;
     }
 
@@ -1440,9 +1495,9 @@ const SellerDashboard = () => {
                 <span className="text-emerald-400 font-bold">CONFIRMADO EN CUSTODIA</span>
               </div>
               <div className="text-right">
-                <span className="text-zinc-500 block text-[11px]">Folio Apartado</span>
+                <span className="text-zinc-500 block text-[11px]">NOD</span>
                 <span className="text-zinc-300 font-mono font-bold">
-                  {String(selectedApartadoForSchedule.id).substring(0, 8).toUpperCase()}
+                  {selectedApartadoForSchedule.nod}
                 </span>
               </div>
             </div>
@@ -1552,22 +1607,30 @@ const SellerDashboard = () => {
                   <Calendar size={13} className="text-red-brand" />
                   <span>Día de Inspección (Seleccionar Fecha) *</span>
                 </label>
-                <input
-                  type="date"
-                  required
-                  min={new Date().toISOString().split('T')[0]}
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  disabled={
-                    scheduleLoading ||
-                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA' ||
-                    (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA'
-                  }
-                  className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                <p className="text-[11px] text-zinc-400 mt-1.5">
-                  Nota: Conforme a la política Motoluv, el peritaje se agenda por día. El horario de atención en taller es continuo de 9:00 AM a 6:00 PM.
-                </p>
+                {(() => {
+                  const { minDate, maxDate } = getApartadoScheduleRange(selectedApartadoForSchedule?.created_at);
+                  return (
+                    <>
+                      <input
+                        type="date"
+                        required
+                        min={minDate}
+                        max={maxDate}
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        disabled={
+                          scheduleLoading ||
+                          (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'PROGRAMADA' ||
+                          (selectedApartadoForSchedule?.certification_appointment_status || '').toUpperCase() === 'COMPLETADA'
+                        }
+                        className="w-full px-3.5 py-2.5 bg-[#0a0a0c] border border-white/15 focus:border-red-brand text-white text-xs rounded-xl outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      />
+                      <p className="text-[11px] text-zinc-400 mt-1.5">
+                        Nota: La inspección debe agendarse dentro de los 3 días posteriores al apartado. El horario de atención en taller es continuo de 9:00 AM a 6:00 PM.
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
 
               {scheduleError && (
