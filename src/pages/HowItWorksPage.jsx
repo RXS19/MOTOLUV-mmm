@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Shield, Users, FileText, CreditCard, ArrowRight, HelpCircle, Search, HandCoins, UserCheck, ClipboardCheck, PackageCheck, Bike, ShoppingCart } from 'lucide-react';
+import { Check, Shield, Users, FileText, CreditCard, ArrowRight, HelpCircle, Search, HandCoins, UserCheck, ClipboardCheck, PackageCheck, Bike, ShoppingCart, Lock } from 'lucide-react';
 import { packages, sellerPackages } from '../data/plans';
 import { useAuth } from '../context/AuthContext';
 
@@ -102,39 +102,64 @@ const HowItWorksPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {currentPackages.map((p) => (
-            <div
-              key={p.id}
-              className={`package-card relative bg-[#111112] rounded-md p-8 flex flex-col ${p.recommended ? 'border-2 border-red-brand shadow-[0_0_40px_rgba(239,68,68,0.15)]' : 'border border-white/5'}`}
-            >
-              {p.recommended && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-brand text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-sm">
-                  Recomendado
-                </div>
-              )}
-              <h3 className="font-display font-bold text-white text-2xl uppercase">{p.name}</h3>
-              <div className="mt-2 font-display font-bold text-red-brand text-3xl">{p.price}</div>
-              <p className="text-xs text-zinc-500 mt-1">{p.subtitle}</p>
-
-              <ul className="mt-6 space-y-3 flex-1">
-                {p.features.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                    <Check size={14} className="text-red-brand mt-0.5 flex-shrink-0" /> {f}
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                to={pkgTab === 'vendedor' ? '/panel/publicar' : '/motos'}
-                className={`mt-8 inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm ${
-                  p.recommended ? 'btn-red' : 'btn-outline'
-                }`}
+        <div className="relative">
+          {/* Blurred and censored package cards */}
+          <div
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 filter blur-md md:blur-lg pointer-events-none select-none opacity-40 transition-all"
+            aria-hidden="true"
+          >
+            {currentPackages.map((p) => (
+              <div
+                key={p.id}
+                className={`package-card relative bg-[#111112] rounded-md p-8 flex flex-col ${p.recommended ? 'border-2 border-red-brand shadow-[0_0_40px_rgba(239,68,68,0.15)]' : 'border border-white/5'}`}
               >
-                {pkgTab === 'vendedor' ? 'Publicar Ahora' : 'Empezar'}
-              </Link>
+                {p.recommended && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-red-brand text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-sm">
+                    Recomendado
+                  </div>
+                )}
+                <h3 className="font-display font-bold text-white text-2xl uppercase">{p.name}</h3>
+                <div className="mt-2 font-display font-bold text-red-brand text-3xl">{p.price}</div>
+                <p className="text-xs text-zinc-500 mt-1">{p.subtitle}</p>
+
+                <ul className="mt-6 space-y-3 flex-1">
+                  {p.features.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
+                      <Check size={14} className="text-red-brand mt-0.5 flex-shrink-0" /> {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <div
+                  className={`mt-8 inline-flex items-center justify-center gap-2 text-xs font-bold tracking-widest uppercase px-5 py-3 rounded-sm ${
+                    p.recommended ? 'btn-red' : 'btn-outline'
+                  }`}
+                >
+                  {pkgTab === 'vendedor' ? 'Publicar Ahora' : 'Empezar'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Censorship blur overlay banner */}
+          <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/40 rounded-2xl">
+            <div className="max-w-md w-full text-center p-6 md:p-8 bg-[#121216]/95 border border-white/15 rounded-2xl shadow-2xl space-y-4 backdrop-blur-md">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-red-brand/10 border border-red-brand/30 flex items-center justify-center text-red-brand shadow-lg shadow-red-brand/10">
+                <Lock size={24} />
+              </div>
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-brand/15 border border-red-brand/30 text-red-400 text-[10px] font-bold uppercase tracking-widest">
+                  Información Censurada / En Revisión
+                </div>
+                <h3 className="font-display font-bold text-white text-lg md:text-xl uppercase tracking-wide">
+                  Paquetes de {pkgTab === 'vendedor' ? 'Publicación' : 'Garantía'}
+                </h3>
+                <p className="text-zinc-400 text-xs leading-relaxed max-w-sm mx-auto">
+                  La información de costos, beneficios y coberturas de esta sección ha sido censurada temporalmente mientras se actualizan los nuevos esquemas oficiales.
+                </p>
+              </div>
             </div>
-          ))}
+          </div>
         </div>
       </section>
 
