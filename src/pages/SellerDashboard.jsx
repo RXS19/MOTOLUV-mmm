@@ -38,6 +38,7 @@ import { CERTIFIED_WORKSHOPS } from '../data/workshops';
 import { calculateCommission } from '../utils/commission';
 import { getStatusStyle } from '../utils/status';
 import { resolveSafeImageUrl, handleImageError } from '../utils/imageFallback';
+import { generateAndDownloadInspectionIcs } from '../utils/calendar';
 import { toast } from '../hooks/use-toast';
 
 const SellerDashboard = () => {
@@ -223,6 +224,21 @@ const SellerDashboard = () => {
         workshop_name: chosenWorkshop.name,
         workshop_id: chosenWorkshop.id,
       });
+
+      // Generate and download standard .ics calendar event for Apple Calendar, Google Calendar, and Outlook
+      try {
+        generateAndDownloadInspectionIcs({
+          nod: selectedApartadoForSchedule.nod || (selectedApartadoForSchedule.id ? `NOD-${String(selectedApartadoForSchedule.id).replace(/\D/g, '').slice(0, 6).padStart(6, '0')}` : 'NOD-000100'),
+          brand: selectedApartadoForSchedule.moto_brand || selectedApartadoForSchedule.moto?.brand,
+          model: selectedApartadoForSchedule.moto_model || selectedApartadoForSchedule.moto?.model,
+          year: selectedApartadoForSchedule.moto_year || selectedApartadoForSchedule.moto?.year,
+          workshopName: chosenWorkshop.name,
+          workshopAddress: chosenWorkshop.address,
+          dateStr: selectedDate,
+        });
+      } catch (icsErr) {
+        console.error('Error al generar el archivo .ics:', icsErr);
+      }
 
       const appointmentIso = new Date(selectedDate + 'T12:00:00').toISOString();
 
