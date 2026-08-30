@@ -13,7 +13,9 @@ const Footer = () => {
           <div>
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <Link to="/" className="inline-block" aria-label="Motoluv Inicio">
-                <MotoluvLogo className="h-9 md:h-10 w-auto" />
+                <div className="flex items-center justify-center py-1 px-2 rounded bg-black/60 border border-black w-fit hover:border-[#E10600]/40 transition-colors">
+                  <MotoluvLogo className="h-8 w-auto" />
+                </div>
               </Link>
 
               <div className="h-6 w-px bg-black hidden xs:block" aria-hidden="true" />
