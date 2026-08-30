@@ -1,13 +1,14 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, MapPin, Star, Wrench, Heart } from 'lucide-react';
 import { getStatusStyle } from '../utils/status';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { handleImageError, resolveSafeImageUrl } from '../utils/imageFallback';
-import { handleMotoLinkClick } from '../utils/motoNavigation';
+import { trackMotoClick } from '../utils/motoNavigation';
 
 const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const style = getStatusStyle(moto.status);
@@ -41,10 +42,29 @@ const MotoCard = ({ moto, showScore = true, showStatus = false }) => {
     toggleFavorite(moto);
   };
 
+  const handleCardClick = async (e) => {
+    // Si el click fue en un botón o elemento interactivo, no navegar
+    if (e.target && typeof e.target.closest === 'function') {
+      const isInteractive = e.target.closest('button, [data-prevent-nav]');
+      if (isInteractive) return;
+    }
+
+    e.preventDefault();
+    if (!moto?.id) return;
+
+    try {
+      await trackMotoClick(moto.id);
+    } catch (err) {
+      console.warn('Error al registrar click en moto:', err);
+    }
+
+    navigate(`/motos/${moto.id}`);
+  };
+
   return (
     <Link
       to={`/motos/${moto.id}`}
-      onClick={(e) => handleMotoLinkClick(e, moto.id)}
+      onClick={handleCardClick}
       className="moto-card group block bg-gradient-to-b from-[#151517] to-[#0d0d0e] hover:from-[#242428] hover:to-[#141416] border border-black rounded-md overflow-hidden transition-all duration-300 shadow-md hover:shadow-xl relative"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900">
